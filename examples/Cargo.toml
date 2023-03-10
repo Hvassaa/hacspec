@@ -35,4 +35,5 @@ members = [
     "coverage_test",
     "pearlite-example",
     "xor",
+    "pasta",
 ]
