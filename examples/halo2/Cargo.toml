@@ -1,0 +1,20 @@
+[package]
+name = "hacspec-halo2"
+version = "0.1.0"
+authors = ["Lasse Bramer Schmidt <lassebramer@gmail.com>", "Rasmus Tomtava Bjerg <rs.bjerg@gmail.com>"]
+edition = "2018"
+
+[lib]
+path = "src/halo2.rs"
+
+[dependencies]
+hacspec-lib = { path = "../../lib" }
+
+[dev-dependencies]
+quickcheck = "1"
+quickcheck_macros = "1"
+polynomial = "0.2.5"
+
+[[bench]]
+name = "benchmarks"
+harness = false
