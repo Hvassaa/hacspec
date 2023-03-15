@@ -36,4 +36,5 @@ members = [
     "pearlite-example",
     "xor",
     "pasta",
+    "halo2",
 ]
