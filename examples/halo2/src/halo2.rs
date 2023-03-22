@@ -36,20 +36,30 @@ fn mul_scalar_polyx(p1: Seq<Fp>, s: Fp) -> Seq<Fp> {
     res
 }
 
-#[cfg(test)]
-extern crate quickcheck;
-#[cfg(test)]
-#[macro_use(quickcheck)]
-extern crate quickcheck_macros;
-#[cfg(test)]
-extern crate polynomial;
+fn eval_polyx(p1: Seq<Fp>, x: Fp) -> Fp {
+    let mut res = Fp::ZERO();
+
+    for i in 0..p1.len() {
+        res = res + p1[i] * x.exp(i as u32);
+    }
+
+    res
+}
+
+// #[cfg(test)]
+// extern crate quickcheck;
+// #[cfg(test)]
+// #[macro_use(quickcheck)]
+// extern crate quickcheck_macros;
+// #[cfg(test)]
+// extern crate polynomial;
+//
+// #[cfg(test)]
+// use quickcheck::*;
 
 #[cfg(test)]
-use quickcheck::*;
-
-#[cfg(test)]
-#[quickcheck]
-fn test_poly_add() -> bool {
+#[test]
+fn test_poly_add() {
     let v1 = vec![5, 10, 20]
         .iter()
         .map(|e| Fp::from_literal((*e) as u128))
@@ -63,12 +73,14 @@ fn test_poly_add() -> bool {
 
     let p3 = add_polyx(p1, p2);
 
-    p3[0] == Fp::from_literal(60) && p3[1] == Fp::from_literal(10) && p3[2] == Fp::from_literal(20)
+    assert_eq!(p3[0], Fp::from_literal(60));
+    assert_eq!(p3[1], Fp::from_literal(10));
+    assert_eq!(p3[2], Fp::from_literal(20));
 }
 
 #[cfg(test)]
-#[quickcheck]
-fn test_poly_mul() -> bool {
+#[test]
+fn test_poly_mul() {
     let v1 = vec![5, 10, 20]
         .iter()
         .map(|e| Fp::from_literal((*e) as u128))
@@ -77,5 +89,19 @@ fn test_poly_mul() -> bool {
 
     let p3 = mul_scalar_polyx(p1, Fp::TWO());
 
-    p3[0] == Fp::from_literal(10) && p3[1] == Fp::from_literal(20) && p3[2] == Fp::from_literal(40)
+    assert_eq!(p3[0], Fp::from_literal(10));
+    assert_eq!(p3[1], Fp::from_literal(20));
+    assert_eq!(p3[2], Fp::from_literal(40));
+}
+
+#[cfg(test)]
+#[test]
+fn test_poly_eval() {
+    let v1 = vec![5, 10, 20]
+        .iter()
+        .map(|e| Fp::from_literal((*e) as u128))
+        .collect();
+    let p1 = Seq::from_vec(v1);
+
+    assert_eq!(eval_polyx(p1, Fp::TWO()), Fp::from_literal(105));
 }
