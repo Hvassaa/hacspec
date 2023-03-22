@@ -36,7 +36,7 @@ num = "0.4"
 
 pearlite-syn = { git = "https://github.com/xldenis/creusot" } #, rev = "ebe88ac51dc9ceba3d18ede3351ccee4c4b121bd" } # branch = "master"
 
-syn = { version = "*", features = ["full", "extra-traits"] }
+syn = { version = "1.0.103", features = ["full", "extra-traits"] }
 quote = "*"
 proc-macro2 = "*"
 
