@@ -1,5 +1,6 @@
 use hacspec_lib::*;
 use hacspec_pasta::{g1add, g1mul, Fp, FpCurve, G1};
+use hacspec_sha256::{hash, Sha256Digest};
 
 // public_nat_mod!( //Custom Macro - defining a newtype with some functions - well defined macro's have library functions built in
 //     type_name: Fp,
@@ -75,6 +76,21 @@ fn commit_polyx(crs: CRS, a: Seq<Fp>, r: Fp) -> G1 {
     res
 }
 
+fn random_sample_poly(randomness: ByteSeq, size: usize) -> Seq<Fp> {
+    let mut s = Seq::new(size);
+    let mut r = randomness;
+
+    for i in 0..size {
+        let digest = hash(&r);
+        let hex = digest.to_hex();
+        r = ByteSeq::from_hex(&hex);
+
+        s[i] = Fp::from_byte_seq_be(&r);
+    }
+
+    s
+}
+
 // #[cfg(test)]
 // extern crate quickcheck;
 // #[cfg(test)]
@@ -133,4 +149,11 @@ fn test_poly_eval() {
     let p1 = Seq::from_vec(v1);
 
     assert_eq!(eval_polyx(p1, FpCurve::TWO()), FpCurve::from_literal(105));
+}
+
+#[cfg(test)]
+#[test]
+fn test_pr() {
+    let random = ByteSeq::from_hex("1000");
+    println!("{:?}", random_sample_poly(random, 10));
 }
