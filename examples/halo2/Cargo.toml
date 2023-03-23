@@ -9,6 +9,7 @@ path = "src/halo2.rs"
 
 [dependencies]
 hacspec-lib = { path = "../../lib" }
+hacspec-pasta = { path = "../pasta" }
 
 [dev-dependencies]
 quickcheck = "1"

@@ -3,7 +3,7 @@
 use hacspec_lib::*;
 
 public_nat_mod!( //Custom Macro - defining a newtype with some functions - well defined macro's have library functions built in
-    type_name: Fp,
+    type_name: FpCurve,
     type_of_canvas: FpCanvas,
     bit_size_of_field: 255, //381 with 3 extra bits
     modulo_value: "40000000000000000000000000000000224698fc094cf91b992d30ed00000001" //0x40000000000000000000000000000000224698fc094cf91b992d30ed00000001
@@ -13,31 +13,31 @@ bytes!(SerializedFp, 48); //Represent points as arrays for easier testing
 array!(ArrayFp, 6, U64);
 
 public_nat_mod!( //Custom Macro - defining a new type with some functions - well defined macro's have library functions built in
-    type_name: Scalar,
+    type_name: Fp,
     type_of_canvas: ScalarCanvas,
     bit_size_of_field: 256,
-    modulo_value: "8000000000000000000000000000000000000000000000000000000000000000" //0x8000000000000000000000000000000000000000000000000000000000000000
+    modulo_value: "40000000000000000000000000000000224698fc094cf91b992d30ed00000001" //0x40000000000000000000000000000000224698fc094cf91b992d30ed00000001
 );
 
 //bool is "isPointAtInfinity"
-pub type G1 = (Fp, Fp, bool);
-pub type Fp2 = (Fp, Fp); //(10, 8) = (10+8u) : u² = -1
+pub type G1 = (FpCurve, FpCurve, bool);
+pub type Fp2 = (FpCurve, FpCurve); //(10, 8) = (10+8u) : u² = -1
 pub type G2 = (Fp2, Fp2, bool);
 pub type Fp6 = (Fp2, Fp2, Fp2); //v³ = u + 1
 pub type Fp12 = (Fp6, Fp6); //w² = v
 
 /* Arithmetic for FP2 elements */
-pub fn fp2fromfp(n: Fp) -> Fp2 {
-    (n, Fp::ZERO())
+pub fn fp2fromfp(n: FpCurve) -> Fp2 {
+    (n, FpCurve::ZERO())
 }
 
 pub fn fp2zero() -> Fp2 {
-    fp2fromfp(Fp::ZERO())
+    fp2fromfp(FpCurve::ZERO())
 }
 
 pub fn fp2neg(n: Fp2) -> Fp2 {
     let (n1, n2) = n;
-    (Fp::ZERO() - n1, Fp::ZERO() - n2)
+    (FpCurve::ZERO() - n1, FpCurve::ZERO() - n2)
 }
 
 pub fn fp2add(n: Fp2, m: Fp2) -> Fp2 {
@@ -65,13 +65,13 @@ pub fn fp2inv(n: Fp2) -> Fp2 {
     let t0 = n1 * n1 + (n2 * n2);
     let t1 = t0.inv();
     let x1 = n1 * t1;
-    let x2 = Fp::ZERO() - (n2 * t1);
+    let x2 = FpCurve::ZERO() - (n2 * t1);
     (x1, x2)
 }
 
 pub fn fp2conjugate(n: Fp2) -> Fp2 {
     let (n1, n2) = n;
-    (n1, Fp::ZERO() - n2)
+    (n1, FpCurve::ZERO() - n2)
 }
 
 /* Arithmetic for Fp6 elements */
@@ -106,7 +106,7 @@ fn fp6sub(n: Fp6, m: Fp6) -> Fp6 {
 fn fp6mul(n: Fp6, m: Fp6) -> Fp6 {
     let (n1, n2, n3) = n;
     let (m1, m2, m3) = m;
-    let eps = (Fp::ONE(), Fp::ONE()); //1 + u
+    let eps = (FpCurve::ONE(), FpCurve::ONE()); //1 + u
     let t1 = fp2mul(n1, m1);
     let t2 = fp2mul(n2, m2);
     let t3 = fp2mul(n3, m3);
@@ -126,7 +126,7 @@ fn fp6mul(n: Fp6, m: Fp6) -> Fp6 {
 
 fn fp6inv(n: Fp6) -> Fp6 {
     let (n1, n2, n3) = n;
-    let eps = (Fp::ONE(), Fp::ONE()); //1 + u
+    let eps = (FpCurve::ONE(), FpCurve::ONE()); //1 + u
     let t1 = fp2mul(n1, n1); //n1^2
     let t2 = fp2mul(n2, n2); //n2^2
     let t3 = fp2mul(n3, n3); //n3^2
@@ -170,7 +170,7 @@ pub fn fp12sub(n: Fp12, m: Fp12) -> Fp12 {
 pub fn fp12mul(n: Fp12, m: Fp12) -> Fp12 {
     let (n1, n2) = n;
     let (m1, m2) = m;
-    let gamma = (fp2zero(), fp2fromfp(Fp::ONE()), fp2zero()); //0 + v + 0 (c0, c1v, c2v^2)
+    let gamma = (fp2zero(), fp2fromfp(FpCurve::ONE()), fp2zero()); //0 + v + 0 (c0, c1v, c2v^2)
 
     let t1 = fp6mul(n1, m1); //n1 * n2
     let t2 = fp6mul(n2, m2); //n2 * m2
@@ -182,7 +182,7 @@ pub fn fp12mul(n: Fp12, m: Fp12) -> Fp12 {
 
 pub fn fp12inv(n: Fp12) -> Fp12 {
     let (n1, n2) = n;
-    let gamma = (fp2zero(), fp2fromfp(Fp::ONE()), fp2zero()); //0 + v + 0 (c0, c1v, c2v^2)
+    let gamma = (fp2zero(), fp2fromfp(FpCurve::ONE()), fp2zero()); //0 + v + 0 (c0, c1v, c2v^2)
 
     let t1 = fp6mul(n1, n1); //n1^2
     let t2 = fp6mul(n2, n2); //n2^2
@@ -193,8 +193,8 @@ pub fn fp12inv(n: Fp12) -> Fp12 {
     (x, y)
 }
 
-pub fn fp12exp(n: Fp12, k: Scalar) -> Fp12 {
-    let mut c = fp12fromfp6(fp6fromfp2(fp2fromfp(Fp::ONE())));
+pub fn fp12exp(n: Fp12, k: Fp) -> Fp12 {
+    let mut c = fp12fromfp6(fp6fromfp2(fp2fromfp(FpCurve::ONE())));
     for i in 0..256 {
         //starting from second most significant bit
         c = fp12mul(c, c);
@@ -234,18 +234,18 @@ fn g1double_a(p: G1) -> G1 {
     let (x1, y1, _) = p;
 
     let x12 = x1.exp(2u32);
-    let xovery = (Fp::from_literal(3u128) * x12) * (Fp::TWO() * y1).inv();
-    let x3 = xovery.exp(2u32) - Fp::TWO() * x1;
+    let xovery = (FpCurve::from_literal(3u128) * x12) * (FpCurve::TWO() * y1).inv();
+    let x3 = xovery.exp(2u32) - FpCurve::TWO() * x1;
     let y3 = xovery * (x1 - x3) - y1;
     (x3, y3, false)
 }
 /* Wrapper functions with Point of Infinity */
 pub fn g1double(p: G1) -> G1 {
     let (_x1, y1, inf1) = p;
-    if y1 != Fp::ZERO() && !inf1 {
+    if y1 != FpCurve::ZERO() && !inf1 {
         g1double_a(p)
     } else {
-        (Fp::ZERO(), Fp::ZERO(), true)
+        (FpCurve::ZERO(), FpCurve::ZERO(), true)
     }
 }
 
@@ -263,18 +263,18 @@ pub fn g1add(p: G1, q: G1) -> G1 {
             if p == q {
                 g1double(p)
             } else {
-                if !(x1 == x2 && y1 == Fp::ZERO() - y2) {
+                if !(x1 == x2 && y1 == FpCurve::ZERO() - y2) {
                     g1add_a(p, q)
                 } else {
-                    (Fp::ZERO(), Fp::ZERO(), true)
+                    (FpCurve::ZERO(), FpCurve::ZERO(), true)
                 }
             }
         }
     }
 }
 
-pub fn g1mul(m: Scalar, p: G1) -> G1 {
-    let mut t = (Fp::ZERO(), Fp::ZERO(), true);
+pub fn g1mul(m: Fp, p: G1) -> G1 {
+    let mut t = (FpCurve::ZERO(), FpCurve::ZERO(), true);
     for i in 0..256 {
         //starting from second most significant bit
         t = g1double(t);
@@ -287,7 +287,7 @@ pub fn g1mul(m: Scalar, p: G1) -> G1 {
 
 pub fn g1neg(p: G1) -> G1 {
     let (x, y, inf) = p;
-    (x, Fp::ZERO() - y, inf)
+    (x, FpCurve::ZERO() - y, inf)
 }
 
 /* Arithmetic in G2 */
@@ -312,11 +312,11 @@ fn g2double_a(p: G2) -> G2 {
     let (x1, y1, _) = p;
 
     let x12 = fp2mul(x1, x1);
-    let t1 = fp2mul(fp2fromfp(Fp::from_literal(3u128)), x12);
-    let t2 = fp2inv(fp2mul(fp2fromfp(Fp::TWO()), y1));
+    let t1 = fp2mul(fp2fromfp(FpCurve::from_literal(3u128)), x12);
+    let t2 = fp2inv(fp2mul(fp2fromfp(FpCurve::TWO()), y1));
     let xovery = fp2mul(t1, t2);
     let t1 = fp2mul(xovery, xovery);
-    let t2 = fp2mul(fp2fromfp(Fp::TWO()), x1);
+    let t2 = fp2mul(fp2fromfp(FpCurve::TWO()), x1);
     let x3 = fp2sub(t1, t2);
     let t1 = fp2sub(x1, x3);
     let t2 = fp2mul(xovery, t1);
@@ -357,7 +357,7 @@ pub fn g2add(p: G2, q: G2) -> G2 {
     }
 }
 
-pub fn g2mul(m: Scalar, p: G2) -> G2 {
+pub fn g2mul(m: Fp, p: G2) -> G2 {
     let mut t = (fp2zero(), fp2zero(), true);
     for i in 0..256 {
         //starting from second most significant bit
@@ -385,8 +385,8 @@ fn twist(p: G1) -> (Fp12, Fp12) {
 //Line double used in ate-pairing
 fn line_double_p(r: G2, p: G1) -> Fp12 {
     let (r0, r1, _) = r;
-    let a = fp2mul(fp2fromfp(Fp::from_literal(3u128)), fp2mul(r0, r0));
-    let a = fp2mul(a, fp2inv(fp2mul(fp2fromfp(Fp::TWO()), r1)));
+    let a = fp2mul(fp2fromfp(FpCurve::from_literal(3u128)), fp2mul(r0, r0));
+    let a = fp2mul(a, fp2inv(fp2mul(fp2fromfp(FpCurve::TWO()), r1)));
     let b = fp2sub(r1, fp2mul(a, r0));
     let a = fp12fromfp6(fp6fromfp2(a));
     let b = fp12fromfp6(fp6fromfp2(b));
@@ -431,7 +431,7 @@ fn frobenius(f: Fp12) -> Fp12 {
         ]
     ));
     let c1 = ArrayFp::to_le_bytes(&c1);
-    let c1 = Fp::from_byte_seq_le(c1);
+    let c1 = FpCurve::from_byte_seq_le(c1);
 
     //00FC3E2B36C4E032 88E9E902231F9FB8 54A14787B6C7B36F EC0C8EC971F63C5F 282D5AC14D6C7EC2 2CF78A126DDC4AF3
     let c2 = ArrayFp(secret_array!(
@@ -446,7 +446,7 @@ fn frobenius(f: Fp12) -> Fp12 {
         ]
     ));
     let c2 = ArrayFp::to_le_bytes(&c2);
-    let c2 = Fp::from_byte_seq_le(c2);
+    let c2 = FpCurve::from_byte_seq_le(c2);
 
     // gamma11 = (1+u)^((p-1) / 6)
     let gamma11 = (c1, c2);
@@ -471,8 +471,8 @@ fn final_exponentiation(f: Fp12) -> Fp12 {
     let fp8 = frobenius(frobenius(fp6_1)); //f^((p⁶-1)p²)
     let f = fp12mul(fp8, fp6_1); // f = f^((p⁶-1)(p²+1))
 
-    let u = Scalar::from_literal(0xd201000000010000u128); //-u
-    let u_half = Scalar::from_literal(0x6900800000008000u128); //u/2
+    let u = Fp::from_literal(0xd201000000010000u128); //-u
+    let u_half = Fp::from_literal(0x6900800000008000u128); //u/2
 
     //Algorithm 2 from https://eprint.iacr.org/2016/130.pdf
     //Conjugations whenever u is used, since u is actually negative - and conjugation is enough (no inversion needed)
@@ -512,9 +512,9 @@ fn final_exponentiation(f: Fp12) -> Fp12 {
 }
 //ate-pairing used for BLS
 pub fn pairing(p: G1, q: G2) -> Fp12 {
-    let t = Scalar::from_literal(0xd201000000010000u128);
+    let t = Fp::from_literal(0xd201000000010000u128);
     let mut r = q;
-    let mut f = fp12fromfp6(fp6fromfp2(fp2fromfp(Fp::ONE())));
+    let mut f = fp12fromfp6(fp6fromfp2(fp2fromfp(FpCurve::ONE())));
     for i in 1..64 {
         let lrr = line_double_p(r, p);
         r = g2double(r);
@@ -543,8 +543,8 @@ use quickcheck::*;
 
 /* Arbitrary Implementation used for Property Based Tests */
 #[cfg(test)]
-impl Arbitrary for Fp {
-    fn arbitrary(g: &mut Gen) -> Fp {
+impl Arbitrary for FpCurve {
+    fn arbitrary(g: &mut Gen) -> FpCurve {
         let mut a: [u64; 6] = [0; 6];
         for i in 0..6 {
             a[i] = u64::arbitrary(g);
@@ -554,14 +554,14 @@ impl Arbitrary for Fp {
             let val: u64 = a[i];
             b[(i * 8)..((i + 1) * 8)].copy_from_slice(&(val.to_le_bytes()));
         }
-        Fp::from_byte_seq_le(Seq::<U8>::from_public_slice(&b))
+        FpCurve::from_byte_seq_le(Seq::<U8>::from_public_slice(&b))
     }
 }
 
 /* Arbitrary Implementation used for Property Based Tests */
 #[cfg(test)]
-impl Arbitrary for Scalar {
-    fn arbitrary(g: &mut Gen) -> Scalar {
+impl Arbitrary for Fp {
+    fn arbitrary(g: &mut Gen) -> Fp {
         let mut a: [u64; 4] = [0; 4];
         for i in 0..4 {
             a[i] = u64::arbitrary(g);
@@ -571,7 +571,7 @@ impl Arbitrary for Scalar {
             let val: u64 = a[i];
             b[(i * 8)..((i + 1) * 8)].copy_from_slice(&(val.to_le_bytes()));
         }
-        Scalar::from_byte_seq_le(Seq::<U8>::from_public_slice(&b))
+        Fp::from_byte_seq_le(Seq::<U8>::from_public_slice(&b))
     }
 }
 
@@ -580,7 +580,7 @@ impl Arbitrary for Scalar {
 #[quickcheck] //Using the fp arbitraty implementation from above to generate fp2 elements.
 fn test_fp2_prop_add_neg(a: Fp2) -> bool {
     let b = fp2neg(a);
-    fp2fromfp(Fp::ZERO()) == fp2add(a, b)
+    fp2fromfp(FpCurve::ZERO()) == fp2add(a, b)
 }
 
 //Generating random numbers, taking inverse and multiplying - checking that random element times inverse gives one
@@ -589,15 +589,15 @@ fn test_fp2_prop_add_neg(a: Fp2) -> bool {
 #[quickcheck] //Using the fp arbitraty implementation from above to generate fp2 elements.
 fn test_fp2_prop_mul_inv(a: Fp2) -> bool {
     let b = fp2inv(a);
-    fp2fromfp(Fp::ONE()) == fp2mul(a, b)
+    fp2fromfp(FpCurve::ONE()) == fp2mul(a, b)
 }
 
 #[cfg(test)]
 #[cfg(proof)]
 #[quickcheck] //Using the fp arbitraty implementation from above to generate fp2 elements.
 fn test_extraction_issue() -> bool {
-    let b = fp2inv((Fp::ONE(), Fp::ONE()));
-    fp2fromfp(Fp::ONE()) == fp2mul((Fp::ONE(), Fp::ONE()), b)
+    let b = fp2inv((FpCurve::ONE(), FpCurve::ONE()));
+    fp2fromfp(FpCurve::ONE()) == fp2mul((FpCurve::ONE(), FpCurve::ONE()), b)
 }
 
 //Fp6 tests
@@ -606,7 +606,7 @@ fn test_extraction_issue() -> bool {
 #[quickcheck] //Using the fp arbitraty implementation from above to generate fp2 elements.
 fn test_fp6_prop_mul_inv(a: Fp6) -> bool {
     let b = fp6inv(a);
-    fp6fromfp2(fp2fromfp(Fp::ONE())) == fp6mul(a, b)
+    fp6fromfp2(fp2fromfp(FpCurve::ONE())) == fp6mul(a, b)
 }
 
 #[cfg(test)]
@@ -614,7 +614,7 @@ fn test_fp6_prop_mul_inv(a: Fp6) -> bool {
 #[quickcheck] //Using the fp arbitraty implementation from above to generate fp2 elements.
 fn test_fp6_prop_add_neg(a: Fp6) -> bool {
     let b = fp6neg(a);
-    fp6fromfp2(fp2fromfp(Fp::ZERO())) == fp6add(a, b)
+    fp6fromfp2(fp2fromfp(FpCurve::ZERO())) == fp6add(a, b)
 }
 
 //Fp12 tests
@@ -677,12 +677,12 @@ fn test_g1_arithmetic() {
 fn test_g1_mul_standard()
 {
     let g = g1();
-    let m = Scalar::ONE();
+    let m = Fp::ONE();
     assert_eq!(g, g1mul(m, g));
-    let m = Scalar::from_literal(2u128);
+    let m = Fp::from_literal(2u128);
     let g2 = g1double(g);
     assert_eq!(g2, g1mul(m, g));
-    let m = Scalar::from_literal(3u128);
+    let m = Fp::from_literal(3u128);
     let g3 = g1add(g, g2);
     assert_eq!(g3, g1mul(m, g));
 }
@@ -692,7 +692,7 @@ fn test_g1_mul_standard()
 fn test_g1_mul_zero()
 {
     let g = g1();
-    let m = Scalar::ZERO();
+    let m = Fp::ZERO();
     let h = g1mul(m, g);
     assert!(h.2);
 } 
@@ -700,36 +700,36 @@ fn test_g1_mul_zero()
 #[cfg(test)]
 #[test]
 fn test_g1_mul_prop() {
-    fn test_g1_mul(a: Scalar) -> bool {
+    fn test_g1_mul(a: Fp) -> bool {
         let g = g1mul(a, g1());
         let r =
-            Scalar::from_hex("40000000000000000000000000000000224698fc0994a8dd8c46eb2100000001"); //r
+            Fp::from_hex("40000000000000000000000000000000224698fc0994a8dd8c46eb2100000001"); //r
         let h = g1mul(r, g);
         h.2
     }
     //Only needing 5 successes, slow because affine
     QuickCheck::new()
         .tests(5)
-        .quickcheck(test_g1_mul as fn(Scalar) -> bool);
+        .quickcheck(test_g1_mul as fn(Fp) -> bool);
 }
 
 #[cfg(test)]
 #[test]
 fn test_g1_add_double_equiv() {
-    fn test_g1_mul(a: Scalar) -> bool {
+    fn test_g1_mul(a: Fp) -> bool {
         let g = g1mul(a, g1());
         g1add(g, g) == g1double(g)
     }
     //Only needing 5 successes, slow because affine
     QuickCheck::new()
         .tests(5)
-        .quickcheck(test_g1_mul as fn(Scalar) -> bool);
+        .quickcheck(test_g1_mul as fn(Fp) -> bool);
 }
 
 #[cfg(test)]
 #[test]
 fn test_g1_add_double_special_case() {
-    let g = (Fp::TWO(), Fp::ZERO(), false);
+    let g = (FpCurve::TWO(), FpCurve::ZERO(), false);
     assert_eq!(g1add(g, g), g1double(g));
 }
 
@@ -813,8 +813,8 @@ fn test_g1_add_double_special_case() {
 //THIS IS A CORRECT G1 GENERATOR :)
 #[cfg(test)]
 fn g1() -> G1 {
-    (Fp::from_hex("40000000000000000000000000000000224698fc094cf91b992d30ed00000000"),
-     Fp::from_hex("02"), false)
+    (FpCurve::from_hex("40000000000000000000000000000000224698fc094cf91b992d30ed00000000"),
+     FpCurve::from_hex("02"), false)
 }
 
 //THIS IS A CORRECT G2 GENERATOR :)
@@ -830,7 +830,7 @@ fn g1() -> G1 {
 #[cfg(test)]
 #[test]
 fn test_g1_generator() {
-    let r = Scalar::from_hex("40000000000000000000000000000000224698fc0994a8dd8c46eb2100000001"); //r
+    let r = Fp::from_hex("40000000000000000000000000000000224698fc0994a8dd8c46eb2100000001"); //r
 
     let aa = g1();
     let dd = g1mul(r, aa);
