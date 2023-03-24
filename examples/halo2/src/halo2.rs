@@ -9,6 +9,10 @@ use hacspec_sha256::{hash, Sha256Digest};
 //     modulo_value: "40000000000000000000000000000000224698fc094cf91b992d30ed00000001" //0x40000000000000000000000000000000224698fc094cf91b992d30ed00000001
 // );
 
+fn halo2() {
+    // step 1
+}
+
 fn add_polyx(p1: Seq<FpCurve>, p2: Seq<FpCurve>) -> Seq<FpCurve> {
     let mut res;
     let short_len;
@@ -48,6 +52,12 @@ fn eval_polyx(p1: Seq<FpCurve>, x: FpCurve) -> FpCurve {
     res
 }
 
+struct PublicParams(
+    Seq<G1>, // G: G in G^d
+    G1,      // U in G
+    G1,      // W in G
+);
+
 struct CRS(
     // G,  // G: group of prime-order p
     Seq<G1>, // g: g in G^d (vector of random elems.)
@@ -55,17 +65,53 @@ struct CRS(
              // Fp, // Fp: finite field order p
 );
 
-// multiscalar multiplicatoin
-fn msm(a: Seq<Fp>, G: Seq<G1>) -> G1 {
-    let mut res = g1mul(a[0], G[0]);
-    for i in 1..a.len() {
-            res = g1add(res, g1mul(a[i], G[i]));
+// Term for multivariate polynomials
+#[derive(Default, Clone)]
+struct Term(
+    Fp,       // Coefficient
+    Seq<u32>, // exponents, s.t. entry i is the i'th variable's exponent
+);
+
+fn eval_multi_term(term: (Fp,Seq<u32>), inputs: &Seq<Fp>) -> Fp {
+    let (coef,powers) = term;
+    let mut res = coef;//First entry in a term sequence is the Coefficient
+
+    for i in 0..powers.len() {
+        let power = powers[i];
+        let input = inputs[i];
+        let val = input.exp(power);
+        res = res * val;
+    }
+    return res;
+}
+
+fn eval_multi_polyx(p1: Seq<(Fp, Seq<u32>)>, inputs: Seq<Fp>) -> Fp {
+    let mut res = Fp::ZERO();
+    for i in 0..p1.len() {
+        let term = p1[i].clone();
+        let term_val = eval_multi_term(term, &inputs);
+        res = res + term_val;
+        // res = res + p1[i] * x.exp(i as u32);
     }
 
     res
 }
 
-// Pedersen vector commitment
+/* Multiscalar multiplicatoin
+ * Auxiliry function for Pedersen vector commitment
+ */
+fn msm(a: Seq<Fp>, g: Seq<G1>) -> G1 {
+    let mut res = g1mul(a[0], g[0]);
+    for i in 1..a.len() {
+        res = g1add(res, g1mul(a[i], g[i]));
+    }
+
+    res
+}
+
+/* 1,3
+ * Pedersen vector commitment
+*/
 fn commit_polyx(crs: CRS, a: Seq<Fp>, r: Fp) -> G1 {
     let CRS(G, H) = crs;
 
@@ -76,6 +122,9 @@ fn commit_polyx(crs: CRS, a: Seq<Fp>, r: Fp) -> G1 {
     res
 }
 
+/* 3 (in protocol)
+ * Generates a random polynomial from given randomness using iterating hashing
+ */
 fn random_sample_poly(randomness: ByteSeq, size: usize) -> Seq<Fp> {
     let mut s = Seq::new(size);
     let mut r = randomness;
@@ -90,6 +139,8 @@ fn random_sample_poly(randomness: ByteSeq, size: usize) -> Seq<Fp> {
 
     s
 }
+
+fn open() {}
 
 // #[cfg(test)]
 // extern crate quickcheck;
