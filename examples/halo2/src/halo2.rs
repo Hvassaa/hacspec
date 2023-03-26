@@ -65,12 +65,10 @@ struct CRS(
              // Fp, // Fp: finite field order p
 );
 
-// Term for multivariate polynomials
-#[derive(Default, Clone)]
-struct Term(
-    Fp,       // Coefficient
-    Seq<u32>, // exponents, s.t. entry i is the i'th variable's exponent
-);
+enum PolyInput {
+    NoEval,
+    Eval(Fp)
+}
 
 fn eval_multi_term(term: (Fp,Seq<u32>), inputs: &Seq<Fp>) -> Fp {
     let (coef,powers) = term;
@@ -93,7 +91,6 @@ fn eval_multi_polyx(p1: Seq<(Fp, Seq<u32>)>, inputs: Seq<Fp>) -> Fp {
         res = res + term_val;
         // res = res + p1[i] * x.exp(i as u32);
     }
-
     res
 }
 
@@ -207,4 +204,21 @@ fn test_poly_eval() {
 fn test_pr() {
     let random = ByteSeq::from_hex("1000");
     println!("{:?}", random_sample_poly(random, 10));
+}
+
+#[cfg(test)]
+#[test]
+fn test_eval_multi_poly() {
+    // 1 + 3xy + 5x*y^2 + 2x^2
+    let t1 = (Fp::from_literal(1), Seq::from_vec(vec![0, 0]));
+    let t2 = (Fp::from_literal(3), Seq::from_vec(vec![1, 1]));
+    let t3 = (Fp::from_literal(5), Seq::from_vec(vec![1, 2]));
+    let t4 = (Fp::from_literal(2), Seq::from_vec(vec![2, 0]));
+
+    let p = Seq::from_vec(vec![t1, t2, t3, t4]);
+    let i = Seq::from_vec(vec![Fp::TWO(), Fp::from_literal(5)]);
+
+    let evaluation = eval_multi_polyx(p, i);
+
+    assert_eq!(evaluation, Fp::from_literal(289));
 }
