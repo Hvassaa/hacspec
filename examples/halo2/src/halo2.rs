@@ -65,32 +65,122 @@ struct CRS(
              // Fp, // Fp: finite field order p
 );
 
-enum PolyInput {
-    NoEval,
-    Eval(Fp)
-}
+// primarily for multivariate polys
+type Term = (Fp, Seq<u32>);
+type InputVar = (bool, Fp);
 
-fn eval_multi_term(term: (Fp,Seq<u32>), inputs: &Seq<Fp>) -> Fp {
-    let (coef,powers) = term;
-    let mut res = coef;//First entry in a term sequence is the Coefficient
+fn reduce_multi_term(term: Term, inputs: &Seq<InputVar>, new_size: usize) -> Term {
+    let (coef, powers) = term;
 
+    let mut new_coef = coef; //First entry in a term sequence is the Coefficient
+    let mut new_powers = Seq::new(new_size);
+
+    let mut idx = 0;
     for i in 0..powers.len() {
         let power = powers[i];
         let input = inputs[i];
-        let val = input.exp(power);
-        res = res * val;
+
+        match input {
+            (true, p) => {
+                let val = p.exp(power);
+                new_coef = new_coef * val;
+            }
+            (false, _) => {
+                new_powers[idx] = power;
+                idx += 1;
+            }
+        }
     }
-    return res;
+
+    return (new_coef, new_powers);
 }
 
-fn eval_multi_polyx(p1: Seq<(Fp, Seq<u32>)>, inputs: Seq<Fp>) -> Fp {
-    let mut res = Fp::ZERO();
-    for i in 0..p1.len() {
-        let term = p1[i].clone();
-        let term_val = eval_multi_term(term, &inputs);
-        res = res + term_val;
-        // res = res + p1[i] * x.exp(i as u32);
+/*
+ * p1 is the polynomial, expressed as a sequence of 2-tuples.
+ *
+ * Each tuple has the coefficient and a sequence of powers, where the i'th entry is the power of
+ * the i'th variable in this term
+ *
+ * inputs is input values of for the variables. The boolean indicates whether the corresponding
+ * variable should be evaluated or not
+ *
+ * the length of inputs and all sequences of powers in p1 should be equal
+ *
+ * The output is a new polynomial, with the evaluated variables removed. If all variables are
+ * evaluated there will be a single term, with a coefficient (which is the final evaluation) and an
+ * empty sequence of powers (i.e. no variables)
+ */
+fn reduce_multi_poly(p1: Seq<(Fp, Seq<u32>)>, inputs: Seq<InputVar>) -> Seq<Term> {
+    // only checking the term for brevity
+    assert_eq!(
+        p1.iter().next().unwrap().1.len(),
+        inputs.len(),
+        "no. of inputs should match length of variables"
+    );
+
+    let mut constant = Fp::ZERO();
+    let mut unevaluated_variables = 0;
+    for i in 0..inputs.len() {
+        let input = inputs[i];
+        match input {
+            (false, _) => {
+                unevaluated_variables += 1;
+            }
+            _ => (),
+        }
     }
+    let mut new_poly = Seq::new(p1.len());
+    let mut terms_added = 0;
+    if unevaluated_variables == 0 {
+        //sum results
+        for i in 0..p1.len() {
+            let term = p1[i].clone();
+            let (coef, _) = reduce_multi_term(term, &inputs, unevaluated_variables);
+            constant = constant + coef;
+        }
+    } else {
+        //check if term can be evaluated, else insert term in new poly
+        for i in 0..p1.len() {
+            let term = p1[i].clone();
+            let (coef, powers) = reduce_multi_term(term, &inputs, unevaluated_variables);
+            let mut all_powers_zero = true;
+            for i in 0..powers.len() {
+                if powers[i] != 0 {
+                    all_powers_zero = false;
+                }
+            }
+            if all_powers_zero {
+                constant = constant + coef;
+            } else {
+                new_poly[terms_added] = (coef, powers);
+                terms_added += 1;
+            }
+        }
+    }
+    let constant_term = (constant, Seq::<u32>::new(unevaluated_variables));
+    new_poly[terms_added] = constant_term;
+
+    new_poly.slice(0, terms_added + 1)
+}
+
+/*
+ * evaluate a multivariate polynomial
+ *
+ * p1 is the polynomial, expressed as a sequence of 2-tuples.
+ * Each tuple has the coefficient and a sequence of powers, where the i'th entry is the power of
+ * the i'th variable in this term
+ *
+ * inputs are a sequence of field elements, where the i'th entry is the value for the i'th variable
+ *
+ * outputs a field element, which is the evaluation of the polynomial
+ */
+fn eval_multi_poly(p1: Seq<Term>, inputs: Seq<Fp>) -> Fp {
+    let mut inputvars = Seq::new(inputs.len());
+    for i in 0..inputs.len() {
+        inputvars[i] = (true, inputs[i]);
+    }
+    let (res, _) = reduce_multi_poly(p1, inputvars)[0];
+
     res
 }
 
@@ -208,17 +298,59 @@ fn test_pr() {
 
 #[cfg(test)]
 #[test]
-fn test_eval_multi_poly() {
-    // 1 + 3xy + 5x*y^2 + 2x^2
+fn test_reduce_multi_poly() {
+    // 1 + 3xy + 5x*y^2 + 2x^2 + 2y
     let t1 = (Fp::from_literal(1), Seq::from_vec(vec![0, 0]));
     let t2 = (Fp::from_literal(3), Seq::from_vec(vec![1, 1]));
     let t3 = (Fp::from_literal(5), Seq::from_vec(vec![1, 2]));
     let t4 = (Fp::from_literal(2), Seq::from_vec(vec![2, 0]));
+    let t5 = (Fp::from_literal(2), Seq::from_vec(vec![0, 1]));
 
-    let p = Seq::from_vec(vec![t1, t2, t3, t4]);
+    // the multivariate poly
+    let p = Seq::from_vec(vec![t1, t2, t3, t4, t5]);
+    // input value for y (2nd var), do not eval for x (1st var)
+    let i1 = Seq::from_vec(vec![(false, Fp::ZERO()), (true, Fp::from_literal(5))]);
+    // check that there are 5 terms, t1 through t5
+    assert_eq!(p.len(), 5);
+
+    // evaluate the polynomial with the y valye
+    let evaluation1 = reduce_multi_poly(p, i1);
+
+    // the last term (2y) becomes constant and should be joined with the other constant (1)
+    // so there should be one less term
+    assert_eq!(evaluation1.len(), 4);
+
+    // input 2 for x (1st var)
+    let i2 = Seq::from_vec(vec![(true, Fp::TWO())]);
+    let evaluation2 = reduce_multi_poly(evaluation1, i2);
+
+    // check that there is only 1 term left (a constant)
+    assert_eq!(evaluation2.len(), 1);
+    let (res, powers) = evaluation2.iter().next().unwrap();
+    // this constant is the final evaluation of the poly
+    assert_eq!(*res, Fp::from_literal(299));
+    // no more vars, no more powers
+    assert_eq!(powers.len(), 0);
+}
+
+#[cfg(test)]
+#[test]
+fn test_eval_multi_poly() {
+    // 1 + 3xy + 5x*y^2 + 2x^2 + 2y
+    let t1 = (Fp::from_literal(1), Seq::from_vec(vec![0, 0]));
+    let t2 = (Fp::from_literal(3), Seq::from_vec(vec![1, 1]));
+    let t3 = (Fp::from_literal(5), Seq::from_vec(vec![1, 2]));
+    let t4 = (Fp::from_literal(2), Seq::from_vec(vec![2, 0]));
+    let t5 = (Fp::from_literal(2), Seq::from_vec(vec![0, 1]));
+
+    // the multivariate poly
+    let p = Seq::from_vec(vec![t1, t2, t3, t4, t5]);
+    // input values x=2 and y=5
     let i = Seq::from_vec(vec![Fp::TWO(), Fp::from_literal(5)]);
-
-    let evaluation = eval_multi_polyx(p, i);
-
-    assert_eq!(evaluation, Fp::from_literal(289));
+    // check that there are 5 terms, t1 through t5
+    assert_eq!(p.len(), 5);
+    // evaluate the poly
+    let res = eval_multi_poly(p, i);
+    // check the result
+    assert_eq!(res, Fp::from_literal(299));
 }
