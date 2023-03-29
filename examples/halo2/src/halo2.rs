@@ -10,7 +10,18 @@ use hacspec_sha256::{hash, Sha256Digest};
 // );
 
 fn halo2() {
+    // dummy
+    let a: Seq<Seq<Term>> = Seq::new(0);
+    let crs = CRS(Seq::new(0), G1::default());
+    let r = Fp::default();
+
     // step 1
+    for j in 0..a.len() {
+        let aj = &a[j];
+        let aj_prime = multi_to_uni_poly(aj, Seq::new(0)); // dummy inputs
+        let Aj = commit_polyx(&crs, aj_prime, r);
+    }
+
 }
 
 fn add_polyx(p1: Seq<FpCurve>, p2: Seq<FpCurve>) -> Seq<FpCurve> {
@@ -192,7 +203,7 @@ fn eval_multi_poly(p1: Seq<Term>, inputs: Seq<Fp>) -> Fp {
 /* Multiscalar multiplicatoin
  * Auxiliry function for Pedersen vector commitment
  */
-fn msm(a: Seq<Fp>, g: Seq<G1>) -> G1 {
+fn msm(a: Seq<Fp>, g: &Seq<G1>) -> G1 {
     let mut res = g1mul(a[0], g[0]);
     for i in 1..a.len() {
         res = g1add(res, g1mul(a[i], g[i]));
@@ -204,11 +215,11 @@ fn msm(a: Seq<Fp>, g: Seq<G1>) -> G1 {
 /* 1.3 (in protocol)
  * Pedersen vector commitment
 */
-fn commit_polyx(crs: CRS, a: Seq<Fp>, r: Fp) -> G1 {
-    let CRS(G, H) = crs;
+fn commit_polyx(crs: &CRS, a: Seq<Fp>, r: Fp) -> G1 {
+    let CRS(g, h) = crs;
 
-    let lhs = msm(a, G);
-    let rhs = g1mul(r, H);
+    let lhs = msm(a, g);
+    let rhs = g1mul(r, *h);
     let res = g1add(lhs, rhs);
 
     res
@@ -247,7 +258,7 @@ fn random_sample_poly(randomness: ByteSeq, size: usize) -> Seq<Fp> {
  * returns a univariate polynomial, represented as a sequence of field elements, where entry i, has
  * degree i in the variable and the coefficient is the entry
  */
-fn multi_to_uni_poly(p1: Seq<Term>, inputs: Seq<InputVar>) -> Seq<Fp> {
+fn multi_to_uni_poly(p1: &Seq<Term>, inputs: Seq<InputVar>) -> Seq<Fp> {
     // assert exactly one var. remains un-evaled
     assert_eq!(
         inputs.iter().map(|f| f.0).filter(|f| *f).count(),
@@ -424,7 +435,7 @@ fn test_multi_to_uni_poly() {
     // input value for y (2nd var), do not eval for x (1st var)
     let i1 = Seq::from_vec(vec![(false, Fp::ZERO()), (true, Fp::from_literal(5))]);
     // 11 + 140x + 2x^2
-    let u = multi_to_uni_poly(p, i1);
+    let u = multi_to_uni_poly(&p, i1);
     assert_eq!(u[0], Fp::from_literal(11));
     assert_eq!(u[1], Fp::from_literal(140));
     assert_eq!(u[2], Fp::from_literal(2));
