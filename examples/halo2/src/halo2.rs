@@ -227,6 +227,44 @@ fn random_sample_poly(randomness: ByteSeq, size: usize) -> Seq<Fp> {
     s
 }
 
+fn multi_to_uni_poly(p1: Seq<Term>, inputs: Seq<InputVar>) -> Seq<Fp> {
+    assert_eq!(
+        inputs.iter().map(|f| f.0).filter(|f| *f).count(),
+        inputs.len() - 1
+    );
+
+    let a = reduce_multi_poly(p1.clone(), inputs);
+
+    let mut max = 0;
+    for i in a.iter().map(|f| f.1[0] as usize) {
+        if i > max {
+            max = i;
+        }
+    }
+
+    let mut s = Seq::new(max + 1);
+
+    for i in 0..max + 1 {
+        let aux = p1
+            .iter()
+            .filter(|f| f.1[0] == (i as u32))
+            .map(|f| {
+                println!("{}", f.0);
+                return f.0;
+            })
+            .reduce(|acc, cur| acc + cur);
+        match aux {
+            Some(f) => {
+                println!("f: {}", f);
+                s[i] = f;
+            }
+            _ => s[i] = Fp::from_literal(0),
+        }
+    }
+
+    s
+}
+
 fn open() {}
 
 // #[cfg(test)]
@@ -293,7 +331,6 @@ fn test_poly_eval() {
 #[test]
 fn test_pr() {
     let random = ByteSeq::from_hex("1000");
-    println!("{:?}", random_sample_poly(random, 10));
 }
 
 #[cfg(test)]
@@ -353,4 +390,32 @@ fn test_eval_multi_poly() {
     let res = eval_multi_poly(p, i);
     // check the result
     assert_eq!(res, Fp::from_literal(299));
+}
+
+#[cfg(test)]
+#[test]
+fn test_multi_to_uni_poly() {
+    // 1 + 3xy + 5x*y^2 + 2x^2 + 2y
+    let t1 = (Fp::from_literal(1), Seq::from_vec(vec![0, 0]));
+    let t2 = (Fp::from_literal(3), Seq::from_vec(vec![1, 1]));
+    let t3 = (Fp::from_literal(5), Seq::from_vec(vec![1, 2]));
+    let t4 = (Fp::from_literal(2), Seq::from_vec(vec![2, 0]));
+    let t5 = (Fp::from_literal(2), Seq::from_vec(vec![0, 1]));
+
+    // the multivariate poly
+    let p = Seq::from_vec(vec![t1, t2, t3, t4, t5]);
+    // input value for y (2nd var), do not eval for x (1st var)
+    let i1 = Seq::from_vec(vec![(false, Fp::ZERO()), (true, Fp::from_literal(5))]);
+    // 11 + 140x + 2x^2
+    // 11 + 140x + 2x^2
+    // 1 + 3xy + 5x*y^2 + 2x^2 + 2y
+    let u2 = reduce_multi_poly(p.clone(), i1.clone());
+    let u = multi_to_uni_poly(p, i1);
+    println!("------------------------");
+    println!("{:?}", u);
+    println!("{:?}", u2);
+    assert_eq!(u[0], Fp::from_literal(11));
+    assert_eq!(u[1], Fp::from_literal(140));
+    // 5
+    assert_eq!(u[2], Fp::from_literal(2));
 }
