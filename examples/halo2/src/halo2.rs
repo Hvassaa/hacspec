@@ -69,6 +69,11 @@ struct CRS(
 type Term = (Fp, Seq<u32>);
 type InputVar = (bool, Fp);
 
+/*
+ * Helper function for reduce_multi_poly
+ *
+ * evaluates a term with on and with the specified variable inputs
+ */
 fn reduce_multi_term(term: Term, inputs: &Seq<InputVar>, new_size: usize) -> Term {
     let (coef, powers) = term;
 
@@ -111,7 +116,7 @@ fn reduce_multi_term(term: Term, inputs: &Seq<InputVar>, new_size: usize) -> Ter
  * empty sequence of powers (i.e. no variables)
  */
 fn reduce_multi_poly(p1: Seq<(Fp, Seq<u32>)>, inputs: Seq<InputVar>) -> Seq<Term> {
-    // only checking the term for brevity
+    // only checking the 1st term for brevity
     assert_eq!(
         p1.iter().next().unwrap().1.len(),
         inputs.len(),
@@ -196,7 +201,7 @@ fn msm(a: Seq<Fp>, g: Seq<G1>) -> G1 {
     res
 }
 
-/* 1,3
+/* 1.3 (in protocol)
  * Pedersen vector commitment
 */
 fn commit_polyx(crs: CRS, a: Seq<Fp>, r: Fp) -> G1 {
@@ -227,6 +232,21 @@ fn random_sample_poly(randomness: ByteSeq, size: usize) -> Seq<Fp> {
     s
 }
 
+/*
+ * 1.1 (in protocol)
+ * evaluate a multivariate polynomial in variables such that it becomes a univariate polynomial
+ *
+ * p1 is the polynomial, expressed as a sequence of 2-tuples.
+ *
+ * Each tuple has the coefficient and a sequence of powers, where the i'th entry is the power of
+ * the i'th variable in this term
+ *
+ * inputs is input values of for the variables. The boolean indicates whether the corresponding
+ * variable should be evaluated or not. Exactly one of of these bools should be false.
+ *
+ * returns a univariate polynomial, represented as a sequence of field elements, where entry i, has
+ * degree i in the variable and the coefficient is the entry
+ */
 fn multi_to_uni_poly(p1: Seq<Term>, inputs: Seq<InputVar>) -> Seq<Fp> {
     // assert exactly one var. remains un-evaled
     assert_eq!(
