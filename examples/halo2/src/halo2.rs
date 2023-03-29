@@ -228,38 +228,35 @@ fn random_sample_poly(randomness: ByteSeq, size: usize) -> Seq<Fp> {
 }
 
 fn multi_to_uni_poly(p1: Seq<Term>, inputs: Seq<InputVar>) -> Seq<Fp> {
+    // assert exactly one var. remains un-evaled
     assert_eq!(
         inputs.iter().map(|f| f.0).filter(|f| *f).count(),
         inputs.len() - 1
     );
 
-    let a = reduce_multi_poly(p1.clone(), inputs);
+    // the univariate polynomial, in mutlivariate representation
+    let reduced_poly = reduce_multi_poly(p1.clone(), inputs);
 
-    let mut max = 0;
-    for i in a.iter().map(|f| f.1[0] as usize) {
-        if i > max {
-            max = i;
-        }
-    }
+    // get the highest degree, or 0 (default) if empty
+    let max = reduced_poly
+        .iter()
+        .map(|f| f.1[0] as usize)
+        .reduce(|acc, curr| if curr > acc { curr } else { acc })
+        .unwrap_or_default();
 
     let mut s = Seq::new(max + 1);
 
     for i in 0..max + 1 {
-        let aux = p1
+        // sum the coefficients of terms with same degree (in "x")
+        let coeff_sum = reduced_poly
             .iter()
             .filter(|f| f.1[0] == (i as u32))
-            .map(|f| {
-                println!("{}", f.0);
-                return f.0;
-            })
-            .reduce(|acc, cur| acc + cur);
-        match aux {
-            Some(f) => {
-                println!("f: {}", f);
-                s[i] = f;
-            }
-            _ => s[i] = Fp::from_literal(0),
-        }
+            .map(|f| f.0)
+            .reduce(|acc, cur| acc + cur)
+            .unwrap_or(Fp::from_literal(0));
+
+        // set the term with degree i to the corresponding coefficient
+        s[i] = coeff_sum;
     }
 
     s
@@ -407,15 +404,8 @@ fn test_multi_to_uni_poly() {
     // input value for y (2nd var), do not eval for x (1st var)
     let i1 = Seq::from_vec(vec![(false, Fp::ZERO()), (true, Fp::from_literal(5))]);
     // 11 + 140x + 2x^2
-    // 11 + 140x + 2x^2
-    // 1 + 3xy + 5x*y^2 + 2x^2 + 2y
-    let u2 = reduce_multi_poly(p.clone(), i1.clone());
     let u = multi_to_uni_poly(p, i1);
-    println!("------------------------");
-    println!("{:?}", u);
-    println!("{:?}", u2);
     assert_eq!(u[0], Fp::from_literal(11));
     assert_eq!(u[1], Fp::from_literal(140));
-    // 5
     assert_eq!(u[2], Fp::from_literal(2));
 }
