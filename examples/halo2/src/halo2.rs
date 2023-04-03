@@ -469,6 +469,50 @@ fn multi_to_uni_poly(p: &Seq<Term>, inputs: Seq<InputVar>) -> Seq<Fp> {
     s
 }
 
+/*
+    5 (in protocol)
+    split polynomial of degree n_g(n-1)-n up into n_(g-2) polynomials of degree at most n-1
+
+    The prolynomials(represented by vectors) are stored in a vectore.
+    This way the index in the outer vector can act as the i when reproducing the original poly:
+    h(X) = SUM from i=0 to n_(g-1) [xˆ(ni)h_i(x)]
+    Where n is a parameter of the prooving system, and h_i is the ith part of the original poly.
+ */
+fn split_poly(p1: Seq<Fp>, n: u32)->Seq<Seq<Fp>>{
+    let no_of_parts = (p1.len()+ (n-2) as usize) / ((n-1) as usize);
+
+    let mut original_index = 0;
+    let mut poly_parts:Seq<Seq<Fp>> = Seq::create(no_of_parts);
+    for i in 0..poly_parts.len(){
+        poly_parts[i] = Seq::create((n-1)as usize);
+        for j in 0..poly_parts.len(){
+            if original_index < p1.len(){
+                poly_parts[i][j] = p1[original_index];
+                original_index += 1;
+            }
+        }
+    }
+    return poly_parts;
+}
+
+/*
+    6 (in protocol)
+
+    commit to each h_i polynomial keeping them in the seq to peserve the power (i)
+
+    WE NEED TO THINK ABOUT THE RANDOMNESS:))))
+ */
+fn commit_to_poly_parts(poly_parts:Seq<Seq<Fp>>,crs: &CRS) -> Seq<G1>{
+    let mut commitment_seq:Seq<G1> = Seq::create(poly_parts.len());
+    // DUMMY VALUE FOR RANDOMNESS
+    let r = Fp::default();
+    for i in 0..poly_parts.len(){
+        let commitment = commit_polyx(crs,poly_parts[i].clone(),r);
+        commitment_seq[i] = commitment;
+    }
+    return commitment_seq;
+}
+
 fn open() {}
 
 // #[cfg(test)]
@@ -481,6 +525,35 @@ fn open() {}
 //
 // #[cfg(test)]
 // use quickcheck::*;
+#[cfg(test)]
+#[test]
+fn test_commit_to_poly_parts(){
+
+    let crs = CRS(Seq::new(0), G1::default());
+
+    let v1 = vec![5, 10, 20]
+        .iter()
+        .map(|e| Fp::from_literal((*e) as u128))
+        .collect();
+    let p1 = Seq::from_vec(v1);
+    let n = 3;
+    let poly_parts = split_poly(p1,n);
+    let commitments = commit_to_poly_parts(poly_parts,&crs);
+}
+
+
+#[cfg(test)]
+#[test]
+fn test_split_poly(){
+    let v1 = vec![5, 10, 20]
+        .iter()
+        .map(|e| Fp::from_literal((*e) as u128))
+        .collect();
+    let p1 = Seq::from_vec(v1);
+    let n = 3;
+    let poly_parte = split_poly(p1,n);
+
+}
 
 #[cfg(test)]
 #[test]
