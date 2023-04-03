@@ -26,6 +26,12 @@ fn halo2() {
     let cR = commit_polyx(&crs, g_prime, r); // TODO update r?
 }
 
+/// Add two polynomials, return resulting polynomial
+///
+/// # Arguments
+///
+/// * `p1` - the LHS polynomial
+/// * `p2` - the RHS polynomial
 fn add_polyx(p1: Seq<Fp>, p2: Seq<Fp>) -> Seq<Fp> {
     let mut res;
     let short_len;
@@ -45,6 +51,12 @@ fn add_polyx(p1: Seq<Fp>, p2: Seq<Fp>) -> Seq<Fp> {
     res
 }
 
+/// Subtract two polynomials, return resulting polynomial
+///
+/// # Arguments
+///
+/// * `p1` - the LHS polynomial
+/// * `p2` - the RHS polynomial
 fn sub_polyx(p1: Seq<Fp>, p2: Seq<Fp>) -> Seq<Fp> {
     let mut res = p1.clone();
 
@@ -55,28 +67,46 @@ fn sub_polyx(p1: Seq<Fp>, p2: Seq<Fp>) -> Seq<Fp> {
     trim_poly(res)
 }
 
-fn mul_scalar_polyx(p1: Seq<Fp>, s: Fp) -> Seq<Fp> {
-    let mut res = p1.clone();
+
+/// Multiply a polynomial by a scalar, return resulting polynomial
+/// 
+/// # Arguments
+/// 
+/// * `p` - the polynomial
+/// * `s` - the scalar
+fn mul_scalar_polyx(p: Seq<Fp>, s: Fp) -> Seq<Fp> {
+    let mut res = p.clone();
 
     for i in 0..res.len() {
-        res[i] = p1[i] * s;
+        res[i] = p[i] * s;
     }
 
     res
 }
 
-fn eval_polyx(p1: Seq<Fp>, x: Fp) -> Fp {
+/// Evaluate a polynomial at point, return the evaluation
+/// 
+/// # Arguments
+/// 
+/// * `p` - the polynomial
+/// * `x` - the point
+fn eval_polyx(p: Seq<Fp>, x: Fp) -> Fp {
     let mut res = Fp::ZERO();
 
-    for i in 0..p1.len() {
-        res = res + p1[i] * x.exp(i as u32);
+    for i in 0..p.len() {
+        res = res + p[i] * x.exp(i as u32);
     }
 
     res
 }
 
-fn uni_deg(p1: Seq<Fp>) -> u32 {
-    let len = p1.len();
+/// Get the degree of a polynomial
+///
+/// # Arguments
+///
+/// * `p` - the polynomial
+fn poly_degree(p: Seq<Fp>) -> u32 {
+    let len = p.len();
     if len == 0 {
         0
     } else {
@@ -84,6 +114,12 @@ fn uni_deg(p1: Seq<Fp>) -> u32 {
     }
 }
 
+/// Get the sum of all coefficietns of a polynomial
+/// (useful for checking if a polynomial is 0)
+///
+/// # Arguments
+///
+/// * `p` - the polynomial
 fn sum_coeffs(p: Seq<Fp>) -> Fp {
     let mut sum = Fp::ZERO();
     for i in 0..p.len() {
@@ -93,7 +129,11 @@ fn sum_coeffs(p: Seq<Fp>) -> Fp {
     sum
 }
 
-// trim a polynomial of trailing zeros (zero-terms)
+// Trim a polynomial of trailing zeros (zero-terms) and return it
+///
+/// # Arguments
+///
+/// * `p` - the polynomial
 fn trim_poly(p: Seq<Fp>) -> Seq<Fp> {
     let mut last_val_idx = 0;
     for i in 0..p.len() {
@@ -110,6 +150,13 @@ fn trim_poly(p: Seq<Fp>) -> Seq<Fp> {
     res
 }
 
+/// divide the leading terms of two polynomials, returning a single term (e.g. 5x^3) represented as a polynomial
+/// (helper function for divide_poly)
+///
+/// # Arguments
+///
+/// * `n` - the dividend/enumerator polynomial
+/// * `d` - the divisor/denominator polynomial
 fn divide_leading_terms(n: Seq<Fp>, d: Seq<Fp>) -> Seq<Fp> {
     let n = trim_poly(n);
     let d = trim_poly(d);
@@ -123,6 +170,14 @@ fn divide_leading_terms(n: Seq<Fp>, d: Seq<Fp>) -> Seq<Fp> {
     res
 }
 
+/// Multiply a polynomial with a single term (e.g. 5x^3), with the single term represented as a
+/// polynomial. Returns the product.
+/// (helper function for divide_poly)
+///
+/// # Arguments
+///
+/// * `p` - the polynomial
+/// * `single_term` - the single term polynomial
 fn multiply_poly_by_single_term(p: Seq<Fp>, single_term: Seq<Fp>) -> Seq<Fp> {
     let single_term = trim_poly(single_term);
     let st_len = single_term.len() - 1;
@@ -135,27 +190,32 @@ fn multiply_poly_by_single_term(p: Seq<Fp>, single_term: Seq<Fp>) -> Seq<Fp> {
     res
 }
 
-/*
- * long division code taken from https://en.wikipedia.org/wiki/Polynomial_long_division
- *
- * pseudo code here:
- * function n / d is
- *  require d ≠ 0
- *  q ← 0
- *  r ← n             // At each step n = d × q + r
-
- *  while r ≠ 0 and degree(r) ≥ degree(d) do
- *      t ← lead(r) / lead(d)       // Divide the leading terms
- *      q ← q + t
- *      r ← r − t × d
-
- *  return (q, r)
- */
-fn poly_divide(n: Seq<Fp>, d: Seq<Fp>) -> (Seq<Fp>, Seq<Fp>) {
+/// Perform polynomial long division, returning the quotient and the remainder.
+/// The algorithm is from from <https://en.wikipedia.org/wiki/Polynomial_long_division>.
+///
+/// The pseudo-code is shown here:
+/// 
+/// function n / d is
+///  require d ≠ 0
+///  q ← 0
+///  r ← n             // At each step n = d × q + r
+///
+///  while r ≠ 0 and degree(r) ≥ degree(d) do
+///      t ← lead(r) / lead(d)       // Divide the leading terms
+///      q ← q + t
+///      r ← r − t × d
+///
+///  return (q, r)
+///
+/// # Arguments
+///
+/// * `n` - the dividend/enumerator polynomial
+/// * `d` - the divisor/denominator polynomial
+fn divide_poly(n: Seq<Fp>, d: Seq<Fp>) -> (Seq<Fp>, Seq<Fp>) {
     let mut q = Seq::new(n.len());
     let mut r = n.clone();
 
-    while sum_coeffs(r.clone()) != Fp::ZERO() && uni_deg(r.clone()) >= uni_deg(d.clone()) {
+    while sum_coeffs(r.clone()) != Fp::ZERO() && poly_degree(r.clone()) >= poly_degree(d.clone()) {
         let t = divide_leading_terms(r.clone(), d.clone());
         q = add_polyx(q, t.clone());
         let aux_prod = multiply_poly_by_single_term(d.clone(), t);
@@ -182,11 +242,12 @@ struct CRS(
 type Term = (Fp, Seq<u32>);
 type InputVar = (bool, Fp);
 
-/*
- * Helper function for reduce_multi_poly
- *
- * evaluates a term with on and with the specified variable inputs
- */
+/// Evaluate a term with specified variable inputs
+/// Helper function for reduce_multi_poly
+///
+/// # Arguments
+///
+/// * `term` - the term
 fn reduce_multi_term(term: Term, inputs: &Seq<InputVar>, new_size: usize) -> Term {
     let (coef, powers) = term;
 
@@ -213,25 +274,26 @@ fn reduce_multi_term(term: Term, inputs: &Seq<InputVar>, new_size: usize) -> Ter
     return (new_coef, new_powers);
 }
 
-/*
- * p1 is the polynomial, expressed as a sequence of 2-tuples.
- *
- * Each tuple has the coefficient and a sequence of powers, where the i'th entry is the power of
- * the i'th variable in this term
- *
- * inputs is input values of for the variables. The boolean indicates whether the corresponding
- * variable should be evaluated or not
- *
- * the length of inputs and all sequences of powers in p1 should be equal
- *
- * The output is a new polynomial, with the evaluated variables removed. If all variables are
- * evaluated there will be a single term, with a coefficient (which is the final evaluation) and an
- * empty sequence of powers (i.e. no variables)
- */
-fn reduce_multi_poly(p1: Seq<(Fp, Seq<u32>)>, inputs: Seq<InputVar>) -> Seq<Term> {
+/// Evaluate a polynomial in some specified variables and return the new multivariate polynomial
+///
+/// The output is a new polynomial, with the evaluated variables removed. If all variables are
+/// evaluated there will be a single term, with a coefficient (which is the final evaluation) and an
+/// empty sequence of powers (i.e. no variables)
+///
+/// # Arguments
+///
+/// * `p` - the multivariate polynomial, expressed as a sequence of 2-tuples.
+/// * `inputs` - values for the variables and bools indicating if the should be evaluated
+///
+/// Each tuple of `p` has the coefficient and a sequence of powers, where the i'th entry is the power of the i'th variable in this term
+///
+/// # Constraints
+///
+/// * The length of inputs and all sequences of powers in p1 should be equal
+fn reduce_multi_poly(p: Seq<Term>, inputs: Seq<InputVar>) -> Seq<Term> {
     // only checking the 1st term for brevity
     assert_eq!(
-        p1.iter().next().unwrap().1.len(),
+        p.iter().next().unwrap().1.len(),
         inputs.len(),
         "no. of inputs should match length of variables"
     );
@@ -247,19 +309,19 @@ fn reduce_multi_poly(p1: Seq<(Fp, Seq<u32>)>, inputs: Seq<InputVar>) -> Seq<Term
             _ => (),
         }
     }
-    let mut new_poly = Seq::new(p1.len());
+    let mut new_poly = Seq::new(p.len());
     let mut terms_added = 0;
     if unevaluated_variables == 0 {
         //sum results
-        for i in 0..p1.len() {
-            let term = p1[i].clone();
+        for i in 0..p.len() {
+            let term = p[i].clone();
             let (coef, _) = reduce_multi_term(term, &inputs, unevaluated_variables);
             constant = constant + coef;
         }
     } else {
         //check if term can be evaluated, else insert term in new poly
-        for i in 0..p1.len() {
-            let term = p1[i].clone();
+        for i in 0..p.len() {
+            let term = p[i].clone();
             let (coef, powers) = reduce_multi_term(term, &inputs, unevaluated_variables);
             let mut all_powers_zero = true;
             for i in 0..powers.len() {
@@ -281,30 +343,35 @@ fn reduce_multi_poly(p1: Seq<(Fp, Seq<u32>)>, inputs: Seq<InputVar>) -> Seq<Term
     new_poly.slice(0, terms_added + 1)
 }
 
-/*
- * evaluate a multivariate polynomial
- *
- * p1 is the polynomial, expressed as a sequence of 2-tuples.
- * Each tuple has the coefficient and a sequence of powers, where the i'th entry is the power of
- * the i'th variable in this term
- *
- * inputs are a sequence of field elements, where the i'th entry is the value for the i'th variable
- *
- * outputs a field element, which is the evaluation of the polynomial
- */
-fn eval_multi_poly(p1: Seq<Term>, inputs: Seq<Fp>) -> Fp {
+/// Evaluate a multivariate polynomials and return the evaluation
+///
+/// # Arguments
+///
+/// * `p` - the polynomial, expressed as a sequence of 2-tuples.
+/// * `inputs` - a sequence of field elements, where the i'th entry is the value for the i'th variable
+///
+/// Each tuple of `p` has the coefficient and a sequence of powers, where the i'th entry is the power of
+/// the i'th variable in this term
+///
+/// # Constraints
+///
+/// * The length of inputs and all sequences of powers in p1 should be equal
+fn eval_multi_poly(p: Seq<Term>, inputs: Seq<Fp>) -> Fp {
     let mut inputvars = Seq::new(inputs.len());
     for i in 0..inputs.len() {
         inputvars[i] = (true, inputs[i]);
     }
-    let (res, _) = reduce_multi_poly(p1, inputvars)[0];
+    let (res, _) = reduce_multi_poly(p, inputvars)[0];
 
     res
 }
 
-/* Multiscalar multiplicatoin
- * Auxiliry function for Pedersen vector commitment
- */
+/// Multiscalar multiplicatoin, auxiliry function for Pedersen vector commitment
+///
+/// # Arguments
+///
+/// * `a` - sequence of scalars (LHS)
+/// * `g` - sequence of group (curve) elements (RHS)
 fn msm(a: Seq<Fp>, g: &Seq<G1>) -> G1 {
     let mut res = g1mul(a[0], g[0]);
     for i in 1..a.len() {
@@ -314,9 +381,13 @@ fn msm(a: Seq<Fp>, g: &Seq<G1>) -> G1 {
     res
 }
 
-/* 1.3 (in protocol)
- * Pedersen vector commitment
-*/
+/// Pedersen vector commitment (1.3 in protocol)
+///
+/// # Arguments
+///
+/// * `crs` - the common reference string
+/// * `a` - the "vector"
+/// * `r` - the "randomness"
 fn commit_polyx(crs: &CRS, a: Seq<Fp>, r: Fp) -> G1 {
     let CRS(g, h) = crs;
 
@@ -327,9 +398,12 @@ fn commit_polyx(crs: &CRS, a: Seq<Fp>, r: Fp) -> G1 {
     res
 }
 
-/* 3 (in protocol)
- * Generates a random polynomial from given randomness using iterating hashing
- */
+/// Generates a random polynomial from given randomness using iterating hashing (3 in protocol)
+///
+/// # Arguments
+///
+/// * `randomness` - the "randomness"
+/// * `size` - the size of the polynomials (the max power -1)
 fn random_sample_poly(randomness: ByteSeq, size: usize) -> Seq<Fp> {
     let mut s = Seq::new(size);
     let mut r = randomness;
@@ -345,22 +419,22 @@ fn random_sample_poly(randomness: ByteSeq, size: usize) -> Seq<Fp> {
     s
 }
 
-/*
- * 1.1 (in protocol)
- * evaluate a multivariate polynomial in variables such that it becomes a univariate polynomial
- *
- * p1 is the polynomial, expressed as a sequence of 2-tuples.
- *
- * Each tuple has the coefficient and a sequence of powers, where the i'th entry is the power of
- * the i'th variable in this term
- *
- * inputs is input values of for the variables. The boolean indicates whether the corresponding
- * variable should be evaluated or not. Exactly one of of these bools should be false.
- *
- * returns a univariate polynomial, represented as a sequence of field elements, where entry i, has
- * degree i in the variable and the coefficient is the entry
- */
-fn multi_to_uni_poly(p1: &Seq<Term>, inputs: Seq<InputVar>) -> Seq<Fp> {
+/// Evaluate a multivariate polynomial in variables such that it becomes a univariate polynomial (1.1 in protocol)
+/// (univaraite polynomial represented as a sequence of field elements, where entry i, has
+/// degree i in the variable and the coefficient is the entry)
+///
+/// # Arguments
+///
+/// * `p` - the multivariate polynomial, expressed as a sequence of 2-tuples.
+/// * `inputs` - values for the variables and bools indicating if the should be evaluated
+///
+/// Each tuple of `p` has the coefficient and a sequence of powers, where the i'th entry is the power of the i'th variable in this term
+///
+/// # Constraints
+///
+/// * The length of inputs and all sequences of powers in p1 should be equal
+/// * Exactly one variable should remain unevaluated_variables
+fn multi_to_uni_poly(p: &Seq<Term>, inputs: Seq<InputVar>) -> Seq<Fp> {
     // assert exactly one var. remains un-evaled
     assert_eq!(
         inputs.iter().map(|f| f.0).filter(|f| *f).count(),
@@ -368,7 +442,7 @@ fn multi_to_uni_poly(p1: &Seq<Term>, inputs: Seq<InputVar>) -> Seq<Fp> {
     );
 
     // the univariate polynomial, in mutlivariate representation
-    let reduced_poly = reduce_multi_poly(p1.clone(), inputs);
+    let reduced_poly = reduce_multi_poly(p.clone(), inputs);
 
     // get the highest degree, or 0 (default) if empty
     let max = reduced_poly
@@ -599,7 +673,7 @@ fn test_poly_div() {
         Fp::ONE(),
     ]);
 
-    let (q, r) = poly_divide(n, d);
+    let (q, r) = divide_poly(n, d);
     assert_eq!(q.len(), 2);
     assert_eq!(q[0], Fp::ZERO());
     assert_eq!(q[1], Fp::ONE());
