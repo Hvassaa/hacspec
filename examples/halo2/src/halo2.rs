@@ -1,26 +1,26 @@
 use hacspec_lib::*;
-use hacspec_pasta::{g1add, g1mul, Fp, FpCurve, G1};
-use hacspec_sha256::{hash, Sha256Digest};
+use hacspec_pasta::*;
+use hacspec_sha256::*;
 
 fn halo2() {
     // step 1
     // dummy values
-    let a: Seq<Seq<Term>> = Seq::new(0);
-    let crs = CRS(Seq::new(0), G1::default());
+    let a: Seq<Seq<Term>> = Seq::<Seq<Term>>::create(0);
+    let crs = CRS(Seq::<G1>::create(0), G1::default());
     let r = Fp::default();
 
     for j in 0..a.len() {
         let aj = &a[j];
-        let aj_prime = multi_to_uni_poly(aj, Seq::new(0)); // dummy inputs
+        let aj_prime = multi_to_uni_poly(aj, Seq::<InputVar>::create(0)); // dummy inputs
         let cAj = commit_polyx(&crs, aj_prime, r);
         // generate challenge cj
     }
 
     // step 2
     // dummy values
-    let g: &Seq<Term> = &Seq::new(0);
+    let g: &Seq<Term> = &Seq::<Term>::create(0);
 
-    let g_prime = multi_to_uni_poly(g, Seq::new(0)); // dummy inputs
+    let g_prime = multi_to_uni_poly(g, Seq::<InputVar>::create(0)); // dummy inputs
 
     // step 3
     let cR = commit_polyx(&crs, g_prime, r); // TODO update r?
@@ -141,7 +141,7 @@ fn trim_poly(p: Seq<Fp>) -> Seq<Fp> {
             last_val_idx = i;
         }
     }
-    let mut res = Seq::create(last_val_idx + 1);
+    let mut res = Seq::<Fp>::create(last_val_idx + 1);
 
     for i in 0..res.len() {
         res[i] = p[i];
@@ -164,7 +164,7 @@ fn divide_leading_terms(n: Seq<Fp>, d: Seq<Fp>) -> Seq<Fp> {
     let n_coeff = n[n.len() - 1];
     let d_coeff = d[d.len() - 1];
     let coeff = n_coeff / d_coeff;
-    let mut res = Seq::create(x_pow + 1);
+    let mut res = Seq::<Fp>::create(x_pow + 1);
     res[x_pow] = coeff;
 
     res
@@ -182,7 +182,7 @@ fn multiply_poly_by_single_term(p: Seq<Fp>, single_term: Seq<Fp>) -> Seq<Fp> {
     let single_term = trim_poly(single_term);
     let st_len = single_term.len() - 1;
     let coef = single_term[st_len];
-    let mut res = Seq::create(p.len() + st_len);
+    let mut res = Seq::<Fp>::create(p.len() + st_len);
     for i in st_len..res.len() {
         res[i] = p[i - st_len] * coef;
     }
@@ -212,7 +212,7 @@ fn multiply_poly_by_single_term(p: Seq<Fp>, single_term: Seq<Fp>) -> Seq<Fp> {
 /// * `n` - the dividend/enumerator polynomial
 /// * `d` - the divisor/denominator polynomial
 fn divide_poly(n: Seq<Fp>, d: Seq<Fp>) -> (Seq<Fp>, Seq<Fp>) {
-    let mut q = Seq::new(n.len());
+    let mut q = Seq::<Fp>::create(n.len());
     let mut r = n.clone();
 
     while sum_coeffs(r.clone()) != Fp::ZERO() && poly_degree(r.clone()) >= poly_degree(d.clone()) {
@@ -252,7 +252,7 @@ fn reduce_multi_term(term: Term, inputs: &Seq<InputVar>, new_size: usize) -> Ter
     let (coef, powers) = term;
 
     let mut new_coef = coef; //First entry in a term sequence is the Coefficient
-    let mut new_powers = Seq::new(new_size);
+    let mut new_powers = Seq::<u32>::create(new_size);
 
     let mut idx = 0;
     for i in 0..powers.len() {
@@ -309,7 +309,7 @@ fn reduce_multi_poly(p: Seq<Term>, inputs: Seq<InputVar>) -> Seq<Term> {
             _ => (),
         }
     }
-    let mut new_poly = Seq::new(p.len());
+    let mut new_poly = Seq::<Term>::create(p.len());
     let mut terms_added = 0;
     if unevaluated_variables == 0 {
         //sum results
@@ -357,7 +357,7 @@ fn reduce_multi_poly(p: Seq<Term>, inputs: Seq<InputVar>) -> Seq<Term> {
 ///
 /// * The length of inputs and all sequences of powers in p1 should be equal
 fn eval_multi_poly(p: Seq<Term>, inputs: Seq<Fp>) -> Fp {
-    let mut inputvars = Seq::new(inputs.len());
+    let mut inputvars = Seq::<InputVar>::create(inputs.len());
     for i in 0..inputs.len() {
         inputvars[i] = (true, inputs[i]);
     }
@@ -405,7 +405,7 @@ fn commit_polyx(crs: &CRS, a: Seq<Fp>, r: Fp) -> G1 {
 /// * `randomness` - the "randomness"
 /// * `size` - the size of the polynomials (the max power -1)
 fn random_sample_poly(randomness: ByteSeq, size: usize) -> Seq<Fp> {
-    let mut s = Seq::new(size);
+    let mut s = Seq::<Fp>::create(size);
     let mut r = randomness;
 
     for i in 0..size {
@@ -451,7 +451,7 @@ fn multi_to_uni_poly(p: &Seq<Term>, inputs: Seq<InputVar>) -> Seq<Fp> {
         .reduce(|acc, curr| if curr > acc { curr } else { acc })
         .unwrap_or_default();
 
-    let mut s = Seq::new(max + 1);
+    let mut s = Seq::<Fp>::create(max + 1);
 
     for i in 0..max + 1 {
         // sum the coefficients of terms with same degree (in "x")
@@ -482,9 +482,9 @@ fn split_poly(p1: Seq<Fp>, n: u32)->Seq<Seq<Fp>>{
     let no_of_parts = (p1.len()+ (n-2) as usize) / ((n-1) as usize);
 
     let mut original_index = 0;
-    let mut poly_parts:Seq<Seq<Fp>> = Seq::create(no_of_parts);
+    let mut poly_parts:Seq<Seq<Fp>> = Seq::<Seq<Fp>>::create(no_of_parts);
     for i in 0..poly_parts.len(){
-        poly_parts[i] = Seq::create((n-1)as usize);
+        poly_parts[i] = Seq::<Fp>::create((n-1)as usize);
         for j in 0..poly_parts.len(){
             if original_index < p1.len(){
                 poly_parts[i][j] = p1[original_index];
@@ -503,7 +503,7 @@ fn split_poly(p1: Seq<Fp>, n: u32)->Seq<Seq<Fp>>{
     WE NEED TO THINK ABOUT THE RANDOMNESS:))))
  */
 fn commit_to_poly_parts(poly_parts:Seq<Seq<Fp>>,crs: &CRS) -> Seq<G1>{
-    let mut commitment_seq:Seq<G1> = Seq::create(poly_parts.len());
+    let mut commitment_seq:Seq<G1> = Seq::<G1>::create(poly_parts.len());
     // DUMMY VALUE FOR RANDOMNESS
     let r = Fp::default();
     for i in 0..poly_parts.len(){
