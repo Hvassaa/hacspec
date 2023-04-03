@@ -2,29 +2,31 @@ use hacspec_lib::*;
 use hacspec_pasta::{g1add, g1mul, Fp, FpCurve, G1};
 use hacspec_sha256::{hash, Sha256Digest};
 
-// public_nat_mod!( //Custom Macro - defining a newtype with some functions - well defined macro's have library functions built in
-//     type_name: Fp,
-//     type_of_canvas: FpCanvas,
-//     bit_size_of_field: 258, //381 with 3 extra bits
-//     modulo_value: "40000000000000000000000000000000224698fc094cf91b992d30ed00000001" //0x40000000000000000000000000000000224698fc094cf91b992d30ed00000001
-// );
-
 fn halo2() {
-    // dummy
+    // step 1
+    // dummy values
     let a: Seq<Seq<Term>> = Seq::new(0);
     let crs = CRS(Seq::new(0), G1::default());
     let r = Fp::default();
 
-    // step 1
     for j in 0..a.len() {
         let aj = &a[j];
         let aj_prime = multi_to_uni_poly(aj, Seq::new(0)); // dummy inputs
-        let Aj = commit_polyx(&crs, aj_prime, r);
+        let cAj = commit_polyx(&crs, aj_prime, r);
+        // generate challenge cj
     }
 
+    // step 2
+    // dummy values
+    let g: &Seq<Term> = &Seq::new(0);
+
+    let g_prime = multi_to_uni_poly(g, Seq::new(0)); // dummy inputs
+
+    // step 3
+    let cR = commit_polyx(&crs, g_prime, r); // TODO update r?
 }
 
-fn add_polyx(p1: Seq<FpCurve>, p2: Seq<FpCurve>) -> Seq<FpCurve> {
+fn add_polyx(p1: Seq<Fp>, p2: Seq<Fp>) -> Seq<Fp> {
     let mut res;
     let short_len;
 
@@ -43,7 +45,7 @@ fn add_polyx(p1: Seq<FpCurve>, p2: Seq<FpCurve>) -> Seq<FpCurve> {
     res
 }
 
-fn mul_scalar_polyx(p1: Seq<FpCurve>, s: FpCurve) -> Seq<FpCurve> {
+fn mul_scalar_polyx(p1: Seq<Fp>, s: Fp) -> Seq<Fp> {
     let mut res = p1.clone();
 
     for i in 0..res.len() {
@@ -53,8 +55,8 @@ fn mul_scalar_polyx(p1: Seq<FpCurve>, s: FpCurve) -> Seq<FpCurve> {
     res
 }
 
-fn eval_polyx(p1: Seq<FpCurve>, x: FpCurve) -> FpCurve {
-    let mut res = FpCurve::ZERO();
+fn eval_polyx(p1: Seq<Fp>, x: Fp) -> Fp {
+    let mut res = Fp::ZERO();
 
     for i in 0..p1.len() {
         res = res + p1[i] * x.exp(i as u32);
@@ -62,6 +64,85 @@ fn eval_polyx(p1: Seq<FpCurve>, x: FpCurve) -> FpCurve {
 
     res
 }
+
+fn uni_deg(p1: Seq<Fp>) -> u32 {
+    let len = p1.len();
+    if len == 0 {
+        0
+    } else {
+        (len as u32) - 1
+    }
+}
+
+fn sum_coeffs(p: Seq<Fp>) -> Fp {
+    let mut sum = Fp::ZERO();
+    for i in 0..p.len() {
+        sum = sum + p[i];
+    }
+
+    sum
+}
+
+fn divide_leading_terms() {}
+
+fn divide(n: Seq<Fp>, d: Seq<Fp>) -> (Seq<Fp>, Seq<Fp>) {
+    let mut q = Seq::new(n.len());
+    let mut r = n.clone();
+
+    while sum_coeffs(r.clone()) != Fp::ZERO() && uni_deg(r.clone()) >= uni_deg(d.clone()) {
+    }
+
+    (q, r)
+}
+
+// fn divide(dividend: Seq<Fp>, divisor: Seq<Fp>) -> Seq<Fp> {
+//     let dd_deg = uni_deg(dividend.clone());
+//     let ds_deg = uni_deg(divisor.clone());
+//     let mut dd_to_use = dividend.clone();
+//     let mut ds_to_use = divisor.clone();
+//     // let dd_max_coeff = dividend[dd_deg - 1];
+//     // let ds_max_coeff = divisor[dd_deg - 1];
+//
+//     // if the degree of the divisor is greater than the degree of the dividend,
+//     // the quotient is zero and the remainder is the divisor
+//     if dd_deg < ds_deg {
+//         return divisor;
+//     }
+//
+//     // if the degree of the dividend is greater than the divisor:
+//     // shift the elements of the divisor to the right, so that the length/degree matches the
+//     // dividend, effictively multiplying by the "variable part" of quotient
+//     // the degree difference also determines the degree of "x" in the quotient
+//     let deg_diff = dd_deg - ds_deg;
+//     let dd_len = dd_deg + 1;
+//     let mut quotient = Seq::new(dd_len as usize);
+//     quotient[deg_diff] = 1;
+//     if dd_deg > ds_deg {
+//         ds_to_use = Seq::new(dd_len as usize);
+//         for i in deg_diff..dd_len {
+//             ds_to_use[i] = divisor[i - deg_diff];
+//         }
+//     }
+//
+//     //  now we find the smallest quotient between the pairwise coefficients
+//     //  which is then multiplied onto our working the quotient
+//     let mut a = Fp::ONE(); // 1 does not really matter, if a lower value is found, it is updated
+//     for i in 0..dd_len {
+//         let ds_coeff = ds_to_use[i];
+//         let dd_coeff = dividend[i];
+//         let q = dd_coeff / ds_coeff; // integer division
+//         if q < a {
+//             a = q;
+//         }
+//     }
+//
+//     // if the divisor's degree is higher then the dividend, there is no hope
+//     // if (dd_deg < ds_deg) || (dd_max_coeff % ds_max_coeff != Fp::ZERO()) {
+//     //     return Seq::new(dd_deg as usize); // TODO make random poly
+//     // }
+//
+//     return Seq::new(dd_deg as usize); // TODO make random poly
+// }
 
 struct PublicParams(
     Seq<G1>, // G: G in G^d
@@ -311,20 +392,20 @@ fn open() {}
 fn test_poly_add() {
     let v1 = vec![5, 10, 20]
         .iter()
-        .map(|e| FpCurve::from_literal((*e) as u128))
+        .map(|e| Fp::from_literal((*e) as u128))
         .collect();
     let v2 = vec![55]
         .iter()
-        .map(|e| FpCurve::from_literal((*e) as u128))
+        .map(|e| Fp::from_literal((*e) as u128))
         .collect();
     let p1 = Seq::from_vec(v1);
     let p2 = Seq::from_vec(v2);
 
     let p3 = add_polyx(p1, p2);
 
-    assert_eq!(p3[0], FpCurve::from_literal(60));
-    assert_eq!(p3[1], FpCurve::from_literal(10));
-    assert_eq!(p3[2], FpCurve::from_literal(20));
+    assert_eq!(p3[0], Fp::from_literal(60));
+    assert_eq!(p3[1], Fp::from_literal(10));
+    assert_eq!(p3[2], Fp::from_literal(20));
 }
 
 #[cfg(test)]
@@ -332,15 +413,15 @@ fn test_poly_add() {
 fn test_poly_mul() {
     let v1 = vec![5, 10, 20]
         .iter()
-        .map(|e| FpCurve::from_literal((*e) as u128))
+        .map(|e| Fp::from_literal((*e) as u128))
         .collect();
     let p1 = Seq::from_vec(v1);
 
-    let p3 = mul_scalar_polyx(p1, FpCurve::TWO());
+    let p3 = mul_scalar_polyx(p1, Fp::TWO());
 
-    assert_eq!(p3[0], FpCurve::from_literal(10));
-    assert_eq!(p3[1], FpCurve::from_literal(20));
-    assert_eq!(p3[2], FpCurve::from_literal(40));
+    assert_eq!(p3[0], Fp::from_literal(10));
+    assert_eq!(p3[1], Fp::from_literal(20));
+    assert_eq!(p3[2], Fp::from_literal(40));
 }
 
 #[cfg(test)]
@@ -348,11 +429,11 @@ fn test_poly_mul() {
 fn test_poly_eval() {
     let v1 = vec![5, 10, 20]
         .iter()
-        .map(|e| FpCurve::from_literal((*e) as u128))
+        .map(|e| Fp::from_literal((*e) as u128))
         .collect();
     let p1 = Seq::from_vec(v1);
 
-    assert_eq!(eval_polyx(p1, FpCurve::TWO()), FpCurve::from_literal(105));
+    assert_eq!(eval_polyx(p1, Fp::TWO()), Fp::from_literal(105));
 }
 
 #[cfg(test)]
@@ -439,4 +520,19 @@ fn test_multi_to_uni_poly() {
     assert_eq!(u[0], Fp::from_literal(11));
     assert_eq!(u[1], Fp::from_literal(140));
     assert_eq!(u[2], Fp::from_literal(2));
+}
+
+#[cfg(test)]
+#[test]
+fn test_divide_poly() {
+    let dividend = Seq::from_vec(vec![
+        Fp::ZERO(),
+        Fp::from_literal(6),
+        Fp::from_literal(4),
+        Fp::from_literal(2),
+    ]);
+    let divisor = Seq::from_vec(vec![Fp::from_literal(3), Fp::TWO(), Fp::ONE()]);
+
+    // let a = divide(dividend, divisor);
+    // println!("{:?}", a);
 }
