@@ -45,6 +45,16 @@ fn add_polyx(p1: Seq<Fp>, p2: Seq<Fp>) -> Seq<Fp> {
     res
 }
 
+fn sub_polyx(p1: Seq<Fp>, p2: Seq<Fp>) -> Seq<Fp> {
+    let mut res = p1.clone();
+
+    for i in 0..p2.len() {
+        res[i] = p1[i] - p2[i];
+    }
+
+    trim_poly(res)
+}
+
 fn mul_scalar_polyx(p1: Seq<Fp>, s: Fp) -> Seq<Fp> {
     let mut res = p1.clone();
 
@@ -83,66 +93,77 @@ fn sum_coeffs(p: Seq<Fp>) -> Fp {
     sum
 }
 
-fn divide_leading_terms() {}
+// trim a polynomial of trailing zeros (zero-terms)
+fn trim_poly(p: Seq<Fp>) -> Seq<Fp> {
+    let mut last_val_idx = 0;
+    for i in 0..p.len() {
+        if p[i] != Fp::ZERO() {
+            last_val_idx = i;
+        }
+    }
+    let mut res = Seq::create(last_val_idx + 1);
 
-fn divide(n: Seq<Fp>, d: Seq<Fp>) -> (Seq<Fp>, Seq<Fp>) {
+    for i in 0..res.len() {
+        res[i] = p[i];
+    }
+
+    res
+}
+
+fn divide_leading_terms(n: Seq<Fp>, d: Seq<Fp>) -> Seq<Fp> {
+    let n = trim_poly(n);
+    let d = trim_poly(d);
+    let x_pow = n.len() - d.len();
+    let n_coeff = n[n.len() - 1];
+    let d_coeff = d[d.len() - 1];
+    let coeff = n_coeff / d_coeff;
+    let mut res = Seq::create(x_pow + 1);
+    res[x_pow] = coeff;
+
+    res
+}
+
+fn multiply_poly_by_single_term(p: Seq<Fp>, single_term: Seq<Fp>) -> Seq<Fp> {
+    let single_term = trim_poly(single_term);
+    let st_len = single_term.len() - 1;
+    let coef = single_term[st_len];
+    let mut res = Seq::create(p.len() + st_len);
+    for i in st_len..res.len() {
+        res[i] = p[i - st_len] * coef;
+    }
+
+    res
+}
+
+/*
+ * long division code taken from https://en.wikipedia.org/wiki/Polynomial_long_division
+ *
+ * pseudo code here:
+ * function n / d is
+ *  require d ≠ 0
+ *  q ← 0
+ *  r ← n             // At each step n = d × q + r
+
+ *  while r ≠ 0 and degree(r) ≥ degree(d) do
+ *      t ← lead(r) / lead(d)       // Divide the leading terms
+ *      q ← q + t
+ *      r ← r − t × d
+
+ *  return (q, r)
+ */
+fn poly_divide(n: Seq<Fp>, d: Seq<Fp>) -> (Seq<Fp>, Seq<Fp>) {
     let mut q = Seq::new(n.len());
     let mut r = n.clone();
 
     while sum_coeffs(r.clone()) != Fp::ZERO() && uni_deg(r.clone()) >= uni_deg(d.clone()) {
+        let t = divide_leading_terms(r.clone(), d.clone());
+        q = add_polyx(q, t.clone());
+        let aux_prod = multiply_poly_by_single_term(d.clone(), t);
+        r = sub_polyx(r, aux_prod);
     }
 
-    (q, r)
+    (trim_poly(q), trim_poly(r))
 }
-
-// fn divide(dividend: Seq<Fp>, divisor: Seq<Fp>) -> Seq<Fp> {
-//     let dd_deg = uni_deg(dividend.clone());
-//     let ds_deg = uni_deg(divisor.clone());
-//     let mut dd_to_use = dividend.clone();
-//     let mut ds_to_use = divisor.clone();
-//     // let dd_max_coeff = dividend[dd_deg - 1];
-//     // let ds_max_coeff = divisor[dd_deg - 1];
-//
-//     // if the degree of the divisor is greater than the degree of the dividend,
-//     // the quotient is zero and the remainder is the divisor
-//     if dd_deg < ds_deg {
-//         return divisor;
-//     }
-//
-//     // if the degree of the dividend is greater than the divisor:
-//     // shift the elements of the divisor to the right, so that the length/degree matches the
-//     // dividend, effictively multiplying by the "variable part" of quotient
-//     // the degree difference also determines the degree of "x" in the quotient
-//     let deg_diff = dd_deg - ds_deg;
-//     let dd_len = dd_deg + 1;
-//     let mut quotient = Seq::new(dd_len as usize);
-//     quotient[deg_diff] = 1;
-//     if dd_deg > ds_deg {
-//         ds_to_use = Seq::new(dd_len as usize);
-//         for i in deg_diff..dd_len {
-//             ds_to_use[i] = divisor[i - deg_diff];
-//         }
-//     }
-//
-//     //  now we find the smallest quotient between the pairwise coefficients
-//     //  which is then multiplied onto our working the quotient
-//     let mut a = Fp::ONE(); // 1 does not really matter, if a lower value is found, it is updated
-//     for i in 0..dd_len {
-//         let ds_coeff = ds_to_use[i];
-//         let dd_coeff = dividend[i];
-//         let q = dd_coeff / ds_coeff; // integer division
-//         if q < a {
-//             a = q;
-//         }
-//     }
-//
-//     // if the divisor's degree is higher then the dividend, there is no hope
-//     // if (dd_deg < ds_deg) || (dd_max_coeff % ds_max_coeff != Fp::ZERO()) {
-//     //     return Seq::new(dd_deg as usize); // TODO make random poly
-//     // }
-//
-//     return Seq::new(dd_deg as usize); // TODO make random poly
-// }
 
 struct PublicParams(
     Seq<G1>, // G: G in G^d
@@ -524,15 +545,63 @@ fn test_multi_to_uni_poly() {
 
 #[cfg(test)]
 #[test]
-fn test_divide_poly() {
-    let dividend = Seq::from_vec(vec![
+fn test_trim_poly() {
+    let p = Seq::from_vec(vec![
         Fp::ZERO(),
         Fp::from_literal(6),
         Fp::from_literal(4),
+        Fp::ZERO(),
+        Fp::ZERO(),
         Fp::from_literal(2),
+        Fp::ZERO(),
+        Fp::ZERO(),
+        Fp::ZERO(),
     ]);
-    let divisor = Seq::from_vec(vec![Fp::from_literal(3), Fp::TWO(), Fp::ONE()]);
 
-    // let a = divide(dividend, divisor);
-    // println!("{:?}", a);
+    let trimmed_p = trim_poly(p.clone());
+    assert_eq!(trimmed_p.len(), p.len() - 3);
+}
+
+#[cfg(test)]
+#[test]
+fn test_mult_poly_st() {
+    let p = Seq::from_vec(vec![
+        Fp::from_literal(5),
+        Fp::from_literal(1),
+        Fp::from_literal(3),
+    ]);
+    let single_term = Seq::from_vec(vec![
+        Fp::ZERO(),
+        Fp::ZERO(),
+        Fp::ZERO(),
+        Fp::from_literal(3),
+    ]);
+
+    let res = multiply_poly_by_single_term(p, single_term);
+    assert_eq!(res[0], Fp::ZERO());
+    assert_eq!(res[1], Fp::ZERO());
+    assert_eq!(res[2], Fp::ZERO());
+    assert_eq!(res[3], Fp::from_literal(15));
+    assert_eq!(res[4], Fp::from_literal(3));
+    assert_eq!(res[5], Fp::from_literal(9));
+}
+
+#[cfg(test)]
+#[test]
+fn test_poly_div() {
+    let n = Seq::from_vec(vec![
+        Fp::ZERO(),
+        Fp::ZERO(),
+        Fp::ONE(),
+    ]);
+    let d = Seq::from_vec(vec![
+        Fp::ZERO(),
+        Fp::ONE(),
+    ]);
+
+    let (q, r) = poly_divide(n, d);
+    assert_eq!(q.len(), 2);
+    assert_eq!(q[0], Fp::ZERO());
+    assert_eq!(q[1], Fp::ONE());
+    assert_eq!(sum_coeffs(r), Fp::ZERO());
 }
