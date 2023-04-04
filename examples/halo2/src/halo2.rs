@@ -104,12 +104,12 @@ fn eval_polyx(p: Seq<Fp>, x: Fp) -> Fp {
 /// # Arguments
 ///
 /// * `p` - the polynomial
-fn poly_degree(p: Seq<Fp>) -> u32 {
+fn poly_degree(p: Seq<Fp>) -> u128 {
     let len = p.len();
     if len == 0 {
         0
     } else {
-        (len as u32) - 1
+        (len as u128) - 1
     }
 }
 
@@ -505,7 +505,7 @@ fn multi_to_uni_poly(p: Seq<Term>, inputs: Seq<InputVar>) -> Seq<Fp> {
 /// * `p1` Polynomial to be split
 /// * `n` defines length of new polynomials (global variable for prooving system)
 ///
-fn split_poly(p1: Seq<Fp>, n: u32) -> Seq<Seq<Fp>> {
+fn split_poly(p1: Seq<Fp>, n: u128) -> Seq<Seq<Fp>> {
     let no_of_parts = (p1.len() + (n - 2) as usize) / ((n - 1) as usize);
 
     let mut original_index = 0;
@@ -547,15 +547,28 @@ fn commit_to_poly_parts(poly_parts:Seq<Seq<Fp>>,crs: &CRS, r_seq:Seq<Fp>) -> Seq
     }
     commitment_seq
 }
+///Step 7
+/// Computes the sum from step 7 in the protocol description
+/// 
+/// # Arguments
+/// * `commitment_seq` is a sequence of commitments
+/// * `x`is the challenge each commitment should be multiplied with
+/// * `n` Global parameter for the prooving system
+fn step_7(commitment_seq:Seq<G1>,x: Fp, n: u128) -> G1{
+    let mut result: G1 = G1::default();
+    for i in 0..commitment_seq.len(){
+        let power:u128 = n*i as u128;
+        let x_raised = x.pow(power);
+        let intemidiate:G1 = g1mul(x_raised, commitment_seq[i]);
+        result = g1add(result, intemidiate);
+    }
+    result
+}
 
-// fn step_7(commitment_se){
-//
-// }
-
-fn step_8(h: Seq<Seq<Fp>>, x: Fp, n: u32) -> Seq<Fp> {
+fn step_8(h: Seq<Seq<Fp>>, x: Fp, n: u128) -> Seq<Fp> {
     let mut res = Seq::<Fp>::create((n - 1) as usize);
     for i in 0..h.len() {
-        let ni_prod = n * (i as u32);
+        let ni_prod = n * (i as u128);
         let x_raised = x.pow(ni_prod as u128);
         let h_i = h[i].clone();
         let aux_prod = mul_scalar_polyx(h_i, x_raised);
@@ -577,6 +590,30 @@ fn open() {}
 //
 // #[cfg(test)]
 // use quickcheck::*;
+
+#[cfg(test)]
+#[test]
+fn test_part_8(){
+    let v1 = vec![5, 10, 20]
+        .iter()
+        .map(|e| Fp::from_literal((*e) as u128))
+        .collect();
+    let p1 = Seq::from_vec(v1);
+    let n = 3;
+    let poly_parts = split_poly(p1, n);
+    let x:Fp = Fp::default();
+    let res:Seq<Fp> = step_8(poly_parts, x, n);
+}
+
+#[cfg(test)]
+#[test]
+fn test_part_7(){
+    let commitment_seq: Seq<G1> = Seq::<G1>::from_vec(vec![G1::default(), G1::default(), G1::default()]);
+    let x:Fp = Fp::default();
+    let n:u128 = 128;
+    let res:G1 = step_7(commitment_seq, x, n);
+}
+
 #[cfg(test)]
 #[test]
 fn test_commit_to_poly_parts() {
@@ -594,7 +631,6 @@ fn test_commit_to_poly_parts() {
     let n = 3;
     let poly_parts = split_poly(p1, n);
     let commitments = commit_to_poly_parts(poly_parts, &crs, r_seq);
-    println!("{:?}", commitments)
 }
 
 #[cfg(test)]
