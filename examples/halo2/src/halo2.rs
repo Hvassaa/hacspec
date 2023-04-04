@@ -34,7 +34,7 @@ fn halo2() {
 /// * `p2` - the RHS polynomial
 fn add_polyx(p1: Seq<Fp>, p2: Seq<Fp>) -> Seq<Fp> {
     let mut res = Seq::<Fp>::create(0);
-    let short_len;
+    let mut short_len = 0;
 
     if p1.len() > p2.len() {
         res = p1.clone();
@@ -190,9 +190,11 @@ fn multiply_poly_by_single_term(p: Seq<Fp>, single_term: Seq<Fp>) -> Seq<Fp> {
 }
 
 /// Perform polynomial long division, returning the quotient and the remainder.
-/// The algorithm is from from <https://en.wikipedia.org/wiki/Polynomial_long_division>.
+/// The algorithm is from <https://en.wikipedia.org/wiki/Polynomial_long_division> and is mainly
+/// performed in `divide_poly_helper`.
 ///
-/// The pseudo-code is shown here:
+/// The pseudo-code is shown here. The while-loop is replaces by a recursive call in a helper
+/// function, since hacspec disallows while-loops.
 ///
 /// function n / d is
 ///  require d ≠ 0
@@ -211,17 +213,30 @@ fn multiply_poly_by_single_term(p: Seq<Fp>, single_term: Seq<Fp>) -> Seq<Fp> {
 /// * `n` - the dividend/enumerator polynomial
 /// * `d` - the divisor/denominator polynomial
 fn divide_poly(n: Seq<Fp>, d: Seq<Fp>) -> (Seq<Fp>, Seq<Fp>) {
-    let mut q = Seq::<Fp>::create(n.len());
-    let mut r = n.clone();
+    let q = Seq::<Fp>::create(n.len());
+    let r = n.clone();
+    divide_poly_helper(n, d, q, r)
+}
 
-    while sum_coeffs(r.clone()) != Fp::ZERO() && poly_degree(r.clone()) >= poly_degree(d.clone()) {
+/// Recursive helper function for `divide_poly`, with the actual algorithm.
+/// It should NOT be used directly
+///
+/// # Arguments
+///
+/// * `n` - the dividend/enumerator polynomial
+/// * `d` - the divisor/denominator polynomial
+/// * `q` - the algorithm's current `q` value (in the recursion)
+/// * `r` - the algorithm's current `r` value (in the recursion)
+fn divide_poly_helper(n: Seq<Fp>, d: Seq<Fp>, q: Seq<Fp>, r: Seq<Fp>) -> (Seq<Fp>, Seq<Fp>) {
+    if sum_coeffs(r.clone()) != Fp::ZERO() && poly_degree(r.clone()) >= poly_degree(d.clone()) {
         let t = divide_leading_terms(r.clone(), d.clone());
-        q = add_polyx(q, t.clone());
+        let q = add_polyx(q, t.clone());
         let aux_prod = multiply_poly_by_single_term(d.clone(), t);
-        r = sub_polyx(r, aux_prod);
+        let r = sub_polyx(r, aux_prod);
+        divide_poly_helper(n, d, q, r)
+    } else {
+        (trim_poly(q), trim_poly(r))
     }
-
-    (trim_poly(q), trim_poly(r))
 }
 
 struct PublicParams(
@@ -258,19 +273,17 @@ fn reduce_multi_term(term: Term, inputs: Seq<InputVar>, new_size: usize) -> Term
         let power = powers[i];
         let input = inputs[i];
 
-        match input {
-            (true, p) => {
-                let val = p.exp(power);
-                new_coef = new_coef * val;
-            }
-            (false, _) => {
-                new_powers[idx] = power;
-                idx += 1;
-            }
+        let (b, p) = input;
+        if b {
+            let val = p.exp(power);
+            new_coef = new_coef * val;
+        } else {
+            new_powers[idx] = power;
+            idx = idx + 1;
         }
     }
 
-    return (new_coef, new_powers);
+    (new_coef, new_powers)
 }
 
 /// Evaluate a polynomial in some specified variables and return the new multivariate polynomial
@@ -291,11 +304,11 @@ fn reduce_multi_term(term: Term, inputs: Seq<InputVar>, new_size: usize) -> Term
 /// * The length of inputs and all sequences of powers in p1 should be equal
 fn reduce_multi_poly(p: Seq<Term>, inputs: Seq<InputVar>) -> Seq<Term> {
     // only checking the 1st term for brevity
-    assert_eq!(
-        p.iter().next().unwrap().1.len(),
-        inputs.len(),
-        "no. of inputs should match length of variables"
-    );
+    // assert_eq!(
+    //     p.iter().next().unwrap().1.len(),
+    //     inputs.len(),
+    //     "no. of inputs should match length of variables"
+    // );
 
     let mut constant = Fp::ZERO();
     let mut unevaluated_variables = 0;
@@ -303,7 +316,7 @@ fn reduce_multi_poly(p: Seq<Term>, inputs: Seq<InputVar>) -> Seq<Term> {
         let input = inputs[i];
         match input {
             (false, _) => {
-                unevaluated_variables += 1;
+                unevaluated_variables = unevaluated_variables + 1;
             }
             _ => (),
         }
@@ -332,7 +345,7 @@ fn reduce_multi_poly(p: Seq<Term>, inputs: Seq<InputVar>) -> Seq<Term> {
                 constant = constant + coef;
             } else {
                 new_poly[terms_added] = (coef, powers);
-                terms_added += 1;
+                terms_added = terms_added + 1;
             }
         }
     }
