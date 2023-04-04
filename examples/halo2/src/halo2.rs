@@ -229,7 +229,12 @@ struct PublicParams(
     G1,      // U in G
     G1,      // W in G
 );
-
+/// Commen Reference Struct
+/// This struct is a global variable for the prooving system and holds values used in the commitment schemes
+/// 
+/// # Elements
+/// * `[0]`: Seq<G1> ∈ Gᵈ (vector of random elems.)
+/// * `[1]`: G1 in G (random group element)
 struct CRS(
     // G,  // G: group of prime-order p
     Seq<G1>, // g: g in G^d (vector of random elems.)
@@ -497,13 +502,19 @@ fn split_poly(p1: Seq<Fp>, n: u32)->Seq<Seq<Fp>>{
     return poly_parts;
 }
 
-/*
-   6 (in protocol)
-
-   commit to each h_i polynomial keeping them in the seq to peserve the power (i)
-
-    WE NEED TO THINK ABOUT THE RANDOMNESS:))))
- */
+///
+///6 (in protocol)
+///
+/// commit to each h_i polynomial keeping them in the seq to peserve the power (i)
+///
+/// # Arguments
+/// * `poly_parts` A sequence of polynomials to be commited to
+/// * `crs` Commen Refernce Struct (Global variable for prooving system)
+/// * `r_seq`Sequence of random elements used as blinding factors
+/// 
+/// # Constraints
+/// * `r_seq` should be at least as long as the `poly_parts`
+/// 
 fn commit_to_poly_parts(poly_parts:Seq<Seq<Fp>>,crs: &CRS, r_seq:Seq<Fp>) -> Seq<G1>{
     let mut commitment_seq:Seq<G1> = Seq::<G1>::create(poly_parts.len());
     for i in 0..poly_parts.len(){
@@ -511,6 +522,10 @@ fn commit_to_poly_parts(poly_parts:Seq<Seq<Fp>>,crs: &CRS, r_seq:Seq<Fp>) -> Seq
         commitment_seq[i] = commitment;
     }
     return commitment_seq;
+}
+
+fn step_7(commitment_se){
+
 }
 
 fn open() {}
