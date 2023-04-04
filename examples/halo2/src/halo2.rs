@@ -6,7 +6,7 @@ fn halo2() {
     // step 1
     // dummy values
     let a: Seq<Seq<Term>> = Seq::<Seq<Term>>::create(0);
-    let crs = CRS(Seq::<G1>::create(0), G1::default());
+    let crs: CRS = (Seq::<G1>::create(0), G1::default());
     let r = Fp::default();
 
     for j in 0..a.len() {
@@ -109,7 +109,7 @@ fn poly_degree(p: Seq<Fp>) -> u32 {
     if len == 0 {
         0
     } else {
-        (len as u32) - 1
+        (len - 1) as u32
     }
 }
 
@@ -190,12 +190,10 @@ fn multiply_poly_by_single_term(p: Seq<Fp>, single_term: Seq<Fp>) -> Seq<Fp> {
 }
 
 /// Perform polynomial long division, returning the quotient and the remainder.
-/// The algorithm is from <https://en.wikipedia.org/wiki/Polynomial_long_division> and is mainly
-/// performed in `divide_poly_helper`.
+/// The algorithm is from from <https://en.wikipedia.org/wiki/Polynomial_long_division>.
 ///
-/// The pseudo-code is shown here. The while-loop is replaces by a recursive call in a helper
-/// function, since hacspec disallows while-loops.
-///
+/// The pseudo-code is shown here:
+/// 
 /// function n / d is
 ///  require d ≠ 0
 ///  q ← 0
@@ -212,31 +210,19 @@ fn multiply_poly_by_single_term(p: Seq<Fp>, single_term: Seq<Fp>) -> Seq<Fp> {
 ///
 /// * `n` - the dividend/enumerator polynomial
 /// * `d` - the divisor/denominator polynomial
+#[cfg(test)]
 fn divide_poly(n: Seq<Fp>, d: Seq<Fp>) -> (Seq<Fp>, Seq<Fp>) {
-    let q = Seq::<Fp>::create(n.len());
-    let r = n.clone();
-    divide_poly_helper(n, d, q, r)
-}
+    let mut q = Seq::new(n.len());
+    let mut r = n.clone();
 
-/// Recursive helper function for `divide_poly`, with the actual algorithm.
-/// It should NOT be used directly
-///
-/// # Arguments
-///
-/// * `n` - the dividend/enumerator polynomial
-/// * `d` - the divisor/denominator polynomial
-/// * `q` - the algorithm's current `q` value (in the recursion)
-/// * `r` - the algorithm's current `r` value (in the recursion)
-fn divide_poly_helper(n: Seq<Fp>, d: Seq<Fp>, q: Seq<Fp>, r: Seq<Fp>) -> (Seq<Fp>, Seq<Fp>) {
-    if sum_coeffs(r.clone()) != Fp::ZERO() && poly_degree(r.clone()) >= poly_degree(d.clone()) {
+    while sum_coeffs(r.clone()) != Fp::ZERO() && poly_degree(r.clone()) >= poly_degree(d.clone()) {
         let t = divide_leading_terms(r.clone(), d.clone());
-        let q = add_polyx(q, t.clone());
+        q = add_polyx(q, t.clone());
         let aux_prod = multiply_poly_by_single_term(d.clone(), t);
-        let r = sub_polyx(r, aux_prod);
-        divide_poly_helper(n, d, q, r)
-    } else {
-        (trim_poly(q), trim_poly(r))
+        r = sub_polyx(r, aux_prod);
     }
+
+    (trim_poly(q), trim_poly(r))
 }
 
 struct PublicParams(
@@ -244,18 +230,14 @@ struct PublicParams(
     G1,      // U in G
     G1,      // W in G
 );
+
 /// Commen Reference Struct
 /// This struct is a global variable for the prooving system and holds values used in the commitment schemes
 /// 
 /// # Elements
 /// * `[0]`: Seq<G1> ∈ Gᵈ (vector of random elems.)
 /// * `[1]`: G1 in G (random group element)
-struct CRS(
-    // G,  // G: group of prime-order p
-    Seq<G1>, // g: g in G^d (vector of random elems.)
-    G1,      // H: H in G (random group element)
-             // Fp, // Fp: finite field order p
-);
+type CRS = (Seq<G1>, G1);
 
 // primarily for multivariate polys
 type Term = (Fp, Seq<u32>);
@@ -404,7 +386,7 @@ fn msm(a: Seq<Fp>, g: Seq<G1>) -> G1 {
 /// * `a` - the "vector"
 /// * `r` - the "randomness"
 fn commit_polyx(crs: &CRS, a: Seq<Fp>, r: Fp) -> G1 {
-    let CRS(g, h) = crs;
+    let (g, h) = crs;
 
     let lhs = msm(a, g.clone());
     let rhs = g1mul(r, h.clone());
@@ -580,7 +562,7 @@ fn open() {}
 #[cfg(test)]
 #[test]
 fn test_commit_to_poly_parts() {
-    let crs = CRS(
+    let crs: CRS = (
         Seq::<G1>::from_vec(vec![G1::default(), G1::default(), G1::default()]),
         G1::default(),
     );
