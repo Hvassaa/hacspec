@@ -544,8 +544,21 @@ fn commit_to_poly_parts(poly_parts:Seq<Seq<Fp>>,crs: &CRS, r_seq:Seq<Fp>) -> Seq
     return commitment_seq;
 }
 
-fn step_7(commitment_se){
+// fn step_7(commitment_se){
+//
+// }
 
+fn step_8(h: Seq<Seq<Fp>>, x: Fp, n: u32) -> Seq<Fp> {
+    let mut res = Seq::<Fp>::create((n - 1) as usize);
+    for i in 0..h.len() {
+        let ni_prod = n * (i as u32);
+        let x_raised = x.pow(ni_prod as u128);
+        let h_i = h[i].clone();
+        let aux_prod = mul_scalar_polyx(h_i, x_raised);
+        res = add_polyx(res, aux_prod)
+    }
+
+    res
 }
 
 fn open() {}
