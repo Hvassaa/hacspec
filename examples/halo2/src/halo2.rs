@@ -313,12 +313,9 @@ fn reduce_multi_poly(p: Seq<Term>, inputs: Seq<InputVar>) -> Seq<Term> {
     let mut constant = Fp::ZERO();
     let mut unevaluated_variables = 0;
     for i in 0..inputs.len() {
-        let input = inputs[i];
-        match input {
-            (false, _) => {
-                unevaluated_variables = unevaluated_variables + 1;
-            }
-            _ => (),
+        let (b, _) = inputs[i];
+        if !b {
+            unevaluated_variables = unevaluated_variables + 1;
         }
     }
     let mut new_poly = Seq::<Term>::create(p.len());
@@ -373,7 +370,8 @@ fn eval_multi_poly(p: Seq<Term>, inputs: Seq<Fp>) -> Fp {
     for i in 0..inputs.len() {
         inputvars[i] = (true, inputs[i]);
     }
-    let (res, _) = reduce_multi_poly(p, inputvars)[0];
+    let reduced = reduce_multi_poly(p, inputvars);
+    let (res, _) = reduced[0];
 
     res
 }
@@ -404,7 +402,7 @@ fn commit_polyx(crs: &CRS, a: Seq<Fp>, r: Fp) -> G1 {
     let CRS(g, h) = crs;
 
     let lhs = msm(a, g.clone());
-    let rhs = g1mul(r, *h);
+    let rhs = g1mul(r, h.clone());
     let res = g1add(lhs, rhs);
 
     res
@@ -448,31 +446,40 @@ fn random_sample_poly(randomness: ByteSeq, size: usize) -> Seq<Fp> {
 /// * Exactly one variable should remain unevaluated_variables
 fn multi_to_uni_poly(p: Seq<Term>, inputs: Seq<InputVar>) -> Seq<Fp> {
     // assert exactly one var. remains un-evaled
-    assert_eq!(
-        inputs.iter().map(|f| f.0).filter(|f| *f).count(),
-        inputs.len() - 1
-    );
+    // assert_eq!(
+    //     inputs.iter().map(|f| f.0).filter(|f| *f).count(),
+    //     inputs.len() - 1
+    // );
 
     // the univariate polynomial, in mutlivariate representation
     let reduced_poly = reduce_multi_poly(p.clone(), inputs);
 
     // get the highest degree, or 0 (default) if empty
-    let max = reduced_poly
-        .iter()
-        .map(|f| f.1[0] as usize)
-        .reduce(|acc, curr| if curr > acc { curr } else { acc })
-        .unwrap_or_default();
+    let mut max_deg = 0;
+    for i in 0..reduced_poly.len() {
+        let term = reduced_poly[i].clone();
+        let powers = term.1;
+        let cur_deg = powers[0] as usize;
+        if  cur_deg > max_deg {
+            max_deg = cur_deg;
+        }
+    }
 
-    let mut s = Seq::<Fp>::create(max + 1);
+    let mut s = Seq::<Fp>::create(max_deg + 1);
 
-    for i in 0..max + 1 {
+    for i in 0..max_deg + 1 {
         // sum the coefficients of terms with same degree (in "x")
-        let coeff_sum = reduced_poly
-            .iter()
-            .filter(|f| f.1[0] == (i as u32))
-            .map(|f| f.0)
-            .reduce(|acc, cur| acc + cur)
-            .unwrap_or(Fp::from_literal(0));
+        let mut coeff_sum = Fp::ZERO();
+        for j in 0..reduced_poly.len() {
+            let mut coeff = Fp::ZERO();
+            let term = reduced_poly[j].clone();
+            let powers = term.1;
+            let power = powers[0];
+            if power == (i as u32) {
+                coeff = term.0;
+            }
+            coeff_sum = coeff_sum + coeff;
+        }
 
         // set the term with degree i to the corresponding coefficient
         s[i] = coeff_sum;
@@ -483,18 +490,18 @@ fn multi_to_uni_poly(p: Seq<Term>, inputs: Seq<InputVar>) -> Seq<Fp> {
 
 /// 5 (in protocol)
 /// split polynomial of degree n_g(n-1)-n up into n_(g-2) polynomials of degree at most n-1
-/// 
+///
 /// The prolynomials(represented by vectors) are stored in a vectore.
 /// This way the index in the outer vector can act as the i when reproducing the original poly:
 /// h(X) = SUM from i=0 to n_(g-1) [xˆ(ni)h_i(x)]
 /// Where n is a parameter of the prooving system, and h_i is the ith part of the original poly.
-/// 
+///
 /// # Arguments
 /// * `p1` Polynomial to be split
 /// * `n` defines length of new polynomials (global variable for prooving system)
-/// 
-fn split_poly(p1: Seq<Fp>, n: u32)->Seq<Seq<Fp>>{
-    let no_of_parts = (p1.len()+ (n-2) as usize) / ((n-1) as usize);
+///
+fn split_poly(p1: Seq<Fp>, n: u32) -> Seq<Seq<Fp>> {
+    let no_of_parts = (p1.len() + (n - 2) as usize) / ((n - 1) as usize);
 
     let mut original_index = 0;
     let mut poly_parts: Seq<Seq<Fp>> = Seq::<Seq<Fp>>::create(no_of_parts);
@@ -511,16 +518,16 @@ fn split_poly(p1: Seq<Fp>, n: u32)->Seq<Seq<Fp>>{
 }
 
 /*
-   6 (in protocol)
+  6 (in protocol)
 
-   commit to each h_i polynomial keeping them in the seq to peserve the power (i)
+  commit to each h_i polynomial keeping them in the seq to peserve the power (i)
 
-    WE NEED TO THINK ABOUT THE RANDOMNESS:))))
- */
-fn commit_to_poly_parts(poly_parts:Seq<Seq<Fp>>,crs: &CRS, r_seq:Seq<Fp>) -> Seq<G1>{
-    let mut commitment_seq:Seq<G1> = Seq::<G1>::create(poly_parts.len());
-    for i in 0..poly_parts.len(){
-        let commitment = commit_polyx(crs,poly_parts[i].clone(),r_seq[i]);
+   WE NEED TO THINK ABOUT THE RANDOMNESS:))))
+*/
+fn commit_to_poly_parts(poly_parts: Seq<Seq<Fp>>, crs: &CRS, r_seq: Seq<Fp>) -> Seq<G1> {
+    let mut commitment_seq: Seq<G1> = Seq::<G1>::create(poly_parts.len());
+    for i in 0..poly_parts.len() {
+        let commitment = commit_polyx(crs, poly_parts[i].clone(), r_seq[i]);
         commitment_seq[i] = commitment;
     }
     return commitment_seq;
@@ -540,20 +547,22 @@ fn open() {}
 // use quickcheck::*;
 #[cfg(test)]
 #[test]
-fn test_commit_to_poly_parts(){
+fn test_commit_to_poly_parts() {
+    let crs = CRS(
+        Seq::<G1>::from_vec(vec![G1::default(), G1::default(), G1::default()]),
+        G1::default(),
+    );
 
-    let crs = CRS(Seq::<G1>::from_vec(vec![G1::default(),G1::default(),G1::default()]), G1::default());
-
-    let r_seq = Seq::<Fp>::from_vec(vec![Fp::default(),Fp::default(),Fp::default()]);
+    let r_seq = Seq::<Fp>::from_vec(vec![Fp::default(), Fp::default(), Fp::default()]);
     let v1 = vec![5, 10, 20]
         .iter()
         .map(|e| Fp::from_literal((*e) as u128))
         .collect();
     let p1 = Seq::from_vec(v1);
     let n = 3;
-    let poly_parts = split_poly(p1,n);
-    let commitments = commit_to_poly_parts(poly_parts,&crs,r_seq);
-    println!("{:?}",commitments)
+    let poly_parts = split_poly(p1, n);
+    let commitments = commit_to_poly_parts(poly_parts, &crs, r_seq);
+    println!("{:?}", commitments)
 }
 
 #[cfg(test)]
@@ -565,8 +574,7 @@ fn test_split_poly() {
         .collect();
     let p1 = Seq::from_vec(v1);
     let n = 3;
-    let poly_parts = split_poly(p1,n);
-
+    let poly_parts = split_poly(p1, n);
 }
 
 #[cfg(test)]
