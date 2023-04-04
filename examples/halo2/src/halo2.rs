@@ -513,13 +513,17 @@ fn split_poly(p1: Seq<Fp>, n: u32) -> Seq<Seq<Fp>> {
     for i in 0..poly_parts.len() {
         poly_parts[i] = Seq::<Fp>::create((n - 1) as usize);
         for j in 0..poly_parts.len() {
+            let mut current_poly_part:Seq<Fp> = Seq::<Fp>::create(no_of_parts);
+
             if original_index < p1.len() {
-                poly_parts[i][j] = p1[original_index];
-                original_index += 1;
+                
+                current_poly_part[j] = p1[original_index];
+                original_index = original_index + 1;
             }
+            poly_parts[j] = current_poly_part;
         }
     }
-    return poly_parts;
+    poly_parts
 }
 
 ///
@@ -541,12 +545,14 @@ fn commit_to_poly_parts(poly_parts:Seq<Seq<Fp>>,crs: &CRS, r_seq:Seq<Fp>) -> Seq
         let commitment = commit_polyx(crs,poly_parts[i].clone(),r_seq[i]);
         commitment_seq[i] = commitment;
     }
-    return commitment_seq;
+    commitment_seq
 }
 
-fn step_7(commitment_se){
+///Executes the summation from step 7 in protocol.
+/// It sums the 
+// fn step_7(commitment_seq:Seq<G1>,x:Fp){
 
-}
+// }
 
 fn open() {}
 
