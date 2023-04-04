@@ -10,17 +10,17 @@ fn halo2() {
     let r = Fp::default();
 
     for j in 0..a.len() {
-        let aj = &a[j];
-        let aj_prime = multi_to_uni_poly(aj, Seq::<InputVar>::create(0)); // dummy inputs
+        let aj = a[j].clone();
+        let aj_prime = multi_to_uni_poly(aj.clone(), Seq::<InputVar>::create(0)); // dummy inputs
         let cAj = commit_polyx(&crs, aj_prime, r);
         // generate challenge cj
     }
 
     // step 2
     // dummy values
-    let g: &Seq<Term> = &Seq::<Term>::create(0);
+    let g: Seq<Term> = Seq::<Term>::create(0);
 
-    let g_prime = multi_to_uni_poly(g, Seq::<InputVar>::create(0)); // dummy inputs
+    let g_prime = multi_to_uni_poly(g.clone(), Seq::<InputVar>::create(0)); // dummy inputs
 
     // step 3
     let cR = commit_polyx(&crs, g_prime, r); // TODO update r?
@@ -33,7 +33,7 @@ fn halo2() {
 /// * `p1` - the LHS polynomial
 /// * `p2` - the RHS polynomial
 fn add_polyx(p1: Seq<Fp>, p2: Seq<Fp>) -> Seq<Fp> {
-    let mut res;
+    let mut res = Seq::<Fp>::create(0);
     let short_len;
 
     if p1.len() > p2.len() {
@@ -67,11 +67,10 @@ fn sub_polyx(p1: Seq<Fp>, p2: Seq<Fp>) -> Seq<Fp> {
     trim_poly(res)
 }
 
-
 /// Multiply a polynomial by a scalar, return resulting polynomial
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `p` - the polynomial
 /// * `s` - the scalar
 fn mul_scalar_polyx(p: Seq<Fp>, s: Fp) -> Seq<Fp> {
@@ -85,9 +84,9 @@ fn mul_scalar_polyx(p: Seq<Fp>, s: Fp) -> Seq<Fp> {
 }
 
 /// Evaluate a polynomial at point, return the evaluation
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `p` - the polynomial
 /// * `x` - the point
 fn eval_polyx(p: Seq<Fp>, x: Fp) -> Fp {
@@ -194,7 +193,7 @@ fn multiply_poly_by_single_term(p: Seq<Fp>, single_term: Seq<Fp>) -> Seq<Fp> {
 /// The algorithm is from from <https://en.wikipedia.org/wiki/Polynomial_long_division>.
 ///
 /// The pseudo-code is shown here:
-/// 
+///
 /// function n / d is
 ///  require d ≠ 0
 ///  q ← 0
@@ -248,7 +247,7 @@ type InputVar = (bool, Fp);
 /// # Arguments
 ///
 /// * `term` - the term
-fn reduce_multi_term(term: Term, inputs: &Seq<InputVar>, new_size: usize) -> Term {
+fn reduce_multi_term(term: Term, inputs: Seq<InputVar>, new_size: usize) -> Term {
     let (coef, powers) = term;
 
     let mut new_coef = coef; //First entry in a term sequence is the Coefficient
@@ -315,14 +314,14 @@ fn reduce_multi_poly(p: Seq<Term>, inputs: Seq<InputVar>) -> Seq<Term> {
         //sum results
         for i in 0..p.len() {
             let term = p[i].clone();
-            let (coef, _) = reduce_multi_term(term, &inputs, unevaluated_variables);
+            let (coef, _) = reduce_multi_term(term, inputs.clone(), unevaluated_variables);
             constant = constant + coef;
         }
     } else {
         //check if term can be evaluated, else insert term in new poly
         for i in 0..p.len() {
             let term = p[i].clone();
-            let (coef, powers) = reduce_multi_term(term, &inputs, unevaluated_variables);
+            let (coef, powers) = reduce_multi_term(term, inputs.clone(), unevaluated_variables);
             let mut all_powers_zero = true;
             for i in 0..powers.len() {
                 if powers[i] != 0 {
@@ -372,7 +371,7 @@ fn eval_multi_poly(p: Seq<Term>, inputs: Seq<Fp>) -> Fp {
 ///
 /// * `a` - sequence of scalars (LHS)
 /// * `g` - sequence of group (curve) elements (RHS)
-fn msm(a: Seq<Fp>, g: &Seq<G1>) -> G1 {
+fn msm(a: Seq<Fp>, g: Seq<G1>) -> G1 {
     let mut res = g1mul(a[0], g[0]);
     for i in 1..a.len() {
         res = g1add(res, g1mul(a[i], g[i]));
@@ -390,9 +389,8 @@ fn msm(a: Seq<Fp>, g: &Seq<G1>) -> G1 {
 /// * `r` - the "randomness"
 fn commit_polyx(crs: &CRS, a: Seq<Fp>, r: Fp) -> G1 {
     let CRS(g, h) = crs;
-    println!("{:?}",g);
-    
-    let lhs = msm(a, g);
+
+    let lhs = msm(a, g.clone());
     let rhs = g1mul(r, *h);
     let res = g1add(lhs, rhs);
 
@@ -435,7 +433,7 @@ fn random_sample_poly(randomness: ByteSeq, size: usize) -> Seq<Fp> {
 ///
 /// * The length of inputs and all sequences of powers in p1 should be equal
 /// * Exactly one variable should remain unevaluated_variables
-fn multi_to_uni_poly(p: &Seq<Term>, inputs: Seq<InputVar>) -> Seq<Fp> {
+fn multi_to_uni_poly(p: Seq<Term>, inputs: Seq<InputVar>) -> Seq<Fp> {
     // assert exactly one var. remains un-evaled
     assert_eq!(
         inputs.iter().map(|f| f.0).filter(|f| *f).count(),
@@ -486,11 +484,11 @@ fn split_poly(p1: Seq<Fp>, n: u32)->Seq<Seq<Fp>>{
     let no_of_parts = (p1.len()+ (n-2) as usize) / ((n-1) as usize);
 
     let mut original_index = 0;
-    let mut poly_parts:Seq<Seq<Fp>> = Seq::<Seq<Fp>>::create(no_of_parts);
-    for i in 0..poly_parts.len(){
-        poly_parts[i] = Seq::<Fp>::create((n-1)as usize);
-        for j in 0..poly_parts.len(){
-            if original_index < p1.len(){
+    let mut poly_parts: Seq<Seq<Fp>> = Seq::<Seq<Fp>>::create(no_of_parts);
+    for i in 0..poly_parts.len() {
+        poly_parts[i] = Seq::<Fp>::create((n - 1) as usize);
+        for j in 0..poly_parts.len() {
+            if original_index < p1.len() {
                 poly_parts[i][j] = p1[original_index];
                 original_index += 1;
             }
@@ -500,9 +498,9 @@ fn split_poly(p1: Seq<Fp>, n: u32)->Seq<Seq<Fp>>{
 }
 
 /*
-    6 (in protocol)
+   6 (in protocol)
 
-    commit to each h_i polynomial keeping them in the seq to peserve the power (i)
+   commit to each h_i polynomial keeping them in the seq to peserve the power (i)
 
     WE NEED TO THINK ABOUT THE RANDOMNESS:))))
  */
@@ -545,10 +543,9 @@ fn test_commit_to_poly_parts(){
     println!("{:?}",commitments)
 }
 
-
 #[cfg(test)]
 #[test]
-fn test_split_poly(){
+fn test_split_poly() {
     let v1 = vec![5, 10, 20]
         .iter()
         .map(|e| Fp::from_literal((*e) as u128))
@@ -688,7 +685,7 @@ fn test_multi_to_uni_poly() {
     // input value for y (2nd var), do not eval for x (1st var)
     let i1 = Seq::from_vec(vec![(false, Fp::ZERO()), (true, Fp::from_literal(5))]);
     // 11 + 140x + 2x^2
-    let u = multi_to_uni_poly(&p, i1);
+    let u = multi_to_uni_poly(p, i1);
     assert_eq!(u[0], Fp::from_literal(11));
     assert_eq!(u[1], Fp::from_literal(140));
     assert_eq!(u[2], Fp::from_literal(2));
@@ -740,15 +737,8 @@ fn test_mult_poly_st() {
 #[cfg(test)]
 #[test]
 fn test_poly_div() {
-    let n = Seq::from_vec(vec![
-        Fp::ZERO(),
-        Fp::ZERO(),
-        Fp::ONE(),
-    ]);
-    let d = Seq::from_vec(vec![
-        Fp::ZERO(),
-        Fp::ONE(),
-    ]);
+    let n = Seq::from_vec(vec![Fp::ZERO(), Fp::ZERO(), Fp::ONE()]);
+    let d = Seq::from_vec(vec![Fp::ZERO(), Fp::ONE()]);
 
     let (q, r) = divide_poly(n, d);
     assert_eq!(q.len(), 2);
