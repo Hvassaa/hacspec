@@ -1,3 +1,4 @@
+
 use hacspec_lib::*;
 use hacspec_pasta::*;
 use hacspec_sha256::*;
@@ -23,6 +24,7 @@ fn halo2() {
     let g_prime = multi_to_uni_poly(g.clone(), Seq::<InputVar>::create(0)); // dummy inputs
 
     // step 3
+    //g_prime is not randomly sampled
     let cR = commit_polyx(&crs, g_prime, r); // TODO update r?
 }
 
@@ -577,6 +579,31 @@ fn step_8(h: Seq<Seq<Fp>>, x: Fp, n: u128) -> Seq<Fp> {
 
     res
 }
+/// This functions creates a seq filled with a_i from the second part of step 9
+/// 
+/// # Arguments
+/// * `a_prime_seq` A sequence of the a' polynomials from step 1
+/// * `n_e` Global parameter for the protocol
+/// * `omega` The generator for the evaluations points also a global parameter for the protocol
+/// * `x`The challenge from step 7
+/// 
+fn step_9(a_prime_seq:Seq<Seq<Fp>>,n_e:usize,omega:Fp,x: Fp)-> Seq<Seq<Fp>>{
+    let n_a:usize =  a_prime_seq.len();
+    let mut a_seq:Seq<Seq<Fp>> = Seq::<Seq<Fp>>::create(n_a);
+    for i in 0..n_a{
+        let a_prime_i: Seq<Fp> = a_prime_seq[i].clone();
+        let mut a_i_seq:Seq<Fp> = Seq::<Fp>::create(n_e);
+        for j in 0..a_prime_i.len(){
+            let power:u32 = 2; //This is a dummy val as we need to figure the p_i sets out
+            let argument:Fp = omega.exp(power).mul(x);
+            let a_i_j:Fp = eval_polyx(a_prime_i.clone(), argument);
+            a_i_seq[j] = a_i_j;
+        }
+        a_seq[i] = a_i_seq;
+    }
+    a_seq
+}
+
 
 fn open() {}
 
@@ -591,6 +618,41 @@ fn open() {}
 // #[cfg(test)]
 // use quickcheck::*;
 
+
+#[cfg(test)]
+#[test]
+fn test_step_9(){
+    use std::clone;
+
+    let v1 = vec![1, 1, 1]
+        .iter()
+        .map(|e| Fp::from_literal((*e) as u128))
+        .collect();
+    let v2:Vec<Fp> = vec![1, 1, 1]
+        .iter()
+        .map(|e| Fp::from_literal((*e) as u128))
+        .collect();
+    let v3:Vec<Fp> = vec![1, 1, 1]
+        .iter()
+        .map(|e| Fp::from_literal((*e) as u128))
+        .collect();
+    let p1 = Seq::from_vec(v1);
+    let p2: Seq<Fp> = Seq::from_vec(v2);
+    let p3: Seq<Fp> = Seq::from_vec(v3);
+    let mut a_prime_seq:Seq<Seq<Fp>> = Seq::<Seq<Fp>>::create(3);
+    a_prime_seq[0] = p1;
+    a_prime_seq[1] = p2;
+    a_prime_seq[2] = p3;
+    let n_e  = 3;
+    let x:Fp = Fp::from_literal(1);
+    let omega:Fp = Fp::from_literal(2);
+    let a_seq:Seq<Seq<Fp>> = step_9(a_prime_seq, n_e, omega, x);
+    let a_i_seq: &Seq<Fp> = &a_seq[1];
+    println!("{}",a_i_seq[1]);
+    assert_eq!(a_i_seq[1], Fp::from_literal(21));
+
+}
+
 #[cfg(test)]
 #[test]
 fn test_part_8(){
@@ -604,6 +666,8 @@ fn test_part_8(){
     let x:Fp = Fp::default();
     let res:Seq<Fp> = step_8(poly_parts, x, n);
 }
+
+
 
 #[cfg(test)]
 #[test]
