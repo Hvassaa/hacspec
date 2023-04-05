@@ -109,7 +109,7 @@ fn poly_degree(p: Seq<Fp>) -> u128 {
     if len == 0 {
         0
     } else {
-        (len as u128) - 1
+        (len as u128) - (1 as u128)
     }
 }
 
@@ -249,10 +249,10 @@ type InputVar = (bool, Fp);
 /// # Arguments
 ///
 /// * `term` - the term
-fn reduce_multi_term(term: Term, inputs: Seq<InputVar>, new_size: usize) -> Term {
+fn reduce_multi_term(term: &Term, inputs: Seq<InputVar>, new_size: usize) -> Term {
     let (coef, powers) = term;
 
-    let mut new_coef = coef; //First entry in a term sequence is the Coefficient
+    let mut new_coef = coef.clone(); //First entry in a term sequence is the Coefficient
     let mut new_powers = Seq::<u32>::create(new_size);
 
     let mut idx = 0;
@@ -310,18 +310,18 @@ fn reduce_multi_poly(p: Seq<Term>, inputs: Seq<InputVar>) -> Seq<Term> {
     if unevaluated_variables == 0 {
         //sum results
         for i in 0..p.len() {
-            let term = p[i].clone();
-            let (coef, _) = reduce_multi_term(term, inputs.clone(), unevaluated_variables);
+            // let term = p[i].clone();
+            let (coef, _) = reduce_multi_term(&p[i], inputs.clone(), unevaluated_variables);
             constant = constant + coef;
         }
     } else {
         //check if term can be evaluated, else insert term in new poly
         for i in 0..p.len() {
-            let term = p[i].clone();
-            let (coef, powers) = reduce_multi_term(term, inputs.clone(), unevaluated_variables);
+            // let term = p[i].clone();
+            let (coef, powers) = reduce_multi_term(&p[i], inputs.clone(), unevaluated_variables);
             let mut all_powers_zero = true;
             for i in 0..powers.len() {
-                if powers[i] != 0 {
+                if powers[i] != (0 as u32) {
                     all_powers_zero = false;
                 }
             }
@@ -387,9 +387,10 @@ fn msm(a: Seq<Fp>, g: Seq<G1>) -> G1 {
 /// * `r` - the "randomness"
 fn commit_polyx(crs: &CRS, a: Seq<Fp>, r: Fp) -> G1 {
     let (g, h) = crs;
+    let (f1, f2, b) = h;
 
     let lhs = msm(a, g.clone());
-    let rhs = g1mul(r, h.clone());
+    let rhs = g1mul(r, (f1.clone(), f2.clone(), b.clone()));
     let res = g1add(lhs, rhs);
 
     res
@@ -401,20 +402,27 @@ fn commit_polyx(crs: &CRS, a: Seq<Fp>, r: Fp) -> G1 {
 ///
 /// * `randomness` - the "randomness"
 /// * `size` - the size of the polynomials (the max power -1)
-fn random_sample_poly(randomness: ByteSeq, size: usize) -> Seq<Fp> {
-    let mut s = Seq::<Fp>::create(size);
-    let mut r = randomness;
+// fn random_sample_poly(randomness: ByteSeq, size: usize) -> Seq<Fp> {
+//     let mut s = Seq::<Fp>::create(size);
+//     let mut r = randomness;
 
-    for i in 0..size {
-        let digest = hash(&r);
-        let hex = digest.to_hex();
-        r = ByteSeq::from_hex(&hex);
+//     for i in 0..size {
+//         let digest = hash(&r);
+//         let hex = digest.to_hex();
+//         r = ByteSeq::from_hex(&hex);
 
-        s[i] = Fp::from_byte_seq_be(&r);
-    }
+//         s[i] = Fp::from_byte_seq_be(&r);
+//     }
 
-    s
-}
+//     s
+// }
+
+// fn extract_term(term: &Term) -> (Fp, u32) {
+//     let (f, powers): (Fp, Seq<u32>) = term.clone();
+//     // let degs: Seq<u32> = powers.clone();
+//     // let deg: u32 = degs[0].clone::<u32>();
+//     (f.clone(), powers[0].clone())
+// }
 
 /// Evaluate a multivariate polynomial in variables such that it becomes a univariate polynomial (1.1 in protocol)
 /// (univaraite polynomial represented as a sequence of field elements, where entry i, has
@@ -459,11 +467,12 @@ fn multi_to_uni_poly(p: Seq<Term>, inputs: Seq<InputVar>) -> Seq<Fp> {
         let mut coeff_sum = Fp::ZERO();
         for j in 0..reduced_poly.len() {
             let mut coeff = Fp::ZERO();
-            let term = reduced_poly[j].clone();
-            let powers = term.1;
+            let poly_clone = reduced_poly.clone();
+            let powers = poly_clone[j].1.clone();
+            let f = poly_clone[j].0.clone();
             let power = powers[0];
             if power == (i as u32) {
-                coeff = term.0;
+                coeff = f.clone();
             }
             coeff_sum = coeff_sum + coeff;
         }
@@ -488,12 +497,12 @@ fn multi_to_uni_poly(p: Seq<Term>, inputs: Seq<InputVar>) -> Seq<Fp> {
 /// * `n` defines length of new polynomials (global variable for prooving system)
 ///
 fn split_poly(p1: Seq<Fp>, n: u128) -> Seq<Seq<Fp>> {
-    let no_of_parts = (p1.len() + (n - 2) as usize) / ((n - 1) as usize);
+    let no_of_parts = (p1.len() + (n - (2 as u128)) as usize) / ((n - (1 as u128)) as usize);
 
     let mut original_index = 0;
     let mut poly_parts: Seq<Seq<Fp>> = Seq::<Seq<Fp>>::create(no_of_parts);
     for i in 0..poly_parts.len() {
-        poly_parts[i] = Seq::<Fp>::create((n - 1) as usize);
+        poly_parts[i] = Seq::<Fp>::create((n - (1 as u128)) as usize);
         for j in 0..poly_parts.len() {
             let mut current_poly_part: Seq<Fp> = Seq::<Fp>::create(no_of_parts);
 
@@ -547,7 +556,7 @@ fn step_7(commitment_seq: Seq<G1>, x: Fp, n: u128) -> G1 {
 }
 
 fn step_8(h: Seq<Seq<Fp>>, x: Fp, n: u128) -> Seq<Fp> {
-    let mut res = Seq::<Fp>::create((n - 1) as usize);
+    let mut res = Seq::<Fp>::create((n - (1 as u128)) as usize);
     for i in 0..h.len() {
         let ni_prod = n * (i as u128);
         let x_raised = x.pow(ni_prod as u128);
