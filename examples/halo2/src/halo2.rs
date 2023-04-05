@@ -7,7 +7,7 @@ fn halo2() {
     // step 1
     // dummy values
     let a: Seq<Seq<Term>> = Seq::<Seq<Term>>::create(0);
-    let crs = CRS(Seq::<G1>::create(0), G1::default());
+    let crs: CRS = (Seq::<G1>::create(0), G1::default());
     let r = Fp::default();
 
     for j in 0..a.len() {
@@ -111,7 +111,7 @@ fn poly_degree(p: Seq<Fp>) -> u128 {
     if len == 0 {
         0
     } else {
-        (len as u128) - 1
+        (len as u128) - (1 as u128)
     }
 }
 
@@ -192,11 +192,9 @@ fn multiply_poly_by_single_term(p: Seq<Fp>, single_term: Seq<Fp>) -> Seq<Fp> {
 }
 
 /// Perform polynomial long division, returning the quotient and the remainder.
-/// The algorithm is from <https://en.wikipedia.org/wiki/Polynomial_long_division> and is mainly
-/// performed in `divide_poly_helper`.
+/// The algorithm is from from <https://en.wikipedia.org/wiki/Polynomial_long_division>.
 ///
-/// The pseudo-code is shown here. The while-loop is replaces by a recursive call in a helper
-/// function, since hacspec disallows while-loops.
+/// The pseudo-code is shown here:
 ///
 /// function n / d is
 ///  require d ≠ 0
@@ -214,31 +212,19 @@ fn multiply_poly_by_single_term(p: Seq<Fp>, single_term: Seq<Fp>) -> Seq<Fp> {
 ///
 /// * `n` - the dividend/enumerator polynomial
 /// * `d` - the divisor/denominator polynomial
+#[cfg(test)]
 fn divide_poly(n: Seq<Fp>, d: Seq<Fp>) -> (Seq<Fp>, Seq<Fp>) {
-    let q = Seq::<Fp>::create(n.len());
-    let r = n.clone();
-    divide_poly_helper(n, d, q, r)
-}
+    let mut q = Seq::new(n.len());
+    let mut r = n.clone();
 
-/// Recursive helper function for `divide_poly`, with the actual algorithm.
-/// It should NOT be used directly
-///
-/// # Arguments
-///
-/// * `n` - the dividend/enumerator polynomial
-/// * `d` - the divisor/denominator polynomial
-/// * `q` - the algorithm's current `q` value (in the recursion)
-/// * `r` - the algorithm's current `r` value (in the recursion)
-fn divide_poly_helper(n: Seq<Fp>, d: Seq<Fp>, q: Seq<Fp>, r: Seq<Fp>) -> (Seq<Fp>, Seq<Fp>) {
-    if sum_coeffs(r.clone()) != Fp::ZERO() && poly_degree(r.clone()) >= poly_degree(d.clone()) {
+    while sum_coeffs(r.clone()) != Fp::ZERO() && poly_degree(r.clone()) >= poly_degree(d.clone()) {
         let t = divide_leading_terms(r.clone(), d.clone());
-        let q = add_polyx(q, t.clone());
+        q = add_polyx(q, t.clone());
         let aux_prod = multiply_poly_by_single_term(d.clone(), t);
-        let r = sub_polyx(r, aux_prod);
-        divide_poly_helper(n, d, q, r)
-    } else {
-        (trim_poly(q), trim_poly(r))
+        r = sub_polyx(r, aux_prod);
     }
+
+    (trim_poly(q), trim_poly(r))
 }
 
 struct PublicParams(
@@ -246,18 +232,14 @@ struct PublicParams(
     G1,      // U in G
     G1,      // W in G
 );
+
 /// Commen Reference Struct
 /// This struct is a global variable for the prooving system and holds values used in the commitment schemes
-/// 
+///
 /// # Elements
 /// * `[0]`: Seq<G1> ∈ Gᵈ (vector of random elems.)
 /// * `[1]`: G1 in G (random group element)
-struct CRS(
-    // G,  // G: group of prime-order p
-    Seq<G1>, // g: g in G^d (vector of random elems.)
-    G1,      // H: H in G (random group element)
-             // Fp, // Fp: finite field order p
-);
+type CRS = (Seq<G1>, G1);
 
 // primarily for multivariate polys
 type Term = (Fp, Seq<u32>);
@@ -269,10 +251,10 @@ type InputVar = (bool, Fp);
 /// # Arguments
 ///
 /// * `term` - the term
-fn reduce_multi_term(term: Term, inputs: Seq<InputVar>, new_size: usize) -> Term {
+fn reduce_multi_term(term: &Term, inputs: Seq<InputVar>, new_size: usize) -> Term {
     let (coef, powers) = term;
 
-    let mut new_coef = coef; //First entry in a term sequence is the Coefficient
+    let mut new_coef = coef.clone(); //First entry in a term sequence is the Coefficient
     let mut new_powers = Seq::<u32>::create(new_size);
 
     let mut idx = 0;
@@ -330,18 +312,18 @@ fn reduce_multi_poly(p: Seq<Term>, inputs: Seq<InputVar>) -> Seq<Term> {
     if unevaluated_variables == 0 {
         //sum results
         for i in 0..p.len() {
-            let term = p[i].clone();
-            let (coef, _) = reduce_multi_term(term, inputs.clone(), unevaluated_variables);
+            // let term = p[i].clone();
+            let (coef, _) = reduce_multi_term(&p[i], inputs.clone(), unevaluated_variables);
             constant = constant + coef;
         }
     } else {
         //check if term can be evaluated, else insert term in new poly
         for i in 0..p.len() {
-            let term = p[i].clone();
-            let (coef, powers) = reduce_multi_term(term, inputs.clone(), unevaluated_variables);
+            // let term = p[i].clone();
+            let (coef, powers) = reduce_multi_term(&p[i], inputs.clone(), unevaluated_variables);
             let mut all_powers_zero = true;
             for i in 0..powers.len() {
-                if powers[i] != 0 {
+                if powers[i] != (0 as u32) {
                     all_powers_zero = false;
                 }
             }
@@ -406,10 +388,11 @@ fn msm(a: Seq<Fp>, g: Seq<G1>) -> G1 {
 /// * `a` - the "vector"
 /// * `r` - the "randomness"
 fn commit_polyx(crs: &CRS, a: Seq<Fp>, r: Fp) -> G1 {
-    let CRS(g, h) = crs;
+    let (g, h) = crs;
+    let (f1, f2, b) = h;
 
     let lhs = msm(a, g.clone());
-    let rhs = g1mul(r, h.clone());
+    let rhs = g1mul(r, (f1.clone(), f2.clone(), b.clone()));
     let res = g1add(lhs, rhs);
 
     res
@@ -421,20 +404,27 @@ fn commit_polyx(crs: &CRS, a: Seq<Fp>, r: Fp) -> G1 {
 ///
 /// * `randomness` - the "randomness"
 /// * `size` - the size of the polynomials (the max power -1)
-fn random_sample_poly(randomness: ByteSeq, size: usize) -> Seq<Fp> {
-    let mut s = Seq::<Fp>::create(size);
-    let mut r = randomness;
+// fn random_sample_poly(randomness: ByteSeq, size: usize) -> Seq<Fp> {
+//     let mut s = Seq::<Fp>::create(size);
+//     let mut r = randomness;
 
-    for i in 0..size {
-        let digest = hash(&r);
-        let hex = digest.to_hex();
-        r = ByteSeq::from_hex(&hex);
+//     for i in 0..size {
+//         let digest = hash(&r);
+//         let hex = digest.to_hex();
+//         r = ByteSeq::from_hex(&hex);
 
-        s[i] = Fp::from_byte_seq_be(&r);
-    }
+//         s[i] = Fp::from_byte_seq_be(&r);
+//     }
 
-    s
-}
+//     s
+// }
+
+// fn extract_term(term: &Term) -> (Fp, u32) {
+//     let (f, powers): (Fp, Seq<u32>) = term.clone();
+//     // let degs: Seq<u32> = powers.clone();
+//     // let deg: u32 = degs[0].clone::<u32>();
+//     (f.clone(), powers[0].clone())
+// }
 
 /// Evaluate a multivariate polynomial in variables such that it becomes a univariate polynomial (1.1 in protocol)
 /// (univaraite polynomial represented as a sequence of field elements, where entry i, has
@@ -467,7 +457,7 @@ fn multi_to_uni_poly(p: Seq<Term>, inputs: Seq<InputVar>) -> Seq<Fp> {
         let term = reduced_poly[i].clone();
         let powers = term.1;
         let cur_deg = powers[0] as usize;
-        if  cur_deg > max_deg {
+        if cur_deg > max_deg {
             max_deg = cur_deg;
         }
     }
@@ -479,11 +469,12 @@ fn multi_to_uni_poly(p: Seq<Term>, inputs: Seq<InputVar>) -> Seq<Fp> {
         let mut coeff_sum = Fp::ZERO();
         for j in 0..reduced_poly.len() {
             let mut coeff = Fp::ZERO();
-            let term = reduced_poly[j].clone();
-            let powers = term.1;
+            let poly_clone = reduced_poly.clone();
+            let powers = poly_clone[j].1.clone();
+            let f = poly_clone[j].0.clone();
             let power = powers[0];
             if power == (i as u32) {
-                coeff = term.0;
+                coeff = f.clone();
             }
             coeff_sum = coeff_sum + coeff;
         }
@@ -508,17 +499,16 @@ fn multi_to_uni_poly(p: Seq<Term>, inputs: Seq<InputVar>) -> Seq<Fp> {
 /// * `n` defines length of new polynomials (global variable for prooving system)
 ///
 fn split_poly(p1: Seq<Fp>, n: u128) -> Seq<Seq<Fp>> {
-    let no_of_parts = (p1.len() + (n - 2) as usize) / ((n - 1) as usize);
+    let no_of_parts = (p1.len() + (n - (2 as u128)) as usize) / ((n - (1 as u128)) as usize);
 
     let mut original_index = 0;
     let mut poly_parts: Seq<Seq<Fp>> = Seq::<Seq<Fp>>::create(no_of_parts);
     for i in 0..poly_parts.len() {
-        poly_parts[i] = Seq::<Fp>::create((n - 1) as usize);
+        poly_parts[i] = Seq::<Fp>::create((n - (1 as u128)) as usize);
         for j in 0..poly_parts.len() {
-            let mut current_poly_part:Seq<Fp> = Seq::<Fp>::create(no_of_parts);
+            let mut current_poly_part: Seq<Fp> = Seq::<Fp>::create(no_of_parts);
 
             if original_index < p1.len() {
-                
                 current_poly_part[j] = p1[original_index];
                 original_index = original_index + 1;
             }
@@ -537,38 +527,38 @@ fn split_poly(p1: Seq<Fp>, n: u128) -> Seq<Seq<Fp>> {
 /// * `poly_parts` A sequence of polynomials to be commited to
 /// * `crs` Commen Refernce Struct (Global variable for prooving system)
 /// * `r_seq`Sequence of random elements used as blinding factors
-/// 
+///
 /// # Constraints
 /// * `r_seq` should be at least as long as the `poly_parts`
-/// 
-fn commit_to_poly_parts(poly_parts:Seq<Seq<Fp>>,crs: &CRS, r_seq:Seq<Fp>) -> Seq<G1>{
-    let mut commitment_seq:Seq<G1> = Seq::<G1>::create(poly_parts.len());
-    for i in 0..poly_parts.len(){
-        let commitment = commit_polyx(crs,poly_parts[i].clone(),r_seq[i]);
+///
+fn commit_to_poly_parts(poly_parts: Seq<Seq<Fp>>, crs: &CRS, r_seq: Seq<Fp>) -> Seq<G1> {
+    let mut commitment_seq: Seq<G1> = Seq::<G1>::create(poly_parts.len());
+    for i in 0..poly_parts.len() {
+        let commitment = commit_polyx(crs, poly_parts[i].clone(), r_seq[i]);
         commitment_seq[i] = commitment;
     }
     commitment_seq
 }
 ///Step 7
 /// Computes the sum from step 7 in the protocol description
-/// 
+///
 /// # Arguments
 /// * `commitment_seq` is a sequence of commitments
 /// * `x`is the challenge each commitment should be multiplied with
 /// * `n` Global parameter for the prooving system
-fn step_7(commitment_seq:Seq<G1>,x: Fp, n: u128) -> G1{
+fn step_7(commitment_seq: Seq<G1>, x: Fp, n: u128) -> G1 {
     let mut result: G1 = G1::default();
-    for i in 0..commitment_seq.len(){
-        let power:u128 = n*i as u128;
+    for i in 0..commitment_seq.len() {
+        let power: u128 = n * i as u128;
         let x_raised = x.pow(power);
-        let intemidiate:G1 = g1mul(x_raised, commitment_seq[i]);
+        let intemidiate: G1 = g1mul(x_raised, commitment_seq[i]);
         result = g1add(result, intemidiate);
     }
     result
 }
 
 fn step_8(h: Seq<Seq<Fp>>, x: Fp, n: u128) -> Seq<Fp> {
-    let mut res = Seq::<Fp>::create((n - 1) as usize);
+    let mut res = Seq::<Fp>::create((n - (1 as u128)) as usize);
     for i in 0..h.len() {
         let ni_prod = n * (i as u128);
         let x_raised = x.pow(ni_prod as u128);
@@ -655,7 +645,7 @@ fn test_step_9(){
 
 #[cfg(test)]
 #[test]
-fn test_part_8(){
+fn test_part_8() {
     let v1 = vec![5, 10, 20]
         .iter()
         .map(|e| Fp::from_literal((*e) as u128))
@@ -663,25 +653,26 @@ fn test_part_8(){
     let p1 = Seq::from_vec(v1);
     let n = 3;
     let poly_parts = split_poly(p1, n);
-    let x:Fp = Fp::default();
-    let res:Seq<Fp> = step_8(poly_parts, x, n);
+    let x: Fp = Fp::default();
+    let res: Seq<Fp> = step_8(poly_parts, x, n);
 }
 
 
 
 #[cfg(test)]
 #[test]
-fn test_part_7(){
-    let commitment_seq: Seq<G1> = Seq::<G1>::from_vec(vec![G1::default(), G1::default(), G1::default()]);
-    let x:Fp = Fp::default();
-    let n:u128 = 128;
-    let res:G1 = step_7(commitment_seq, x, n);
+fn test_part_7() {
+    let commitment_seq: Seq<G1> =
+        Seq::<G1>::from_vec(vec![G1::default(), G1::default(), G1::default()]);
+    let x: Fp = Fp::default();
+    let n: u128 = 128;
+    let res: G1 = step_7(commitment_seq, x, n);
 }
 
 #[cfg(test)]
 #[test]
 fn test_commit_to_poly_parts() {
-    let crs = CRS(
+    let crs: CRS = (
         Seq::<G1>::from_vec(vec![G1::default(), G1::default(), G1::default()]),
         G1::default(),
     );
