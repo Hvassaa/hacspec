@@ -660,6 +660,61 @@ fn step_11(
     qs
 }
 
+/// Step 12
+/// Get the list of Q's (Q_0, ..., Q_{n_q - 1})
+///
+/// # Arguments
+/// * `n_q` n_q from the protocol
+/// * `n_a` n_a from the protocol
+/// * `x1` challenge 1
+/// * `h_prime` h', the computed polynomial from step 8
+/// * `r` the "random" polynomial from step 3
+/// * `a_prime` a', the list of univariate polys from step 1
+/// * `q` q, from the protocol represented as seqs of (i, set), s.t. q_i = set
+fn step_12(
+    n_q: u128,
+    n_a: u128,
+    x1: Fp,
+    h_prime: Seq<Fp>,
+    r: Seq<Fp>,
+    a_prime: Seq<Seq<Fp>>,
+    q: Seq<(u128, Seq<u128>)>,
+) -> Seq<Seq<Fp>> {
+    let nq_minus1 = n_q - (1 as u128);
+    let mut qs = Seq::<Seq<Fp>>::create(nq_minus1 as usize);
+
+    // initialize all polys to constant 0
+    for i in 0..qs.len() {
+        qs[i] = Seq::<Fp>::create(1);
+    }
+
+    let na_minus1 = n_a - (1 as u128);
+
+    // bullet 1
+    for i in 0..(na_minus1 as usize) {
+        let a_i = a_prime[i as usize].clone();
+        let sigma_i = sigma(i as u128, q.clone());
+        // TODO is this what is meant by Q_sigma(i) ?
+        for j in 0..sigma_i.len() {
+            let j = sigma_i[j];
+            let q_sigma_i = qs[j as usize].clone();
+            let product = mul_scalar_polyx(q_sigma_i.clone(), x1);
+            qs[j as usize] = add_polyx(product, a_i.clone());
+        }
+    }
+
+    // bullet 2
+    let x1_squared = x1 * x1;
+    let q0 = qs[0 as usize].clone();
+    let product1 = mul_scalar_polyx(q0, x1_squared);
+    let product2 = mul_scalar_polyx(h_prime, x1);
+    let sum1 = add_polyx(product1, product2);
+    let final_sum = add_polyx(sum1, r);
+    qs[0] = final_sum;
+
+    qs
+}
+
 fn open() {}
 
 // #[cfg(test)]
@@ -964,4 +1019,18 @@ fn test_step11() {
     let r = G1::default();
     let q = Seq::create(0);
     step_11(n_a, n_q, x1, h_prime, r, a, q);
+}
+
+#[cfg(test)]
+#[test]
+fn test_step12() {
+    // TODO dont use dummy values
+    let x1 = Fp::default();
+    let a = Seq::create(0);
+    let n_a = u128::TWO();
+    let n_q = u128::ONE();
+    let h_prime = Seq::create(0);
+    let r = Seq::create(0);
+    let q = Seq::create(0);
+    step_12(n_a, n_q, x1, h_prime, r, a, q);
 }
