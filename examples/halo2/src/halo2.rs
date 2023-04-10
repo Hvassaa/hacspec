@@ -1,7 +1,6 @@
-
 use hacspec_lib::*;
 use hacspec_pasta::*;
-use hacspec_sha256::*;
+// use hacspec_sha256::*;
 
 fn halo2() {
     // step 1
@@ -570,23 +569,23 @@ fn step_8(h: Seq<Seq<Fp>>, x: Fp, n: u128) -> Seq<Fp> {
     res
 }
 /// This functions creates a seq filled with a_i from the second part of step 9
-/// 
+///
 /// # Arguments
 /// * `a_prime_seq` A sequence of the a' polynomials from step 1
 /// * `n_e` Global parameter for the protocol
 /// * `omega` The generator for the evaluations points also a global parameter for the protocol
 /// * `x`The challenge from step 7
-/// 
-fn step_9(a_prime_seq:Seq<Seq<Fp>>,n_e:usize,omega:Fp,x: Fp)-> Seq<Seq<Fp>>{
-    let n_a:usize =  a_prime_seq.len();
-    let mut a_seq:Seq<Seq<Fp>> = Seq::<Seq<Fp>>::create(n_a);
-    for i in 0..n_a{
+///
+fn step_9(a_prime_seq: Seq<Seq<Fp>>, n_e: usize, omega: Fp, x: Fp) -> Seq<Seq<Fp>> {
+    let n_a: usize = a_prime_seq.len();
+    let mut a_seq: Seq<Seq<Fp>> = Seq::<Seq<Fp>>::create(n_a);
+    for i in 0..n_a {
         let a_prime_i: Seq<Fp> = a_prime_seq[i].clone();
-        let mut a_i_seq:Seq<Fp> = Seq::<Fp>::create(n_e);
-        for j in 0..a_prime_i.len(){
-            let power:u32 = 2; //This is a dummy val as we need to figure the p_i sets out
-            let argument:Fp = omega.exp(power).mul(x);
-            let a_i_j:Fp = eval_polyx(a_prime_i.clone(), argument);
+        let mut a_i_seq: Seq<Fp> = Seq::<Fp>::create(n_e);
+        for j in 0..a_prime_i.len() {
+            let power: u32 = 2; //This is a dummy val as we need to figure the p_i sets out
+            let argument: Fp = omega.exp(power).mul(x);
+            let a_i_j: Fp = eval_polyx(a_prime_i.clone(), argument);
             a_i_seq[j] = a_i_j;
         }
         a_seq[i] = a_i_seq;
@@ -594,6 +593,72 @@ fn step_9(a_prime_seq:Seq<Seq<Fp>>,n_e:usize,omega:Fp,x: Fp)-> Seq<Seq<Fp>>{
     a_seq
 }
 
+/// Implementation of the σ mapping from the protocol
+///
+/// # Arguments
+/// * `i` the i in σ(i)
+/// * `q` q, from the protocol represented as seqs of (i, set), s.t. q_i = set
+fn sigma(i: u128, q: Seq<(u128, Seq<u128>)>) -> Seq<u128> {
+    let mut res = Seq::<u128>::create(0);
+    for j in 0..q.len() {
+        let maybe_i = q[j].0;
+        let maybe_res = q[j].1.clone();
+        if i == maybe_i {
+            res = maybe_res;
+        }
+    }
+
+    res
+}
+
+/// Step 11
+/// Get the list of Q's (Q_0, ..., Q_{n_q - 1})
+///
+/// # Arguments
+/// * `n_q` n_q from the protocol
+/// * `n_a` n_a from the protocol
+/// * `x1` challenge 1
+/// * `h_prime` H', the computed sum from step 7
+/// * `r` R, commitment from step 3
+/// * `a` A, the list of hiding commitments for a_i's
+/// * `q` q, from the protocol represented as seqs of (i, set), s.t. q_i = set
+fn step_11(
+    n_q: u128,
+    n_a: u128,
+    x1: Fp,
+    h_prime: G1,
+    r: G1,
+    a: Seq<G1>,
+    q: Seq<(u128, Seq<u128>)>,
+) -> Seq<G1> {
+    let nq_minus1 = n_q - (1 as u128);
+    let mut qs = Seq::<G1>::create(nq_minus1 as usize);
+    let na_minus1 = n_a - (1 as u128);
+
+    // bullet 1
+    for i in 0..(na_minus1 as usize) {
+        let a_i = a[i as usize];
+        let sigma_i = sigma(i as u128, q.clone());
+        // TODO is this what is meant by Q_sigma(i) ?
+        for j in 0..sigma_i.len() {
+            let j = sigma_i[j];
+            let q_sigma_i = qs[j as usize];
+            let product = g1mul(x1, q_sigma_i);
+            qs[j as usize] = g1add(product, a_i);
+        }
+    }
+
+    // bullet 2
+    let x1_squared = x1 * x1;
+    let q0 = qs[0];
+    let product1 = g1mul(x1_squared, q0);
+    let product2 = g1mul(x1, h_prime);
+    let sum1 = g1add(product1, product2);
+    let final_sum = g1add(sum1, r);
+    qs[0] = final_sum;
+
+    qs
+}
 
 fn open() {}
 
@@ -608,39 +673,37 @@ fn open() {}
 // #[cfg(test)]
 // use quickcheck::*;
 
-
 #[cfg(test)]
 #[test]
-fn test_step_9(){
+fn test_step_9() {
     use std::clone;
 
     let v1 = vec![1, 1, 1]
         .iter()
         .map(|e| Fp::from_literal((*e) as u128))
         .collect();
-    let v2:Vec<Fp> = vec![1, 1, 1]
+    let v2: Vec<Fp> = vec![1, 1, 1]
         .iter()
         .map(|e| Fp::from_literal((*e) as u128))
         .collect();
-    let v3:Vec<Fp> = vec![1, 1, 1]
+    let v3: Vec<Fp> = vec![1, 1, 1]
         .iter()
         .map(|e| Fp::from_literal((*e) as u128))
         .collect();
     let p1 = Seq::from_vec(v1);
     let p2: Seq<Fp> = Seq::from_vec(v2);
     let p3: Seq<Fp> = Seq::from_vec(v3);
-    let mut a_prime_seq:Seq<Seq<Fp>> = Seq::<Seq<Fp>>::create(3);
+    let mut a_prime_seq: Seq<Seq<Fp>> = Seq::<Seq<Fp>>::create(3);
     a_prime_seq[0] = p1;
     a_prime_seq[1] = p2;
     a_prime_seq[2] = p3;
-    let n_e  = 3;
-    let x:Fp = Fp::from_literal(1);
-    let omega:Fp = Fp::from_literal(2);
-    let a_seq:Seq<Seq<Fp>> = step_9(a_prime_seq, n_e, omega, x);
+    let n_e = 3;
+    let x: Fp = Fp::from_literal(1);
+    let omega: Fp = Fp::from_literal(2);
+    let a_seq: Seq<Seq<Fp>> = step_9(a_prime_seq, n_e, omega, x);
     let a_i_seq: &Seq<Fp> = &a_seq[1];
-    println!("{}",a_i_seq[1]);
+    println!("{}", a_i_seq[1]);
     assert_eq!(a_i_seq[1], Fp::from_literal(21));
-
 }
 
 #[cfg(test)]
@@ -656,8 +719,6 @@ fn test_part_8() {
     let x: Fp = Fp::default();
     let res: Seq<Fp> = step_8(poly_parts, x, n);
 }
-
-
 
 #[cfg(test)]
 #[test]
@@ -889,4 +950,18 @@ fn test_poly_div() {
     assert_eq!(q[0], Fp::ZERO());
     assert_eq!(q[1], Fp::ONE());
     assert_eq!(sum_coeffs(r), Fp::ZERO());
+}
+
+#[cfg(test)]
+#[test]
+fn test_step11() {
+    // TODO dont use dummy values
+    let x1 = Fp::default();
+    let a = Seq::<G1>::create(1);
+    let n_a = u128::TWO();
+    let n_q = u128::TWO();
+    let h_prime = G1::default();
+    let r = G1::default();
+    let q = Seq::create(0);
+    step_11(n_a, n_q, x1, h_prime, r, a, q);
 }
