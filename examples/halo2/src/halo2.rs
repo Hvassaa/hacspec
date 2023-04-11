@@ -191,7 +191,7 @@ fn multiply_poly_by_single_term(p: Seq<Fp>, single_term: Seq<Fp>) -> Seq<Fp> {
 }
 
 /// Perform polynomial long division, returning the quotient and the remainder.
-/// The algorithm is from from <https://en.wikipedia.org/wiki/Polynomial_long_division>.
+/// The algorithm is from <https://en.wikipedia.org/wiki/Polynomial_long_division>.
 ///
 /// The pseudo-code is shown here:
 ///
@@ -291,13 +291,6 @@ fn reduce_multi_term(term: &Term, inputs: Seq<InputVar>, new_size: usize) -> Ter
 ///
 /// * The length of inputs and all sequences of powers in p1 should be equal
 fn reduce_multi_poly(p: Seq<Term>, inputs: Seq<InputVar>) -> Seq<Term> {
-    // only checking the 1st term for brevity
-    // assert_eq!(
-    //     p.iter().next().unwrap().1.len(),
-    //     inputs.len(),
-    //     "no. of inputs should match length of variables"
-    // );
-
     let mut constant = Fp::ZERO();
     let mut unevaluated_variables = 0;
     for i in 0..inputs.len() {
@@ -441,12 +434,6 @@ fn commit_polyx(crs: &CRS, a: Seq<Fp>, r: Fp) -> G1 {
 /// * The length of inputs and all sequences of powers in p1 should be equal
 /// * Exactly one variable should remain unevaluated_variables
 fn multi_to_uni_poly(p: Seq<Term>, inputs: Seq<InputVar>) -> Seq<Fp> {
-    // assert exactly one var. remains un-evaled
-    // assert_eq!(
-    //     inputs.iter().map(|f| f.0).filter(|f| *f).count(),
-    //     inputs.len() - 1
-    // );
-
     // the univariate polynomial, in mutlivariate representation
     let reduced_poly = reduce_multi_poly(p.clone(), inputs);
 
@@ -496,7 +483,6 @@ fn multi_to_uni_poly(p: Seq<Term>, inputs: Seq<InputVar>) -> Seq<Fp> {
 /// # Arguments
 /// * `p1` Polynomial to be split
 /// * `n` defines length of new polynomials (global variable for prooving system)
-///
 fn split_poly(p1: Seq<Fp>, n: u128) -> Seq<Seq<Fp>> {
     let no_of_parts = (p1.len() + (n - (2 as u128)) as usize) / ((n - (1 as u128)) as usize);
 
@@ -518,7 +504,7 @@ fn split_poly(p1: Seq<Fp>, n: u128) -> Seq<Seq<Fp>> {
 }
 
 ///
-///6 (in protocol)
+/// 6 (in protocol)
 ///
 /// commit to each h_i polynomial keeping them in the seq to peserve the power (i)
 ///
@@ -538,7 +524,7 @@ fn commit_to_poly_parts(poly_parts: Seq<Seq<Fp>>, crs: &CRS, r_seq: Seq<Fp>) -> 
     }
     commitment_seq
 }
-///Step 7
+/// Step 7
 /// Computes the sum from step 7 in the protocol description
 ///
 /// # Arguments
@@ -568,6 +554,7 @@ fn step_8(h: Seq<Seq<Fp>>, x: Fp, n: u128) -> Seq<Fp> {
 
     res
 }
+
 /// This functions creates a seq filled with a_i from the second part of step 9
 ///
 /// # Arguments
