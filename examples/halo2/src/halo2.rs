@@ -59,10 +59,18 @@ fn add_polyx(p1: Seq<Fp>, p2: Seq<Fp>) -> Seq<Fp> {
 /// * `p1` - the LHS polynomial
 /// * `p2` - the RHS polynomial
 fn sub_polyx(p1: Seq<Fp>, p2: Seq<Fp>) -> Seq<Fp> {
-    let mut res = p1.clone();
+    let mut largest = p1.len();
+    if p2.len() > p1.len() {
+        largest = p2.len();
+    }
+
+    let mut res = Seq::<Fp>::create(largest);
+    for i in 0..p1.len() {
+        res[i] = p1[i];
+    }
 
     for i in 0..p2.len() {
-        res[i] = p1[i] - p2[i];
+        res[i] = res[i] - p2[i];
     }
 
     trim_poly(res)
