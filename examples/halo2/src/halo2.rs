@@ -110,7 +110,7 @@ fn eval_polyx(p: Seq<Fp>, x: Fp) -> Fp {
 ///
 /// * `p` - the polynomial
 fn poly_degree(p: Seq<Fp>) -> u128 {
-    let len = p.len();
+    let len = trim_poly(p).len();
     if len == 0 {
         0
     } else {
@@ -133,7 +133,7 @@ fn sum_coeffs(p: Seq<Fp>) -> Fp {
     sum
 }
 
-// Trim a polynomial of trailing zeros (zero-terms) and return it
+/// Trim a polynomial of trailing zeros (zero-terms) and return it
 ///
 /// # Arguments
 ///
@@ -224,6 +224,12 @@ fn divide_poly(n: Seq<Fp>, d: Seq<Fp>) -> (Seq<Fp>, Seq<Fp>) {
         q = add_polyx(q, t.clone());
         let aux_prod = multiply_poly_by_single_term(d.clone(), t);
         r = sub_polyx(r, aux_prod);
+        println!("??????????????");
+        println!("{:?}",r);
+        println!("{:?}",d);
+        println!("+++++++++++++");
+
+
     }
 
     (trim_poly(q), trim_poly(r))
@@ -262,6 +268,9 @@ fn legrange_basis(points: Seq<(Fp,Fp)>,x:Fp)->Seq<Fp>{
     }
     let mut division_poly = Seq::<Fp>::create(points.len());
     division_poly[0] = devisor;
+    println!("{:?}",division_poly);
+    println!("{:?}",basis);
+
     let output = divide_poly(basis, division_poly);
     basis = output.0;
     let rest = output.1;
