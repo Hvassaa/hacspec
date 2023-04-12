@@ -167,6 +167,7 @@ fn divide_leading_terms(n: Seq<Fp>, d: Seq<Fp>) -> Seq<Fp> {
     let x_pow = n.len() - d.len();
     let n_coeff = n[n.len() - 1];
     let d_coeff = d[d.len() - 1];
+    // let coeff = n_coeff / d_coeff;
     let coeff = n_coeff / d_coeff;
     let mut res = Seq::<Fp>::create(x_pow + 1);
     res[x_pow] = coeff;
@@ -216,20 +217,22 @@ fn multiply_poly_by_single_term(p: Seq<Fp>, single_term: Seq<Fp>) -> Seq<Fp> {
 /// * `n` - the dividend/enumerator polynomial
 /// * `d` - the divisor/denominator polynomial
 fn divide_poly(n: Seq<Fp>, d: Seq<Fp>) -> (Seq<Fp>, Seq<Fp>) {
-    let mut q = Seq::new(n.len());
+    let mut q = Seq::<Fp>::new(n.len());
     let mut r = n.clone();
 
-    while sum_coeffs(r.clone()) != Fp::ZERO() && poly_degree(r.clone()) >= poly_degree(d.clone()) {
-        let t = divide_leading_terms(r.clone(), d.clone());
-        q = add_polyx(q, t.clone());
-        let aux_prod = multiply_poly_by_single_term(d.clone(), t);
-        r = sub_polyx(r, aux_prod);
-        println!("??????????????");
-        println!("{:?}",r);
-        println!("{:?}",d);
-        println!("+++++++++++++");
+    let mut loop_upper_bound = d.len();
+    if q.len() > d.len() {
+        loop_upper_bound = q.len();
+    }
 
-
+    for _ in 0..loop_upper_bound {
+        if sum_coeffs(r.clone()) != Fp::ZERO() && poly_degree(r.clone()) >= poly_degree(d.clone()) {
+            let t = divide_leading_terms(r.clone(), d.clone());
+            println!("{:?}", t);
+            q = add_polyx(q, t.clone());
+            let aux_prod = multiply_poly_by_single_term(d.clone(), t);
+            r = sub_polyx(r, aux_prod);
+        }
     }
 
     (trim_poly(q), trim_poly(r))
@@ -758,6 +761,65 @@ fn step_12(
     qs
 }
 
+fn step_13_compute_h() {
+    // Fp::TWO().inv();
+    // mul_poly(, , );
+}
+/// Step 13
+/// Get the list of Q's (Q_0, ..., Q_{n_q - 1})
+///
+/// # Arguments
+/// * `n_q` n_q from the protocol
+/// * `n_a` n_a from the protocol
+/// * `x1` challenge 1
+/// * `s` s, the computed polynomials from step 10
+/// * `r` the "random" polynomial from step 3
+/// * `a_prime` a', the list of univariate polys from step 1
+/// * `q` q, from the protocol represented as seqs of (i, set), s.t. q_i = set
+fn step_13(
+    n_q: u128,
+    n_a: u128,
+    x1: Fp,
+    h_prime: Seq<Fp>,
+    r: Seq<Fp>,
+    s: Seq<Seq<Fp>>,
+    q: Seq<(u128, Seq<u128>)>,
+) -> Seq<Seq<Fp>> {
+    let nq_minus1 = n_q - (1 as u128);
+    let mut rs = Seq::<Seq<Fp>>::create(nq_minus1 as usize);
+
+    // initialize all polys to constant 0
+    for i in 0..rs.len() {
+        rs[i] = Seq::<Fp>::create(1);
+    }
+
+    let na_minus1 = n_a - (1 as u128);
+
+    // bullet 1
+    for i in 0..(na_minus1 as usize) {
+        let s_i = s[i as usize].clone();
+        let sigma_i = sigma(i as u128, q.clone());
+        // TODO is this what is meant by Q_sigma(i) ?
+        for j in 0..sigma_i.len() {
+            let j = sigma_i[j];
+            let r_sigma_i = rs[j as usize].clone();
+            let product = mul_scalar_polyx(r_sigma_i.clone(), x1);
+            rs[j as usize] = add_polyx(product, s_i.clone());
+        }
+    }
+
+    // bullet 2
+    let x1_squared = x1 * x1;
+    let q0 = rs[0 as usize].clone();
+    let product1 = mul_scalar_polyx(q0, x1_squared);
+    let product2 = mul_scalar_polyx(h_prime, x1);
+    let sum1 = add_polyx(product1, product2);
+    let final_sum = add_polyx(sum1, r);
+    rs[0] = final_sum;
+
+    rs
+}
+
 fn open() {}
 
 #[cfg(test)]
@@ -1104,6 +1166,19 @@ fn test_poly_div() {
     let (q, r) = divide_poly(n, d);
     assert_eq!(q.len(), 2);
     assert_eq!(q[0], Fp::ZERO());
+    assert_eq!(q[1], Fp::ONE());
+    assert_eq!(sum_coeffs(r), Fp::ZERO());
+
+    let n = Seq::from_vec(vec![
+        Fp::from_literal(4),
+        Fp::from_literal(8),
+        Fp::from_literal(3),
+    ]);
+    let d = Seq::from_vec(vec![Fp::TWO(), Fp::from_literal(3)]);
+
+    let (q, r) = divide_poly(n, d);
+    assert_eq!(q.len(), 2);
+    assert_eq!(q[0], Fp::TWO());
     assert_eq!(q[1], Fp::ONE());
     assert_eq!(sum_coeffs(r), Fp::ZERO());
 }
