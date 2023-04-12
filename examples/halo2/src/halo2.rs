@@ -1,10 +1,6 @@
-
-use std::clone;
-
 use hacspec_lib::*;
 use hacspec_pasta::*;
 // use hacspec_sha256::*;
-
 
 fn halo2() {
     // step 1
@@ -110,7 +106,7 @@ fn eval_polyx(p: Seq<Fp>, x: Fp) -> Fp {
 ///
 /// * `p` - the polynomial
 fn poly_degree(p: Seq<Fp>) -> u128 {
-    let len = p.len();
+    let len = trim_poly(p).len();
     if len == 0 {
         0
     } else {
@@ -211,7 +207,7 @@ fn multiply_poly_by_single_term(p: Seq<Fp>, single_term: Seq<Fp>) -> Seq<Fp> {
 ///      r ← r − t × d
 ///
 ///  return (q, r)
-///P
+///
 /// # Arguments
 ///
 /// * `n` - the dividend/enumerator polynomial
@@ -236,50 +232,6 @@ fn divide_poly(n: Seq<Fp>, d: Seq<Fp>) -> (Seq<Fp>, Seq<Fp>) {
     }
 
     (trim_poly(q), trim_poly(r))
-}
-
-fn multi_poly_with_x(p: Seq<Fp>)->Seq<Fp>{
-    let mut res: Seq<Fp> = Seq::new(p.len()+1);
-
-    for i in 0..p.len(){
-        res[i+1] = p[i];
-    }
-    res
-}
-
-fn legrange_poly(points: Seq<(Fp,Fp)>)->Seq<Fp>{
-    let mut poly = Seq::<Fp>::create(points.len()-1);
-
-
-    poly
-}
-
-fn legrange_basis(points: Seq<(Fp,Fp)>,x:Fp)->Seq<Fp>{
-    let mut basis = Seq::<Fp>::create(points.len());
-    basis[0] = Fp::ONE();
-    let mut devisor = Fp::ONE();
-    for i in 0..points.len(){
-        let point = points[i];
-        let p_x = point.0;
-        if p_x != x{
-            devisor = devisor.mul(x.sub(p_x));
-            let poly_mul_x = multi_poly_with_x(basis.clone());
-            let poly_mul_scalar:Seq<Fp>= mul_scalar_polyx(basis, p_x);
-            basis = add_polyx(poly_mul_x, poly_mul_scalar);
-
-        }
-    }
-    let mut division_poly = Seq::<Fp>::create(points.len());
-    division_poly[0] = devisor;
-    let output = divide_poly(basis, division_poly);
-    basis = output.0;
-    let rest = output.1;
-    println!("{:?}",basis);
-    println!("{:?}",rest);
-
-
-    basis
-
 }
 
 struct PublicParams(
@@ -819,74 +771,16 @@ fn step_13(
 
 fn open() {}
 
-#[cfg(test)]
-extern crate quickcheck;
-#[cfg(test)]
-#[macro_use(quickcheck)]
-extern crate quickcheck_macros;
-#[cfg(test)]
-extern crate polynomial;
-
-#[cfg(test)]
-use quickcheck::*;
-
-#[cfg(test)]
-#[derive(Clone,Debug)]
-struct UniPolynomial(
-    Seq<Fp>
-);
-
-
-#[cfg(test)]
-impl Arbitrary for UniPolynomial {
-    fn arbitrary(g: &mut quickcheck::Gen) -> UniPolynomial {
-        let size = u8::arbitrary(g) % 20;
-        let mut v = vec![];
-        for _ in 0..size {
-            v.push(Fp::from_literal(u128::arbitrary(g)));
-        }
-        UniPolynomial(Seq::<Fp>::from_vec(v))
-    }
-}
-
-
-#[cfg(test)]
-#[quickcheck]
-fn test_poly_mul_x(a: UniPolynomial){
-    let p1 = a.0;
-    let new_p = &multi_poly_with_x(p1.clone());
-    for i in 1..new_p.len(){
-        assert_eq!(new_p[i],p1[i-1]);
-    }
-    assert_eq!(new_p[0], Fp::from_literal(0));
-}
-
 // #[cfg(test)]
-// #[test]
-// fn test_poly_mul_x(){
-//     let v1 = vec![1, 1, 1]
-//         .iter()
-//         .map(|e| Fp::from_literal((*e) as u128))
-//         .collect();
-//     let p1 = Seq::from_vec(v1);
-//     let new_p = &multi_poly_with_x(p1.clone());
-//     assert_eq!(new_p[0], Fp::from_literal(0));
-//     assert_eq!(new_p[1], p1[0]);
-//     assert_eq!(new_p[2], p1[1]);
-//     assert_eq!(new_p[3], p1[2]);
-
-// }
-
-#[cfg(test)]
-#[test]
-fn test_legrange_basis(){
-    let mut points:Seq<(Fp,Fp)> = Seq::<(Fp,Fp)>::create(3);
-    points[0] = (Fp::ONE(),Fp::from_literal(3));
-    points[1] = (Fp::TWO(),Fp::ONE());
-    points[2] = (Fp::from_literal(4),Fp::TWO());
-    legrange_basis(points, Fp::ONE());
-
-}
+// extern crate quickcheck;
+// #[cfg(test)]
+// #[macro_use(quickcheck)]
+// extern crate quickcheck_macros;
+// #[cfg(test)]
+// extern crate polynomial;
+//
+// #[cfg(test)]
+// use quickcheck::*;
 
 #[cfg(test)]
 #[test]
