@@ -137,7 +137,7 @@ fn sum_coeffs(p: Seq<Fp>) -> Fp {
     sum
 }
 
-// Trim a polynomial of trailing zeros (zero-terms) and return it
+/// Trim a polynomial of trailing zeros (zero-terms) and return it
 ///
 /// # Arguments
 ///
@@ -240,6 +240,49 @@ fn divide_poly(n: Seq<Fp>, d: Seq<Fp>) -> (Seq<Fp>, Seq<Fp>) {
     }
 
     (trim_poly(q), trim_poly(r))
+}
+
+fn multi_poly_with_x(p: Seq<Fp>) -> Seq<Fp> {
+    let mut res: Seq<Fp> = Seq::new(p.len() + 1);
+
+    for i in 0..p.len() {
+        res[i + 1] = p[i];
+    }
+    res
+}
+
+fn legrange_poly(points: Seq<(Fp, Fp)>) -> Seq<Fp> {
+    let mut poly = Seq::<Fp>::create(points.len() - 1);
+
+    poly
+}
+
+fn legrange_basis(points: Seq<(Fp, Fp)>, x: Fp) -> Seq<Fp> {
+    let mut basis = Seq::<Fp>::create(points.len());
+    basis[0] = Fp::ONE();
+    let mut devisor = Fp::ONE();
+    for i in 0..points.len() {
+        let point = points[i];
+        let p_x = point.0;
+        if p_x != x {
+            devisor = devisor.mul(x.sub(p_x));
+            let poly_mul_x = multi_poly_with_x(basis.clone());
+            let poly_mul_scalar: Seq<Fp> = mul_scalar_polyx(basis, p_x);
+            basis = add_polyx(poly_mul_x, poly_mul_scalar);
+        }
+    }
+    let mut division_poly = Seq::<Fp>::create(points.len());
+    division_poly[0] = devisor;
+    println!("{:?}", division_poly);
+    println!("{:?}", basis);
+
+    let output = divide_poly(basis, division_poly);
+    basis = output.0;
+    let rest = output.1;
+    println!("{:?}", basis);
+    println!("{:?}", rest);
+
+    basis
 }
 
 struct PublicParams(
