@@ -835,6 +835,18 @@ fn open() {}
 
 #[cfg(test)]
 #[test]
+fn test_legrange_basis(){
+    let mut points:Seq<(Fp,Fp)> = Seq::<(Fp,Fp)>::create(3);
+    points[0] = (Fp::ONE(),Fp::from_literal(3));
+    points[1] = (Fp::TWO(),Fp::ONE());
+    points[2] = (Fp::from_literal(4),Fp::TWO());
+    let basis = legrange_basis(points, Fp::ONE());
+    let res = eval_polyx(basis, Fp::ONE());
+    assert_eq!(res,Fp::ONE())
+}
+
+#[cfg(test)]
+#[test]
 fn test_step_9() {
     use std::clone;
 
