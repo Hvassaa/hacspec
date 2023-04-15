@@ -137,7 +137,7 @@ fn sum_coeffs(p: Seq<Fp>) -> Fp {
     sum
 }
 
-/// Trim a polynomial of trailing zeros (zero-terms) and return it
+// Trim a polynomial of trailing zeros (zero-terms) and return it
 ///
 /// # Arguments
 ///
@@ -242,47 +242,20 @@ fn divide_poly(n: Seq<Fp>, d: Seq<Fp>) -> (Seq<Fp>, Seq<Fp>) {
     (trim_poly(q), trim_poly(r))
 }
 
-fn multi_poly_with_x(p: Seq<Fp>) -> Seq<Fp> {
-    let mut res: Seq<Fp> = Seq::new(p.len() + 1);
+/// Compute the h(x) polynomial, used in step 4 and 13
+///
+///
+/// # Arguments
+///
+/// * `g_prime` the univariate polynomial calculated in step 2 and 13
+fn compute_h(g_prime: Seq<Fp>) -> Seq<Fp> {
+    // TODO create the real vanishing polynomial
+    let t = Seq::<Fp>::create(0);
 
-    for i in 0..p.len() {
-        res[i + 1] = p[i];
-    }
-    res
-}
+    let (h, remainder) = divide_poly(g_prime, t);
+    // TODO what to do with remainder?
 
-fn legrange_poly(points: Seq<(Fp, Fp)>) -> Seq<Fp> {
-    let mut poly = Seq::<Fp>::create(points.len() - 1);
-
-    poly
-}
-
-fn legrange_basis(points: Seq<(Fp, Fp)>, x: Fp) -> Seq<Fp> {
-    let mut basis = Seq::<Fp>::create(points.len());
-    basis[0] = Fp::ONE();
-    let mut devisor = Fp::ONE();
-    for i in 0..points.len() {
-        let point = points[i];
-        let p_x = point.0;
-        if p_x != x {
-            devisor = devisor.mul(x.sub(p_x));
-            let poly_mul_x = multi_poly_with_x(basis.clone());
-            let poly_mul_scalar: Seq<Fp> = mul_scalar_polyx(basis, p_x);
-            basis = add_polyx(poly_mul_x, poly_mul_scalar);
-        }
-    }
-    let mut division_poly = Seq::<Fp>::create(points.len());
-    division_poly[0] = devisor;
-    println!("{:?}", division_poly);
-    println!("{:?}", basis);
-
-    let output = divide_poly(basis, division_poly);
-    basis = output.0;
-    let rest = output.1;
-    println!("{:?}", basis);
-    println!("{:?}", rest);
-
-    basis
+    h
 }
 
 struct PublicParams(
@@ -309,6 +282,7 @@ type InputVar = (bool, Fp);
 /// # Arguments
 ///
 /// * `term` - the term
+/// TODO, document inputs and new_size (is new_size needed?)
 fn reduce_multi_term(term: &Term, inputs: Seq<InputVar>, new_size: usize) -> Term {
     let (coef, powers) = term;
 
@@ -416,7 +390,7 @@ fn eval_multi_poly(p: Seq<Term>, inputs: Seq<Fp>) -> Fp {
     res
 }
 
-/// Multiscalar multiplicatoin, auxiliry function for Pedersen vector commitment
+/// Multiscalar multiplicatoin, auxiliary function for Pedersen vector commitment
 ///
 /// # Arguments
 ///
@@ -761,10 +735,6 @@ fn step_12(
     qs
 }
 
-fn step_13_compute_h() {
-    // Fp::TWO().inv();
-    // mul_poly(, , );
-}
 /// Step 13
 /// Get the list of Q's (Q_0, ..., Q_{n_q - 1})
 ///
@@ -772,18 +742,18 @@ fn step_13_compute_h() {
 /// * `n_q` n_q from the protocol
 /// * `n_a` n_a from the protocol
 /// * `x1` challenge 1
-/// * `s` s, the computed polynomials from step 10
 /// * `r` the "random" polynomial from step 3
-/// * `a_prime` a', the list of univariate polys from step 1
+/// * `s` s, the computed polynomials from step 10
 /// * `q` q, from the protocol represented as seqs of (i, set), s.t. q_i = set
+/// * `a` a', the list of univariate polys from step 1
 fn step_13(
     n_q: u128,
     n_a: u128,
     x1: Fp,
-    h_prime: Seq<Fp>,
     r: Seq<Fp>,
     s: Seq<Seq<Fp>>,
     q: Seq<(u128, Seq<u128>)>,
+    a: Seq<Seq<Fp>>,
 ) -> Seq<Seq<Fp>> {
     let nq_minus1 = n_q - (1 as u128);
     let mut rs = Seq::<Seq<Fp>>::create(nq_minus1 as usize);
@@ -809,10 +779,12 @@ fn step_13(
     }
 
     // bullet 2
+    let g_prime = Seq::<Fp>::create(0); // TODO calculate the real g_prime (probably put in a function)
+    let h = compute_h(g_prime);
     let x1_squared = x1 * x1;
-    let q0 = rs[0 as usize].clone();
-    let product1 = mul_scalar_polyx(q0, x1_squared);
-    let product2 = mul_scalar_polyx(h_prime, x1);
+    let r0 = rs[0 as usize].clone();
+    let product1 = mul_scalar_polyx(r0, x1_squared);
+    let product2 = mul_scalar_polyx(h, x1);
     let sum1 = add_polyx(product1, product2);
     let final_sum = add_polyx(sum1, r);
     rs[0] = final_sum;
