@@ -836,6 +836,7 @@ struct UniPolynomial(
 );
 
 
+
 #[cfg(test)]
 impl Arbitrary for UniPolynomial {
     fn arbitrary(g: &mut quickcheck::Gen) -> UniPolynomial {
@@ -849,6 +850,32 @@ impl Arbitrary for UniPolynomial {
 }
 
 #[cfg(test)]
+#[derive(Clone,Debug)]
+struct Points(
+    Seq<(Fp,Fp)>
+);
+
+#[cfg(test)]
+impl Arbitrary for Points {
+    fn arbitrary(g: &mut quickcheck::Gen) -> Points {
+        let size = u8::arbitrary(g) % 5;
+        let mut x_cords = vec![];
+        let mut points = vec![];
+        for _ in 0..size {
+            let x: Fp = Fp::from_literal(u128::arbitrary(g)%7);
+            let y: Fp = Fp::from_literal(u128::arbitrary(g)%7);
+            if !x_cords.contains(&x){
+                points.push((x,y));
+                x_cords.push(x)
+            }
+        }
+        Points(Seq::<(Fp,Fp)>::from_vec(points))
+    }
+}
+
+
+
+#[cfg(test)]
 #[quickcheck]
 fn test_poly_mul_x(a: UniPolynomial){
     let p1 = a.0;
@@ -859,18 +886,35 @@ fn test_poly_mul_x(a: UniPolynomial){
     assert_eq!(new_p[0], Fp::from_literal(0));
 }
 
-
 #[cfg(test)]
-#[test]
-fn test_legrange_basis(){
-    let mut points:Seq<(Fp,Fp)> = Seq::<(Fp,Fp)>::create(3);
-    points[0] = (Fp::ONE(),Fp::ONE());
-    points[1] = (Fp::TWO(),Fp::TWO());
-    points[2] = (Fp::from_literal(3),Fp::ONE());
-    let basis = legrange_basis(points, Fp::ONE());
-    let res = eval_polyx(basis, Fp::ONE());
-    assert_eq!(res,Fp::ONE())
+#[quickcheck]
+fn test_legrange_basis(a: Points){
+    let points_seq = a.0;
+    println!("{:?}",points_seq);
+    for i in 0..points_seq.len(){
+        let x = points_seq[i].0;
+        let basis = legrange_basis(points_seq.clone(), x);
+        for j in 0..points_seq.len(){
+            let eval_x = points_seq[j].0;
+            let res = eval_polyx(basis.clone(), eval_x);
+            // println!("{:?}",basis);
+            if x == eval_x{
+                print!("x:");
+                println!("{}",x);
+                print!("eval");
+                println!("{}",eval_x);
+                assert_eq!(res,Fp::ONE())
+            }
+            // else {
+            //     assert_eq!(res,Fp::ZERO())
+            // }
+            
+        }
+    }    
 }
+
+
+
 
 #[cfg(test)]
 #[test]
