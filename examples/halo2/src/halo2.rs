@@ -137,7 +137,7 @@ fn sum_coeffs(p: Seq<Fp>) -> Fp {
     sum
 }
 
-/// Trim a polynomial of trailing zeros (zero-terms) and return it
+// Trim a polynomial of trailing zeros (zero-terms) and return it
 ///
 /// # Arguments
 ///
@@ -241,6 +241,22 @@ fn divide_poly(n: Seq<Fp>, d: Seq<Fp>) -> (Seq<Fp>, Seq<Fp>) {
     (trim_poly(q), trim_poly(r))
 }
 
+/// Compute the h(x) polynomial, used in step 4 and 13
+///
+///
+/// # Arguments
+///
+/// * `g_prime` the univariate polynomial calculated in step 2 and 13
+fn compute_h(g_prime: Seq<Fp>) -> Seq<Fp> {
+    // TODO create the real vanishing polynomial
+    let t = Seq::<Fp>::create(0);
+
+    let (h, remainder) = divide_poly(g_prime, t);
+    // TODO what to do with remainder?
+
+    h
+}
+
 fn multi_poly_with_x(p: Seq<Fp>) -> Seq<Fp> {
     let mut res: Seq<Fp> = Seq::new(p.len() + 1);
 
@@ -305,6 +321,7 @@ type InputVar = (bool, Fp);
 /// # Arguments
 ///
 /// * `term` - the term
+/// TODO, document inputs and new_size (is new_size needed?)
 fn reduce_multi_term(term: &Term, inputs: Seq<InputVar>, new_size: usize) -> Term {
     let (coef, powers) = term;
 
@@ -412,7 +429,7 @@ fn eval_multi_poly(p: Seq<Term>, inputs: Seq<Fp>) -> Fp {
     res
 }
 
-/// Multiscalar multiplicatoin, auxiliry function for Pedersen vector commitment
+/// Multiscalar multiplicatoin, auxiliary function for Pedersen vector commitment
 ///
 /// # Arguments
 ///
@@ -757,10 +774,6 @@ fn step_12(
     qs
 }
 
-fn step_13_compute_h() {
-    // Fp::TWO().inv();
-    // mul_poly(, , );
-}
 /// Step 13
 /// Get the list of Q's (Q_0, ..., Q_{n_q - 1})
 ///
@@ -768,18 +781,18 @@ fn step_13_compute_h() {
 /// * `n_q` n_q from the protocol
 /// * `n_a` n_a from the protocol
 /// * `x1` challenge 1
-/// * `s` s, the computed polynomials from step 10
 /// * `r` the "random" polynomial from step 3
-/// * `a_prime` a', the list of univariate polys from step 1
+/// * `s` s, the computed polynomials from step 10
 /// * `q` q, from the protocol represented as seqs of (i, set), s.t. q_i = set
+/// * `a` a', the list of univariate polys from step 1
 fn step_13(
     n_q: u128,
     n_a: u128,
     x1: Fp,
-    h_prime: Seq<Fp>,
     r: Seq<Fp>,
     s: Seq<Seq<Fp>>,
     q: Seq<(u128, Seq<u128>)>,
+    a: Seq<Seq<Fp>>,
 ) -> Seq<Seq<Fp>> {
     let nq_minus1 = n_q - (1 as u128);
     let mut rs = Seq::<Seq<Fp>>::create(nq_minus1 as usize);
@@ -805,15 +818,59 @@ fn step_13(
     }
 
     // bullet 2
+    let g_prime = Seq::<Fp>::create(0); // TODO calculate the real g_prime (probably put in a function)
+    let h = compute_h(g_prime);
     let x1_squared = x1 * x1;
-    let q0 = rs[0 as usize].clone();
-    let product1 = mul_scalar_polyx(q0, x1_squared);
-    let product2 = mul_scalar_polyx(h_prime, x1);
+    let r0 = rs[0 as usize].clone();
+    let product1 = mul_scalar_polyx(r0, x1_squared);
+    let product2 = mul_scalar_polyx(h, x1);
     let sum1 = add_polyx(product1, product2);
     let final_sum = add_polyx(sum1, r);
     rs[0] = final_sum;
 
     rs
+}
+
+/// Step 14
+/// Get the commitment Q'
+///
+/// # Arguments
+/// * `crs` - the common reference string
+/// * `x2` - the challenge from step 11
+/// * `n_q` n_q from the protocol
+/// * `n_e` n_e from the protocol
+/// * `q_polys` the q polynomials from step 12
+/// * `r_polys` the r polynomials from step 13
+/// * `q` the list of distinct sets of integers containing p_i
+/// * `r` randomness for commiting
+fn step_14(
+    crs: &CRS,
+    x2: Fp,
+    n_q: u128,
+    n_e: u128,
+    q_polys: Seq<Seq<Fp>>,
+    r_polys: Seq<Seq<Fp>>,
+    q: Seq<Seq<u128>>,
+    r: Fp,
+) -> G1 {
+    let mut q_prime = Seq::<Fp>::create(1); // initialize q' to the constant zero poly
+
+    for i in 0..(n_q as usize) {
+        let x2_powered = x2.pow(i as u128);
+        let q_i = q_polys[i].clone();
+        let r_i = r_polys[i].clone();
+        let q_i_sub_r_i = sub_polyx(q_i, r_i);
+        let product = Seq::<Fp>::create(0); // TODO make the real divisor poly
+
+        let (divided_poly, remainder) = divide_poly(q_i_sub_r_i, product); // TODO what to do with remainder?
+        let multed_poly = mul_scalar_polyx(divided_poly, x2_powered);
+
+        q_prime = add_polyx(q_prime, multed_poly);
+    }
+
+    let commitment = commit_polyx(crs, q_prime, r);
+
+    commitment
 }
 
 fn open() {}
@@ -823,8 +880,8 @@ extern crate quickcheck;
 #[cfg(test)]
 #[macro_use(quickcheck)]
 extern crate quickcheck_macros;
-#[cfg(test)]
-extern crate polynomial;
+// #[cfg(test)]
+// extern crate polynomial;
 
 #[cfg(test)]
 use quickcheck::*;
@@ -834,7 +891,6 @@ use quickcheck::*;
 struct UniPolynomial(
     Seq<Fp>
 );
-
 
 
 #[cfg(test)]
@@ -877,11 +933,11 @@ impl Arbitrary for Points {
 
 #[cfg(test)]
 #[quickcheck]
-fn test_poly_mul_x(a: UniPolynomial){
+fn test_poly_mul_x(a: UniPolynomial) {
     let p1 = a.0;
     let new_p = &multi_poly_with_x(p1.clone());
-    for i in 1..new_p.len(){
-        assert_eq!(new_p[i],p1[i-1]);
+    for i in 1..new_p.len() {
+        assert_eq!(new_p[i], p1[i - 1]);
     }
     assert_eq!(new_p[0], Fp::from_literal(0));
 }
