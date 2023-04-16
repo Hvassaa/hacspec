@@ -831,6 +831,48 @@ fn step_13(
     rs
 }
 
+/// Step 14
+/// Get the commitment Q'
+///
+/// # Arguments
+/// * `crs` - the common reference string
+/// * `x2` - the challenge from step 11
+/// * `n_q` n_q from the protocol
+/// * `n_e` n_e from the protocol
+/// * `q_polys` the q polynomials from step 12
+/// * `r_polys` the r polynomials from step 13
+/// * `q` the list of distinct sets of integers containing p_i
+/// * `r` randomness for commiting
+fn step_14(
+    crs: &CRS,
+    x2: Fp,
+    n_q: u128,
+    n_e: u128,
+    q_polys: Seq<Seq<Fp>>,
+    r_polys: Seq<Seq<Fp>>,
+    q: Seq<Seq<u128>>,
+    r: Fp,
+) -> G1 {
+    let mut q_prime = Seq::<Fp>::create(1); // initialize q' to the constant zero poly
+
+    for i in 0..(n_q as usize) {
+        let x2_powered = x2.pow(i as u128);
+        let q_i = q_polys[i].clone();
+        let r_i = r_polys[i].clone();
+        let q_i_sub_r_i = sub_polyx(q_i, r_i);
+        let product = Seq::<Fp>::create(0); // TODO make the real divisor poly
+
+        let (divided_poly, remainder) = divide_poly(q_i_sub_r_i, product); // TODO what to do with remainder?
+        let multed_poly = mul_scalar_polyx(divided_poly, x2_powered);
+
+        q_prime = add_polyx(q_prime, multed_poly);
+    }
+
+    let commitment = commit_polyx(crs, q_prime, r);
+
+    commitment
+}
+
 fn open() {}
 
 #[cfg(test)]
@@ -838,8 +880,8 @@ extern crate quickcheck;
 #[cfg(test)]
 #[macro_use(quickcheck)]
 extern crate quickcheck_macros;
-#[cfg(test)]
-extern crate polynomial;
+// #[cfg(test)]
+// extern crate polynomial;
 
 #[cfg(test)]
 use quickcheck::*;
