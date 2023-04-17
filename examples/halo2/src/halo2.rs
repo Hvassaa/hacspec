@@ -911,6 +911,34 @@ fn step_16(n_q: u128, x3: Fp, q_polys: Seq<Seq<Fp>>) -> Seq<Fp> {
     u
 }
 
+/// Step 19
+/// Get the p(X) polynomial
+///
+/// # Arguments
+/// * `x4` - the challenge from step 17
+/// * `q_prime` the q' polynomial computed by the prover in step 14
+/// * `q_polys` the q polynomials from step 12
+fn step_19(x4: Fp, q_prime: Seq<Fp>, q_polys: Seq<Seq<Fp>>) -> Seq<Fp> {
+    let mut p = Seq::<Fp>::create(1); // initialize p to the constant zero poly
+
+    //  Sum_i^nq-1 {x4^i q_i(X)}
+    for i in 0..q_polys.len() {
+        let x4_powered = x4.pow(i as u128);
+        let q_i = q_polys[i].clone();
+        let multed_poly = mul_scalar_polyx(q_i, x4_powered);
+
+        p = add_polyx(p, multed_poly)
+    }
+
+    // [x4] Sum_i^nq-1 {x4^i q_i(X)}
+    p = mul_scalar_polyx(p, x4);
+
+    // q'(X) + [x4] Sum_i^nq-1 {x4^i q_i(X)}
+    p = add_polyx(p, q_prime);
+
+    p
+}
+
 fn open() {}
 
 #[cfg(test)]
