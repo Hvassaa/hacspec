@@ -573,8 +573,8 @@ fn multi_to_uni_poly(p: Seq<Term>, inputs: Seq<InputVar>) -> Seq<Fp> {
 /// Where n is a parameter of the prooving system, and h_i is the ith part of the original poly.
 ///
 /// # Arguments
-/// * `p1` Polynomial to be split
-/// * `n` defines length of new polynomials (global variable for prooving system)
+/// * `p1` - Polynomial to be split
+/// * `n` - defines length of new polynomials (global variable for prooving system)
 fn split_poly(p1: Seq<Fp>, n: u128) -> Seq<Seq<Fp>> {
     let no_of_parts = (p1.len() + (n - (2 as u128)) as usize) / ((n - (1 as u128)) as usize);
 
@@ -595,15 +595,14 @@ fn split_poly(p1: Seq<Fp>, n: u128) -> Seq<Seq<Fp>> {
     poly_parts
 }
 
-///
 /// 6 (in protocol)
 ///
 /// commit to each h_i polynomial keeping them in the seq to peserve the power (i)
 ///
 /// # Arguments
-/// * `poly_parts` A sequence of polynomials to be commited to
-/// * `crs` Commen Refernce Struct (Global variable for prooving system)
-/// * `r_seq`Sequence of random elements used as blinding factors
+/// * `poly_parts` - A sequence of polynomials to be commited to
+/// * `crs` - Commen Refernce Struct (Global variable for prooving system)
+/// * `r_seq` - Sequence of random elements used as blinding factors
 ///
 /// # Constraints
 /// * `r_seq` should be at least as long as the `poly_parts`
@@ -620,9 +619,9 @@ fn commit_to_poly_parts(poly_parts: Seq<Seq<Fp>>, crs: &CRS, r_seq: Seq<Fp>) -> 
 /// Computes the sum from step 7 in the protocol description
 ///
 /// # Arguments
-/// * `commitment_seq` is a sequence of commitments
-/// * `x`is the challenge each commitment should be multiplied with
-/// * `n` Global parameter for the prooving system
+/// * `commitment_seq` - is a sequence of commitments
+/// * `x`is - the challenge each commitment should be multiplied with
+/// * `n` - Global parameter for the prooving system
 fn step_7(commitment_seq: Seq<G1>, x: Fp, n: u128) -> G1 {
     let mut result: G1 = G1::default();
     for i in 0..commitment_seq.len() {
@@ -650,10 +649,10 @@ fn step_8(h: Seq<Seq<Fp>>, x: Fp, n: u128) -> Seq<Fp> {
 /// This functions creates a seq filled with a_i from the second part of step 9
 ///
 /// # Arguments
-/// * `a_prime_seq` A sequence of the a' polynomials from step 1
-/// * `n_e` Global parameter for the protocol
-/// * `omega` The generator for the evaluations points also a global parameter for the protocol
-/// * `x`The challenge from step 7
+/// * `a_prime_seq` - A sequence of the a' polynomials from step 1
+/// * `n_e` - Global parameter for the protocol
+/// * `omega` - The generator for the evaluations points also a global parameter for the protocol
+/// * `x`The - challenge from step 7
 ///
 fn step_9(a_prime_seq: Seq<Seq<Fp>>, n_e: usize, omega: Fp, x: Fp) -> Seq<Seq<Fp>> {
     let n_a: usize = a_prime_seq.len();
@@ -675,8 +674,8 @@ fn step_9(a_prime_seq: Seq<Seq<Fp>>, n_e: usize, omega: Fp, x: Fp) -> Seq<Seq<Fp
 /// Implementation of the σ mapping from the protocol
 ///
 /// # Arguments
-/// * `i` the i in σ(i)
-/// * `q` q, from the protocol represented as seqs of (i, set), s.t. q_i = set
+/// * `i` - the i in σ(i)
+/// * `q` - q, from the protocol represented as seqs of (i, set), s.t. q_i = set
 fn sigma(i: u128, q: Seq<(u128, Seq<u128>)>) -> Seq<u128> {
     let mut res = Seq::<u128>::create(0);
     for j in 0..q.len() {
@@ -694,13 +693,13 @@ fn sigma(i: u128, q: Seq<(u128, Seq<u128>)>) -> Seq<u128> {
 /// Get the list of Q's (Q_0, ..., Q_{n_q - 1})
 ///
 /// # Arguments
-/// * `n_q` n_q from the protocol
-/// * `n_a` n_a from the protocol
-/// * `x1` challenge 1
-/// * `h_prime` H', the computed sum from step 7
-/// * `r` R, commitment from step 3
-/// * `a` A, the list of hiding commitments for a_i's
-/// * `q` q, from the protocol represented as seqs of (i, set), s.t. q_i = set
+/// * `n_q` - n_q from the protocol
+/// * `n_a` - n_a from the protocol
+/// * `x1` - challenge 1
+/// * `h_prime` - H', the computed sum from step 7
+/// * `r` - R, commitment from step 3
+/// * `a` - A, the list of hiding commitments for a_i's
+/// * `q` - q, from the protocol represented as seqs of (i, set), s.t. q_i = set
 fn step_11(
     n_q: u128,
     n_a: u128,
@@ -743,13 +742,13 @@ fn step_11(
 /// Get the list of Q's (Q_0, ..., Q_{n_q - 1})
 ///
 /// # Arguments
-/// * `n_q` n_q from the protocol
-/// * `n_a` n_a from the protocol
-/// * `x1` challenge 1
-/// * `h_prime` h', the computed polynomial from step 8
-/// * `r` the "random" polynomial from step 3
-/// * `a_prime` a', the list of univariate polys from step 1
-/// * `q` q, from the protocol represented as seqs of (i, set), s.t. q_i = set
+/// * `n_q` - n_q from the protocol
+/// * `n_a` - n_a from the protocol
+/// * `x1` - challenge 1
+/// * `h_prime` - h', the computed polynomial from step 8
+/// * `r` - the "random" polynomial from step 3
+/// * `a_prime` - a', the list of univariate polys from step 1
+/// * `q` - q, from the protocol represented as seqs of (i, set), s.t. q_i = set
 fn step_12(
     n_q: u128,
     n_a: u128,
@@ -798,13 +797,13 @@ fn step_12(
 /// Get the list of Q's (Q_0, ..., Q_{n_q - 1})
 ///
 /// # Arguments
-/// * `n_q` n_q from the protocol
-/// * `n_a` n_a from the protocol
-/// * `x1` challenge 1
-/// * `r` the "random" polynomial from step 3
-/// * `s` s, the computed polynomials from step 10
-/// * `q` q, from the protocol represented as seqs of (i, set), s.t. q_i = set
-/// * `a` a', the list of univariate polys from step 1
+/// * `n_q` - n_q from the protocol
+/// * `n_a` - n_a from the protocol
+/// * `x1` - challenge 1
+/// * `r` - the "random" polynomial from step 3
+/// * `s` - s, the computed polynomials from step 10
+/// * `q` - q, from the protocol represented as seqs of (i, set), s.t. q_i = set
+/// * `a` - a', the list of univariate polys from step 1
 fn step_13(
     n_q: u128,
     n_a: u128,
@@ -857,12 +856,12 @@ fn step_13(
 /// # Arguments
 /// * `crs` - the common reference string
 /// * `x2` - the challenge from step 11
-/// * `n_q` n_q from the protocol
-/// * `n_e` n_e from the protocol
-/// * `q_polys` the q polynomials from step 12
-/// * `r_polys` the r polynomials from step 13
-/// * `q` the list of distinct sets of integers containing p_i
-/// * `r` randomness for commiting
+/// * `n_q` - n_q from the protocol
+/// * `n_e` - n_e from the protocol
+/// * `q_polys` - the q polynomials from step 12
+/// * `r_polys` - the r polynomials from step 13
+/// * `q` - the list of distinct sets of integers containing p_i
+/// * `r` - randomness for commiting
 fn step_14(
     crs: &CRS,
     x2: Fp,
@@ -897,9 +896,9 @@ fn step_14(
 /// Get the u ∈ F^{n_q} vector
 ///
 /// # Arguments
-/// * `n_q` n_q from the protocol
+/// * `n_q` - n_q from the protocol
 /// * `x3` - the challenge from step 15
-/// * `q_polys` the q polynomials from step 12
+/// * `q_polys` - the q polynomials from step 12
 fn step_16(n_q: u128, x3: Fp, q_polys: Seq<Seq<Fp>>) -> Seq<Fp> {
     let mut u = Seq::<Fp>::create(n_q as usize);
     for i in 0..(n_q as usize) {
@@ -916,8 +915,8 @@ fn step_16(n_q: u128, x3: Fp, q_polys: Seq<Seq<Fp>>) -> Seq<Fp> {
 ///
 /// # Arguments
 /// * `x4` - the challenge from step 17
-/// * `q_prime` the q' polynomial computed by the prover in step 14
-/// * `q_polys` the q polynomials from step 12
+/// * `q_prime` - the q' polynomial computed by the prover in step 14
+/// * `q_polys` - the q polynomials from step 12
 fn step_19(x4: Fp, q_prime: Seq<Fp>, q_polys: Seq<Seq<Fp>>) -> Seq<Fp> {
     let mut p = Seq::<Fp>::create(1); // initialize p to the constant zero poly
 
