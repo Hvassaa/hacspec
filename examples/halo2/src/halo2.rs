@@ -142,7 +142,7 @@ fn poly_degree(p: Seq<Fp>) -> u128 {
 }
 
 /// Get the sum of all coefficietns of a polynomial
-/// (useful for checking if a polynomial is 0)
+/// (NOT useful for checking if a polynomial is 0)
 ///
 /// # Arguments
 ///
@@ -155,6 +155,12 @@ fn sum_coeffs(p: Seq<Fp>) -> Fp {
 
     sum
 }
+/// Checks if all entries in a polynomial is 0
+/// # Arguments 
+/// * `p` the polynomial to be checked
+/// # Returns
+/// * `true` if polynomial is NOT all 0
+/// * `false`if polynomial IS all 0
 fn check_not_zero(p: Seq<Fp>) -> bool {
     let mut sum = Fp::ZERO();
     let mut all_zero = false;
@@ -295,6 +301,11 @@ fn multi_poly_with_x(p: Seq<Fp>) -> Seq<Fp> {
     }
     res
 }
+///Find lowest degree polynomial passing through a set points using legrange interpolation
+/// # Arguments
+/// * `points`is a sequence of points `(Fp,Fp)` that the polynomial must pass through
+/// # Assertions
+/// * No two points may have the same x-value
 
 fn legrange_poly(points: Seq<(Fp, Fp)>) -> Seq<Fp> {
     let mut poly = Seq::<Fp>::create(points.len());
@@ -309,7 +320,14 @@ fn legrange_poly(points: Seq<(Fp, Fp)>) -> Seq<Fp> {
     poly = trim_poly(poly);
     poly
 }
-
+/// Finds the legrange basis for a set of `points` and a single evaluation point `x`
+/// This will produce a polynomial that evaluates to 1 at `x`and to 0 at all other x-values in the set `points`
+/// No other guarentees are given about the resulting polynomial
+/// # Arguments
+/// * `points`is a sequence of points `(Fp,Fp)` whose x-values the polynomial wil evaluate to 0 at
+/// * `x`is the x-value where the polynomial will evaluate to 1. If `x`is also in `points` the polynomial will still evaluate to 1 at `x``
+/// # Assertions
+/// * No two points may have the same x-value
 fn legrange_basis(points: Seq<(Fp, Fp)>, x: Fp) -> Seq<Fp> {
     let mut basis = Seq::<Fp>::create(points.len());
     basis[0] = Fp::ONE();
