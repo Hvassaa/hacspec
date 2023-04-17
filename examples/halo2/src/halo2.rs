@@ -939,6 +939,15 @@ fn step_19(x4: Fp, q_prime: Seq<Fp>, q_polys: Seq<Seq<Fp>>) -> Seq<Fp> {
     p
 }
 
+fn step_22(p: G1, g0: G1, s: G1, v: Fp, xi: Fp) -> G1 {
+    let prod1 = g1mul(v, g0);
+    let prod1_neg = g1neg(prod1);
+    let prod2 = g1mul(xi, s);
+    let lhs_sum = g1add(p, prod1_neg);
+    let p_prime = g1add(lhs_sum, prod2);
+    p_prime
+}
+
 fn open() {}
 
 #[cfg(test)]
