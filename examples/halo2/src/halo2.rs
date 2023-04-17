@@ -92,6 +92,25 @@ fn mul_scalar_polyx(p: Seq<Fp>, s: Fp) -> Seq<Fp> {
     res
 }
 
+/// Subtract a scalar (constant) from a polynomial, return resulting polynomial
+///
+/// # Arguments
+///
+/// * `p` - the polynomial
+/// * `s` - the scalar
+fn sub_scalar_polyx(p: Seq<Fp>, s: Fp) -> Seq<Fp> {
+    let mut res = p.clone();
+    if res.len() == 0 {
+        // if poly empty, initialize res to zero constant term
+        res = Seq::<Fp>::create(1);
+    }
+
+    // do the subtraction on constant term
+    res[0] = res[0] - s;
+
+    res
+}
+
 /// Evaluate a polynomial at point, return the evaluation
 ///
 /// # Arguments
@@ -953,6 +972,25 @@ fn step_22(p: G1, g0: G1, s: G1, v: Fp, xi: Fp) -> G1 {
     let prod2 = g1mul(xi, s);
     let lhs_sum = g1add(p, prod1_neg);
     let p_prime = g1add(lhs_sum, prod2);
+    p_prime
+}
+
+/// Step 23
+/// Get the p'(X) polynomial
+///
+/// # Arguments
+/// * `p` - the polynomial p from step 19
+/// * `s` - the polynomial s from step 20
+/// * `x3` - the challenge from step 15
+/// * `xi` - the ξ challenge from step 21
+fn step_23(p: Seq<Fp>, s: Seq<Fp>, x3: Fp, xi: Fp) -> Seq<Fp> {
+    // TODO what happens if v does not correspond with v?
+    let p_eval_x3 = eval_polyx(p.clone(), x3);
+    let xi_mul_s = mul_scalar_polyx(s, xi);
+    let mut p_prime = p;
+    p_prime = sub_scalar_polyx(p_prime, p_eval_x3);
+    p_prime = add_polyx(p_prime, xi_mul_s);
+
     p_prime
 }
 
