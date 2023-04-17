@@ -939,6 +939,15 @@ fn step_19(x4: Fp, q_prime: Seq<Fp>, q_polys: Seq<Seq<Fp>>) -> Seq<Fp> {
     p
 }
 
+/// Step 22
+/// Get the P' curve-point/group-element
+///
+/// # Arguments
+/// * `p` - the group element from step 18
+/// * `g0` - the group element at index zero in **G** from pp
+/// * `s` - the group element/commitment from step 20
+/// * `v` - v as calculated in step 18
+/// * `xi` - the ξ challenge from step 21
 fn step_22(p: G1, g0: G1, s: G1, v: Fp, xi: Fp) -> G1 {
     let prod1 = g1mul(v, g0);
     let prod1_neg = g1neg(prod1);
