@@ -319,8 +319,7 @@ fn legrange_basis(points: Seq<(Fp, Fp)>, x: Fp) -> Seq<Fp> {
         if p_x != x {
             devisor = devisor.mul(x.sub(p_x));
             let poly_mul_x = multi_poly_with_x(basis.clone());
-
-            let poly_mul_scalar: Seq<Fp> = mul_scalar_polyx(basis, p_x.neg());
+            let poly_mul_scalar: Seq<Fp> = mul_scalar_polyx(basis.clone(), p_x.neg());
             basis = add_polyx(poly_mul_x, poly_mul_scalar);
         }
     }
@@ -329,11 +328,27 @@ fn legrange_basis(points: Seq<(Fp, Fp)>, x: Fp) -> Seq<Fp> {
     division_poly[0] = devisor;
 
     let output = divide_poly(basis, division_poly);
-    basis = output.0;
-    let rest = output.1;
+    let final_basis = output.0;
 
-    basis
+    final_basis
 }
+
+
+// fn legrange_basis(points: Seq<(Fp, Fp)>, x: Fp) -> Seq<Fp> {
+//         let mut basis = Seq::<Fp>::create(points.len());
+//         basis[0] = Fp::ONE();
+//         let mut devisor = Fp::ONE();
+//         for i in 0..points.len() {
+//                     let point = points[i];
+//                     let p_x = point.0;
+//                     if p_x != x {
+//                         let poly_mul_x = multi_poly_with_x(basis.clone());
+//                         let poly_mul_scalar: Seq<Fp> = mul_scalar_polyx(basis.clone(), p_x.neg());
+//                         basis = mul_scalar_polyx(basis.clone(), Fp::ONE());
+//                     }
+//                 }
+//         basis
+//     }
 
 struct PublicParams(
     Seq<G1>, // G: G in G^d
