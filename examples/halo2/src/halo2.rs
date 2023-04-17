@@ -347,8 +347,7 @@ fn legrange_basis(points: Seq<(Fp, Fp)>, x: Fp) -> Seq<Fp> {
     division_poly[0] = devisor;
 
     let output = divide_poly(basis, division_poly);
-    let final_basis = output.0;
-
+    let (final_basis,_) = output;
     final_basis
 }
 
@@ -1028,6 +1027,54 @@ fn step_23(p: Seq<Fp>, s: Seq<Fp>, x3: Fp, xi: Fp) -> Seq<Fp> {
 }
 
 fn open() {}
+
+
+///Varifiers final check of the protocol
+/// # Arguments
+/// * `u` - Sequence of `u_j` from step 24
+/// * `L` - Sequence of `L_j` from step 24
+/// * `P_prime` -  from step 22
+/// * `R` - Sequence of `R_j` from step 24
+/// * `c` - from step 25
+/// * `G_prime_0` - the first entry in the `G_prime` sequence from step 24
+/// * `b_0` - the first entry in the `b` sequence from step 24
+/// * `z` - the challenge from step 21
+/// * `U` - from public parameters
+/// * `f` - blinding factor from step 25
+/// * `W` - from public parameters
+/// 
+fn step_26(u:Seq<Fp>,L:Seq<G1>,P_prime:G1,R:Seq<G1>,c:Fp,G_prime_0:G1,b_0:Fp,z:Fp,U:G1,f:Fp,W:G1)-> bool{
+    let mut first_sum:G1 = (FpCurve::ZERO(),FpCurve::ZERO(),true);
+    for j in 0..u.len(){
+        let u_j_inv: Fp = u[j].inv();
+        let L_j: G1 = L[j];
+        let prod_j: G1 = g1mul(u_j_inv, L_j);
+        first_sum = g1add(first_sum, prod_j);
+    }
+
+    let mut second_sum:G1 = (FpCurve::ZERO(),FpCurve::ZERO(),true);
+    for j in 0..u.len(){
+        let u_j: Fp = u[j];
+        let R_j: G1 = R[j];
+        let prod_j: G1 = g1mul(u_j, R_j);
+        second_sum = g1add(second_sum, prod_j);
+    }
+    let lhs:G1 = g1add(first_sum, g1add(P_prime, second_sum));
+
+    let rhs_term_1: G1 = g1mul(c, G_prime_0);
+
+    let cb_0z:Fp = c * b_0 * z;
+
+    let rhs_term_2: G1 = g1mul(cb_0z, U);
+
+    let rhs_term_3: G1 = g1mul(f, W);
+
+    let rhs = g1add(rhs_term_1, g1add(rhs_term_2, rhs_term_3));
+
+    let check: bool = lhs == rhs;
+
+    check    
+}
 
 #[cfg(test)]
 extern crate quickcheck;
