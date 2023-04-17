@@ -873,6 +873,10 @@ fn step_14(
     commitment
 }
 
+fn step_16() -> Seq<Fp> {
+    todo!();
+}
+
 fn open() {}
 
 #[cfg(test)]
