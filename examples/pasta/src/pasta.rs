@@ -16,7 +16,7 @@ public_nat_mod!( //Custom Macro - defining a new type with some functions - well
     type_name: Fp,
     type_of_canvas: ScalarCanvas,
     bit_size_of_field: 256,
-    modulo_value: "7" //0x40000000000000000000000000000000224698fc094cf91b992d30ed00000001
+    modulo_value: "40000000000000000000000000000000224698fc094cf91b992d30ed00000001" //0x40000000000000000000000000000000224698fc094cf91b992d30ed00000001
 );
 
 //bool is "isPointAtInfinity"
