@@ -1,3 +1,6 @@
+#![allow(non_snake_case)]
+#![allow(dead_code)]
+
 use hacspec_lib::*;
 use hacspec_pasta::*;
 // use hacspec_sha256::*;
@@ -156,7 +159,7 @@ fn sum_coeffs(p: Seq<Fp>) -> Fp {
     sum
 }
 /// Checks if all entries in a polynomial is 0
-/// # Arguments 
+/// # Arguments
 /// * `p` the polynomial to be checked
 /// # Returns
 /// * `true` if polynomial is NOT all 0
@@ -482,6 +485,21 @@ fn eval_multi_poly(p: Seq<Term>, inputs: Seq<Fp>) -> Fp {
     }
     let reduced = reduce_multi_poly(p, inputvars);
     let (res, _) = reduced[0];
+
+    res
+}
+
+/// Inner product, between to equal length vectors of field elements
+///
+/// # Arguments
+///
+/// * `u` - LHS vector
+/// * `v` - RHS vector
+fn inner_product(u: Seq<Fp>, v: Seq<Fp>) -> Fp {
+    let mut res = Fp::ZERO();
+    for i in 0..u.len() {
+        res = res + u[i] * v[i];
+    }
 
     res
 }
@@ -1010,6 +1028,98 @@ fn step_23(p: Seq<Fp>, s: Seq<Fp>, x3: Fp, xi: Fp) -> Seq<Fp> {
     p_prime = add_polyx(p_prime, xi_mul_s);
 
     p_prime
+}
+
+/// Auxilary function for computing L_j or R_j in step 24
+///
+/// # Arguments
+/// * `p_part` - $p'_{hi}$ for L or  $p'_{lo}$ for R
+/// * `b_part` - $b_{lo}$ for L or  $b_{hi}$ for R
+/// * `g_part` - $g'_{lo}$ for L or  $g'_{hi}$ for R
+/// * `z` - the challenge z from step 21
+/// * `U` - group element U from pp
+/// * `W` - group element W from pp
+fn calculate_L_or_R(p_part: Seq<Fp>, b_part: Seq<Fp>, g_part: Seq<G1>, z: Fp, U: G1, W: G1) -> G1 {
+    // <p'_part, G'_part>
+    let p_g_msm = msm(p_part.clone(), g_part);
+
+    let p_b_ip = inner_product(p_part, b_part);
+    let z_ip = z * p_b_ip;
+    // [z<p'_part, b_part>]U
+    let z_ip_U = g1mul(z_ip, U);
+
+    let r = Fp::ZERO(); // TODO use real randomness
+
+    // [*]W
+    let multed_W = g1mul(r, W);
+
+    // calculate part j (L_j or R_j)
+    let mut part_j = g1add(p_g_msm, z_ip_U);
+    part_j = g1add(part_j, multed_W);
+
+    part_j
+}
+
+/// Step 24
+/// Get the p'(X) polynomial
+///
+/// # Arguments
+/// * `p` - the polynomial p from step 19
+/// * `s` - the polynomial s from step 20
+/// * `x3` - the challenge from step 15
+/// * `xi` - the ξ challenge from step 21
+fn step_24(
+    p_prime_poly: Seq<Fp>,
+    g: Seq<G1>,
+    x3: Fp,
+    z: Fp,
+    U: G1,
+    W: G1,
+    n: u128,
+    k: usize,
+) -> Seq<Fp> {
+    let u = Seq::<Fp>::create(0); // TODO use real u
+
+    let mut p_prime = p_prime_poly;
+    let mut g_prime = g;
+    let mut b = Seq::<Fp>::create(n as usize);
+    for i in 0..b.len() {
+        let x3_powered = x3.pow(i as u128);
+        b[i] = x3_powered;
+    }
+
+    let p_prime_half = p_prime.len() / 2;
+    let g_prime_half = g_prime.len() / 2;
+    let b_half = b.len() / 2;
+
+    for j in 0..k {
+        // BULLET 1
+        // PROVER WORKS HERE
+        let p_prime_hi = p_prime.slice(0, p_prime_half);
+        let p_prime_lo = p_prime.slice(p_prime_half, p_prime_half);
+
+        let g_prime_hi = g_prime.slice(0, g_prime_half);
+        let g_prime_lo = g_prime.slice(g_prime_half, g_prime_half);
+
+        let b_lo = b.slice(0, b_half);
+        let b_hi = b.slice(b_half, b_half);
+
+        // calcuate L_j and R_j, using the right parts of p', G' and b
+        let L_j = calculate_L_or_R(p_prime_hi, b_lo, g_prime_lo, z, U, W);
+        let R_j = calculate_L_or_R(p_prime_lo, b_hi, g_prime_hi, z, U, W);
+
+        // BULLET 2
+        // VERIFIER WORKS HERE
+        let u_j = u[j];
+
+        // BULLET 3
+        // VERIFIER & PROVER WORKS HERE
+
+        // BULLET 4
+        // PROVER WORKS HERE
+    }
+
+    todo!();
 }
 
 fn open() {}
