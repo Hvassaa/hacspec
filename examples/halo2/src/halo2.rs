@@ -136,6 +136,17 @@ fn sum_coeffs(p: Seq<Fp>) -> Fp {
 
     sum
 }
+fn check_not_zero(p: Seq<Fp>) -> bool {
+    let mut sum = Fp::ZERO();
+    let mut all_zero = false;
+    for i in 0..p.len() {
+        if p[i] > Fp::ZERO(){
+            all_zero = true;
+        }
+    }
+    all_zero
+}
+
 
 // Trim a polynomial of trailing zeros (zero-terms) and return it
 ///
@@ -150,9 +161,10 @@ fn trim_poly(p: Seq<Fp>) -> Seq<Fp> {
         }
     }
     let mut res = Seq::<Fp>::create(last_val_idx + 1);
-
-    for i in 0..res.len() {
-        res[i] = p[i];
+    if p.len() != 0{
+        for i in 0..res.len() {
+            res[i] = p[i];
+        }
     }
 
     res
@@ -224,20 +236,21 @@ fn divide_poly(n: Seq<Fp>, d: Seq<Fp>) -> (Seq<Fp>, Seq<Fp>) {
     let mut q = Seq::<Fp>::new(n.len());
     let mut r = n.clone();
 
+
     let mut loop_upper_bound = d.len();
     if q.len() > d.len() {
         loop_upper_bound = q.len();
     }
-
     for _ in 0..loop_upper_bound {
-        if sum_coeffs(r.clone()) != Fp::ZERO() && poly_degree(r.clone()) >= poly_degree(d.clone()) {
+        let sum = sum_coeffs(r.clone());
+        // if sum_coeffs(r.clone()) != Fp::ZERO() && poly_degree(r.clone()) >= poly_degree(d.clone()) {
+        if check_not_zero(r.clone()) && poly_degree(r.clone()) >= poly_degree(d.clone()) {
             let t = divide_leading_terms(r.clone(), d.clone());
             q = add_polyx(q, t.clone());
             let aux_prod = multiply_poly_by_single_term(d.clone(), t);
             r = sub_polyx(r, aux_prod);
         }
     }
-
     (trim_poly(q), trim_poly(r))
 }
 
@@ -258,7 +271,7 @@ fn compute_h(g_prime: Seq<Fp>) -> Seq<Fp> {
 }
 
 fn multi_poly_with_x(p: Seq<Fp>) -> Seq<Fp> {
-    let mut res: Seq<Fp> = Seq::new(p.len() + 1);
+    let mut res: Seq<Fp> = Seq::<Fp>::create(p.len() + 1);
 
     for i in 0..p.len() {
         res[i + 1] = p[i];
@@ -267,12 +280,22 @@ fn multi_poly_with_x(p: Seq<Fp>) -> Seq<Fp> {
 }
 
 fn legrange_poly(points: Seq<(Fp, Fp)>) -> Seq<Fp> {
-    let mut poly = Seq::<Fp>::create(points.len() - 1);
+    let mut poly = Seq::<Fp>::create(points.len());
 
+    for i in 0..points.len(){
+        let x:Fp = points[i].0;
+        let y:Fp = points[i].1;
+        let basis = legrange_basis(points.clone(), x);
+        let scaled_basis = mul_scalar_polyx(basis, y);
+        poly = add_polyx(poly.clone(), scaled_basis.clone());
+    }
+    poly = trim_poly(poly);
     poly
 }
 
 fn legrange_basis(points: Seq<(Fp, Fp)>, x: Fp) -> Seq<Fp> {
+
+
     let mut basis = Seq::<Fp>::create(points.len());
     basis[0] = Fp::ONE();
     let mut devisor = Fp::ONE();
@@ -282,6 +305,7 @@ fn legrange_basis(points: Seq<(Fp, Fp)>, x: Fp) -> Seq<Fp> {
         if p_x != x {
             devisor = devisor.mul(x.sub(p_x));
             let poly_mul_x = multi_poly_with_x(basis.clone());
+
             let poly_mul_scalar: Seq<Fp> = mul_scalar_polyx(basis, p_x.neg());
             basis = add_polyx(poly_mul_x, poly_mul_scalar);
         }
@@ -891,8 +915,11 @@ extern crate quickcheck_macros;
 use quickcheck::*;
 
 #[cfg(test)]
-#[derive(Clone, Debug)]
-struct UniPolynomial(Seq<Fp>);
+#[derive(Clone,Debug)]
+struct UniPolynomial(
+    Seq<Fp>
+);
+
 
 #[cfg(test)]
 impl Arbitrary for UniPolynomial {
@@ -907,6 +934,32 @@ impl Arbitrary for UniPolynomial {
 }
 
 #[cfg(test)]
+#[derive(Clone,Debug)]
+struct Points(
+    Seq<(Fp,Fp)>
+);
+
+#[cfg(test)]
+impl Arbitrary for Points {
+    fn arbitrary(g: &mut quickcheck::Gen) -> Points {
+        let size = u8::arbitrary(g) % 20;
+        let mut x_cords = vec![];
+        let mut points = vec![];
+        for _ in 0..size {
+            let x: Fp = Fp::from_literal(u128::arbitrary(g)%7);
+            let y: Fp = Fp::from_literal(u128::arbitrary(g)%7);
+            if !x_cords.contains(&x){
+                points.push((x,y));
+                x_cords.push(x)
+            }
+        }
+        Points(Seq::<(Fp,Fp)>::from_vec(points))
+    }
+}
+
+
+
+#[cfg(test)]
 #[quickcheck]
 fn test_poly_mul_x(a: UniPolynomial) {
     let p1 = a.0;
@@ -917,17 +970,49 @@ fn test_poly_mul_x(a: UniPolynomial) {
     assert_eq!(new_p[0], Fp::from_literal(0));
 }
 
+
 #[cfg(test)]
-#[test]
-fn test_legrange_basis() {
-    let mut points: Seq<(Fp, Fp)> = Seq::<(Fp, Fp)>::create(3);
-    points[0] = (Fp::ONE(), Fp::ONE());
-    points[1] = (Fp::TWO(), Fp::TWO());
-    points[2] = (Fp::from_literal(3), Fp::ONE());
-    let basis = legrange_basis(points, Fp::ONE());
-    let res = eval_polyx(basis, Fp::ONE());
-    assert_eq!(res, Fp::ONE())
+#[quickcheck]
+fn test_legrange(a:Points){
+    let points_seq = a.0;
+
+    let legrange_poly = legrange_poly(points_seq.clone());
+
+    for j in 0..points_seq.len(){
+        let eval_x = points_seq[j].0;
+        let point_y = points_seq[j].1;
+        let res = eval_polyx(legrange_poly.clone(), eval_x);
+        assert_eq!(res,point_y)
+    }  
 }
+
+
+
+#[cfg(test)]
+#[quickcheck]
+fn test_legrange_basis(a:Points){
+    let points_seq = a.0;
+    // let points_seq  = Seq::<(Fp,Fp)>::from_vec(vec![(Fp::from_literal(1),Fp::from_literal(2)), (Fp::from_literal(2),Fp::from_literal(3)), (Fp::from_literal(5),Fp::from_literal(0))]);
+
+    for i in 0..points_seq.len(){
+        let x = points_seq[i].0;
+        let basis = legrange_basis(points_seq.clone(), x);
+        for j in 0..points_seq.len(){
+            let eval_x = points_seq[j].0;
+            let res = eval_polyx(basis.clone(), eval_x);
+            if x == eval_x{
+                assert_eq!(res,Fp::ONE())
+            }
+            else {
+                assert_eq!(res,Fp::ZERO())
+            }
+            
+        }
+    }    
+}
+
+
+
 
 #[cfg(test)]
 #[test]
