@@ -4,6 +4,44 @@
 use hacspec_lib::*;
 use hacspec_pasta::*;
 
+/// A struct for the public parameters, pp
+//
+/// Since the group and field is currently fixed, only G, U, W is represented
+struct PublicParams(
+    /// **G** in G^n
+    Seq<G1>,
+    /// U in G
+    G1,
+    /// W in G
+    G1,
+);
+
+/// Common Reference Struct
+///
+/// This struct is a global variable for the proving system and holds values used in the commitment schemes
+///
+/// # Tuple entries
+/// * `0`: Seq<G1> ∈ Gᵈ (vector of random elems.)
+/// * `1`: G1 in G (random group element)
+type CRS = (Seq<G1>, G1);
+
+/// A term in a multivariate polynomial
+///
+/// # Tuple entries
+/// * `0`: - The first entry represents the coefficient for the term.
+/// * `1`: - The second entry, a sequence of `u32`s, represent the powers
+///        for each variable, s.t. the i'th variabe is raised to the power
+///        of the i'th entry in the sequence.
+type Term = (Fp, Seq<u32>);
+
+/// A representation of input variable in multivariate polynomial
+///
+/// # Tuple entries
+/// * `0`: - The first entry determines whether this variable should be evaluated or not.
+///        This is useful for only evaluating some variables in a multivariate polynomial.
+/// * `1`: - The second entry is the actual (inputted) value for the variable
+type InputVar = (bool, Fp);
+
 fn halo2() {
     // step 1
     // dummy values
@@ -143,21 +181,6 @@ fn poly_degree(p: Seq<Fp>) -> u128 {
     }
 }
 
-/// Get the sum of all coefficietns of a polynomial
-/// (NOT useful for checking if a polynomial is 0)
-///
-/// # Arguments
-///
-/// * `p` - the polynomial
-fn sum_coeffs(p: Seq<Fp>) -> Fp {
-    let mut sum = Fp::ZERO();
-    for i in 0..p.len() {
-        sum = sum + p[i];
-    }
-
-    sum
-}
-
 /// Checks if all entries in a polynomial is 0
 /// # Arguments
 /// * `p` the polynomial to be checked
@@ -175,7 +198,7 @@ fn check_not_zero(p: Seq<Fp>) -> bool {
     all_zero
 }
 
-// Trim a polynomial of trailing zeros (zero-terms) and return it
+/// Trim a polynomial of trailing zeros (zero-terms) and return it
 ///
 /// # Arguments
 ///
@@ -270,8 +293,6 @@ fn divide_poly(n: Seq<Fp>, d: Seq<Fp>) -> (Seq<Fp>, Seq<Fp>) {
         loop_upper_bound = q.len();
     }
     for _ in 0..loop_upper_bound {
-        let sum = sum_coeffs(r.clone());
-        // if sum_coeffs(r.clone()) != Fp::ZERO() && poly_degree(r.clone()) >= poly_degree(d.clone()) {
         if check_not_zero(r.clone()) && poly_degree(r.clone()) >= poly_degree(d.clone()) {
             let t = divide_leading_terms(r.clone(), d.clone());
             q = add_polyx(q, t.clone());
@@ -282,21 +303,7 @@ fn divide_poly(n: Seq<Fp>, d: Seq<Fp>) -> (Seq<Fp>, Seq<Fp>) {
     (trim_poly(q), trim_poly(r))
 }
 
-/// Compute the h(x) polynomial, used in step 4 and 13
-///
-/// # Arguments
-///
-/// * `g_prime` the univariate polynomial calculated in step 2 and 13
-fn compute_h(g_prime: Seq<Fp>) -> Seq<Fp> {
-    // TODO create the real vanishing polynomial
-    let t = Seq::<Fp>::create(0);
-
-    let (h, remainder) = divide_poly(g_prime, t);
-    // TODO what to do with remainder?
-
-    h
-}
-
+// TODO document
 fn multi_poly_with_x(p: Seq<Fp>) -> Seq<Fp> {
     let mut res: Seq<Fp> = Seq::<Fp>::create(p.len() + 1);
 
@@ -305,12 +312,12 @@ fn multi_poly_with_x(p: Seq<Fp>) -> Seq<Fp> {
     }
     res
 }
+
 ///Find lowest degree polynomial passing through a set points using legrange interpolation
 /// # Arguments
 /// * `points`is a sequence of points `(Fp,Fp)` that the polynomial must pass through
 /// # Assertions
 /// * No two points may have the same x-value
-
 fn legrange_poly(points: Seq<(Fp, Fp)>) -> Seq<Fp> {
     let mut poly = Seq::<Fp>::create(points.len());
 
@@ -370,24 +377,6 @@ fn legrange_basis(points: Seq<(Fp, Fp)>, x: Fp) -> Seq<Fp> {
 //                 }
 //         basis
 //     }
-
-struct PublicParams(
-    Seq<G1>, // G: G in G^d
-    G1,      // U in G
-    G1,      // W in G
-);
-
-/// Commen Reference Struct
-/// This struct is a global variable for the prooving system and holds values used in the commitment schemes
-///
-/// # Elements
-/// * `[0]`: Seq<G1> ∈ Gᵈ (vector of random elems.)
-/// * `[1]`: G1 in G (random group element)
-type CRS = (Seq<G1>, G1);
-
-// primarily for multivariate polys
-type Term = (Fp, Seq<u32>);
-type InputVar = (bool, Fp);
 
 /// Evaluate a term with specified variable inputs
 /// Helper function for reduce_multi_poly
@@ -503,36 +492,6 @@ fn eval_multi_poly(p: Seq<Term>, inputs: Seq<Fp>) -> Fp {
     res
 }
 
-/// Inner product, between to equal length vectors of field elements
-///
-/// # Arguments
-///
-/// * `u` - LHS vector
-/// * `v` - RHS vector
-fn inner_product(u: Seq<Fp>, v: Seq<Fp>) -> Fp {
-    let mut res = Fp::ZERO();
-    for i in 0..u.len() {
-        res = res + u[i] * v[i];
-    }
-
-    res
-}
-
-/// Multiscalar multiplicatoin, auxiliary function for Pedersen vector commitment
-///
-/// # Arguments
-///
-/// * `a` - sequence of scalars (LHS)
-/// * `g` - sequence of group (curve) elements (RHS)
-fn msm(a: Seq<Fp>, g: Seq<G1>) -> G1 {
-    let mut res = g1mul(a[0], g[0]);
-    for i in 1..a.len() {
-        res = g1add(res, g1mul(a[i], g[i]));
-    }
-
-    res
-}
-
 /// Pedersen vector commitment (1.3 in protocol)
 ///
 /// # Arguments
@@ -550,34 +509,6 @@ fn commit_polyx(crs: &CRS, a: Seq<Fp>, r: Fp) -> G1 {
 
     res
 }
-
-/// Generates a random polynomial from given randomness using iterating hashing (3 in protocol)
-///
-/// # Arguments
-///
-/// * `randomness` - the "randomness"
-/// * `size` - the size of the polynomials (the max power -1)
-// fn random_sample_poly(randomness: ByteSeq, size: usize) -> Seq<Fp> {
-//     let mut s = Seq::<Fp>::create(size);
-//     let mut r = randomness;
-
-//     for i in 0..size {
-//         let digest = hash(&r);
-//         let hex = digest.to_hex();
-//         r = ByteSeq::from_hex(&hex);
-
-//         s[i] = Fp::from_byte_seq_be(&r);
-//     }
-
-//     s
-// }
-
-// fn extract_term(term: &Term) -> (Fp, u32) {
-//     let (f, powers): (Fp, Seq<u32>) = term.clone();
-//     // let degs: Seq<u32> = powers.clone();
-//     // let deg: u32 = degs[0].clone::<u32>();
-//     (f.clone(), powers[0].clone())
-// }
 
 /// Evaluate a multivariate polynomial in variables such that it becomes a univariate polynomial (1.1 in protocol)
 /// (univaraite polynomial represented as a sequence of field elements, where entry i, has
@@ -632,6 +563,104 @@ fn multi_to_uni_poly(p: Seq<Term>, inputs: Seq<InputVar>) -> Seq<Fp> {
 
     s
 }
+
+/// Inner product, between to equal length vectors of field elements
+///
+/// # Arguments
+///
+/// * `u` - LHS vector
+/// * `v` - RHS vector
+fn inner_product(u: Seq<Fp>, v: Seq<Fp>) -> Fp {
+    let mut res = Fp::ZERO();
+    for i in 0..u.len() {
+        res = res + u[i] * v[i];
+    }
+
+    res
+}
+
+/// Multiscalar multiplicatoin, auxiliary function for Pedersen vector commitment
+///
+/// # Arguments
+///
+/// * `a` - sequence of scalars (LHS)
+/// * `g` - sequence of group (curve) elements (RHS)
+fn msm(a: Seq<Fp>, g: Seq<G1>) -> G1 {
+    let mut res = g1mul(a[0], g[0]);
+    for i in 1..a.len() {
+        res = g1add(res, g1mul(a[i], g[i]));
+    }
+
+    res
+}
+
+/// Compute the h(x) polynomial, used in step 4 and 13
+///
+/// # Arguments
+///
+/// * `g_prime` the univariate polynomial calculated in step 2 and 13
+fn compute_h(g_prime: Seq<Fp>) -> Seq<Fp> {
+    // TODO create the real vanishing polynomial
+    let t = Seq::<Fp>::create(0);
+
+    let (h, remainder) = divide_poly(g_prime, t);
+    // TODO what to do with remainder?
+
+    h
+}
+
+/// Implementation of the σ mapping from the protocol
+///
+/// # Arguments
+/// * `i` - the i in σ(i)
+/// * `q` - q, from the protocol represented as seqs of (i, set), s.t. q_i = set
+fn sigma(i: u128, q: Seq<(u128, Seq<u128>)>) -> Seq<u128> {
+    /// TODO this is dummy
+    let mut res = Seq::<u128>::create(0);
+    for j in 0..q.len() {
+        let maybe_i = q[j].0;
+        let maybe_res = q[j].1.clone();
+        if i == maybe_i {
+            res = maybe_res;
+        }
+    }
+
+    res
+}
+
+/// Auxilary function for computing L_j or R_j in step 24
+///
+/// # Arguments
+/// * `p_part` - $p'_{hi}$ for L or  $p'_{lo}$ for R
+/// * `b_part` - $b_{lo}$ for L or  $b_{hi}$ for R
+/// * `g_part` - $g'_{lo}$ for L or  $g'_{hi}$ for R
+/// * `z` - the challenge z from step 21
+/// * `U` - group element U from pp
+/// * `W` - group element W from pp
+fn calculate_L_or_R(p_part: Seq<Fp>, b_part: Seq<Fp>, g_part: Seq<G1>, z: Fp, U: G1, W: G1) -> G1 {
+    // <p'_part, G'_part>
+    let p_g_msm = msm(p_part.clone(), g_part);
+
+    let p_b_ip = inner_product(p_part, b_part);
+    let z_ip = z * p_b_ip;
+    // [z<p'_part, b_part>]U
+    let z_ip_U = g1mul(z_ip, U);
+
+    let r = Fp::ZERO(); // TODO use real randomness
+
+    // [*]W
+    let multed_W = g1mul(r, W);
+
+    // calculate part j (L_j or R_j)
+    let mut part_j = g1add(p_g_msm, z_ip_U);
+    part_j = g1add(part_j, multed_W);
+
+    part_j
+}
+fn step_1() {}
+fn step_2() {}
+fn step_3() {}
+fn step_4() {}
 
 /// Step 5
 /// split polynomial of degree n_g(n-1)-n up into n_(g-2) polynomials of degree at most n-1
@@ -740,24 +769,7 @@ fn step_9(a_prime_seq: Seq<Seq<Fp>>, n_e: usize, omega: Fp, x: Fp) -> Seq<Seq<Fp
     a_seq
 }
 
-/// Implementation of the σ mapping from the protocol
-///
-/// # Arguments
-/// * `i` - the i in σ(i)
-/// * `q` - q, from the protocol represented as seqs of (i, set), s.t. q_i = set
-fn sigma(i: u128, q: Seq<(u128, Seq<u128>)>) -> Seq<u128> {
-    /// TODO this is dummy
-    let mut res = Seq::<u128>::create(0);
-    for j in 0..q.len() {
-        let maybe_i = q[j].0;
-        let maybe_res = q[j].1.clone();
-        if i == maybe_i {
-            res = maybe_res;
-        }
-    }
-
-    res
-}
+fn step_10() {}
 
 /// Step 11
 /// Get the list of Q's (Q_0, ..., Q_{n_q - 1})
@@ -766,16 +778,16 @@ fn sigma(i: u128, q: Seq<(u128, Seq<u128>)>) -> Seq<u128> {
 /// * `n_q` - n_q from the protocol
 /// * `n_a` - n_a from the protocol
 /// * `x1` - challenge 1
-/// * `h_prime` - H', the computed sum from step 7
-/// * `r` - R, commitment from step 3
+/// * `H_prime` - H', the computed sum from step 7
+/// * `R` - R, commitment from step 3
 /// * `a` - A, the list of hiding commitments for a_i's
 /// * `q` - q, from the protocol represented as seqs of (i, set), s.t. q_i = set
 fn step_11(
     n_q: u128,
     n_a: u128,
     x1: Fp,
-    h_prime: G1,
-    r: G1,
+    H_prime: G1,
+    R: G1,
     a: Seq<G1>,
     q: Seq<(u128, Seq<u128>)>,
 ) -> Seq<G1> {
@@ -800,24 +812,24 @@ fn step_11(
     let x1_squared = x1 * x1;
     let q0 = qs[0];
     let product1 = g1mul(x1_squared, q0);
-    let product2 = g1mul(x1, h_prime);
+    let product2 = g1mul(x1, H_prime);
     let sum1 = g1add(product1, product2);
-    let final_sum = g1add(sum1, r);
+    let final_sum = g1add(sum1, R);
     qs[0] = final_sum;
 
     qs
 }
 
 /// Step 12
-/// Get the list of Q's (Q_0, ..., Q_{n_q - 1})
+/// Get the list of q's (q_0, ..., q_{n_q - 1})
 ///
 /// # Arguments
 /// * `n_q` - n_q from the protocol
 /// * `n_a` - n_a from the protocol
 /// * `x1` - challenge 1
-/// * `h_prime` - h', the computed polynomial from step 8
-/// * `r` - the "random" polynomial from step 3
-/// * `a_prime` - a', the list of univariate polys from step 1
+/// * `h_prime` - h', the computed polynomial from [step_8]
+/// * `r` - the "random" polynomial from [step_3]
+/// * `a_prime` - a', the list of univariate polys from [step_1]
 /// * `q` - q, from the protocol represented as seqs of (i, set), s.t. q_i = set
 fn step_12(
     n_q: u128,
@@ -864,7 +876,7 @@ fn step_12(
 }
 
 /// Step 13
-/// Get the list of Q's (Q_0, ..., Q_{n_q - 1})
+/// Get the list of r's (r_0, ..., r_{n_q - 1})
 ///
 /// # Arguments
 /// * `n_q` - n_q from the protocol
@@ -962,6 +974,8 @@ fn step_14(
     commitment
 }
 
+fn step_15() {}
+
 /// Step 16
 /// Get the u ∈ F^{n_q} vector
 ///
@@ -979,6 +993,9 @@ fn step_16(n_q: u128, x3: Fp, q_polys: Seq<Seq<Fp>>) -> Seq<Fp> {
 
     u
 }
+
+fn step_17() {}
+fn step_18() {}
 
 /// Step 19
 /// Get the p(X) polynomial
@@ -1007,6 +1024,9 @@ fn step_19(x4: Fp, q_prime: Seq<Fp>, q_polys: Seq<Seq<Fp>>) -> Seq<Fp> {
 
     p
 }
+
+fn step_20() {}
+fn step_21() {}
 
 /// Step 22
 /// Get the P' curve-point/group-element
@@ -1043,36 +1063,6 @@ fn step_23(p: Seq<Fp>, s: Seq<Fp>, x3: Fp, xi: Fp) -> Seq<Fp> {
     p_prime = add_polyx(p_prime, xi_mul_s);
 
     p_prime
-}
-
-/// Auxilary function for computing L_j or R_j in step 24
-///
-/// # Arguments
-/// * `p_part` - $p'_{hi}$ for L or  $p'_{lo}$ for R
-/// * `b_part` - $b_{lo}$ for L or  $b_{hi}$ for R
-/// * `g_part` - $g'_{lo}$ for L or  $g'_{hi}$ for R
-/// * `z` - the challenge z from step 21
-/// * `U` - group element U from pp
-/// * `W` - group element W from pp
-fn calculate_L_or_R(p_part: Seq<Fp>, b_part: Seq<Fp>, g_part: Seq<G1>, z: Fp, U: G1, W: G1) -> G1 {
-    // <p'_part, G'_part>
-    let p_g_msm = msm(p_part.clone(), g_part);
-
-    let p_b_ip = inner_product(p_part, b_part);
-    let z_ip = z * p_b_ip;
-    // [z<p'_part, b_part>]U
-    let z_ip_U = g1mul(z_ip, U);
-
-    let r = Fp::ZERO(); // TODO use real randomness
-
-    // [*]W
-    let multed_W = g1mul(r, W);
-
-    // calculate part j (L_j or R_j)
-    let mut part_j = g1add(p_g_msm, z_ip_U);
-    part_j = g1add(part_j, multed_W);
-
-    part_j
 }
 
 /// Step 24
@@ -1147,7 +1137,7 @@ fn step_24(
     todo!();
 }
 
-fn open() {}
+fn step_25() {}
 
 ///Varifiers final check of the protocol
 /// # Arguments
@@ -1213,9 +1203,6 @@ extern crate quickcheck;
 #[cfg(test)]
 #[macro_use(quickcheck)]
 extern crate quickcheck_macros;
-// #[cfg(test)]
-// extern crate polynomial;
-
 #[cfg(test)]
 use quickcheck::*;
 
@@ -1579,7 +1566,7 @@ fn test_poly_div() {
     assert_eq!(q.len(), 2);
     assert_eq!(q[0], Fp::ZERO());
     assert_eq!(q[1], Fp::ONE());
-    assert_eq!(sum_coeffs(r), Fp::ZERO());
+    assert!(!check_not_zero(r));
 
     let n = Seq::from_vec(vec![
         Fp::from_literal(4),
@@ -1592,7 +1579,7 @@ fn test_poly_div() {
     assert_eq!(q.len(), 2);
     assert_eq!(q[0], Fp::TWO());
     assert_eq!(q[1], Fp::ONE());
-    assert_eq!(sum_coeffs(r), Fp::ZERO());
+    assert!(!check_not_zero(r));
 }
 
 #[cfg(test)]
