@@ -3,7 +3,6 @@
 
 use hacspec_lib::*;
 use hacspec_pasta::*;
-// use hacspec_sha256::*;
 
 fn halo2() {
     // step 1
@@ -158,6 +157,7 @@ fn sum_coeffs(p: Seq<Fp>) -> Fp {
 
     sum
 }
+
 /// Checks if all entries in a polynomial is 0
 /// # Arguments
 /// * `p` the polynomial to be checked
@@ -243,6 +243,7 @@ fn multiply_poly_by_single_term(p: Seq<Fp>, single_term: Seq<Fp>) -> Seq<Fp> {
 ///
 /// The pseudo-code is shown here:
 ///
+/// ```text
 /// function n / d is
 ///  require d ≠ 0
 ///  q ← 0
@@ -254,6 +255,7 @@ fn multiply_poly_by_single_term(p: Seq<Fp>, single_term: Seq<Fp>) -> Seq<Fp> {
 ///      r ← r − t × d
 ///
 ///  return (q, r)
+/// ```
 ///
 /// # Arguments
 ///
@@ -281,7 +283,6 @@ fn divide_poly(n: Seq<Fp>, d: Seq<Fp>) -> (Seq<Fp>, Seq<Fp>) {
 }
 
 /// Compute the h(x) polynomial, used in step 4 and 13
-///
 ///
 /// # Arguments
 ///
@@ -632,19 +633,19 @@ fn multi_to_uni_poly(p: Seq<Term>, inputs: Seq<InputVar>) -> Seq<Fp> {
     s
 }
 
-/// 5 (in protocol)
+/// Step 5
 /// split polynomial of degree n_g(n-1)-n up into n_(g-2) polynomials of degree at most n-1
 ///
-/// The prolynomials(represented by vectors) are stored in a vectore.
+/// The polynomials(represented by vectors) are stored in a vectore.
 /// This way the index in the outer vector can act as the i when reproducing the original poly:
 /// h(X) = SUM from i=0 to n_(g-1) [xˆ(ni)h_i(x)]
 /// Where n is a parameter of the prooving system, and h_i is the ith part of the original poly.
 ///
 /// # Arguments
-/// * `p1` - Polynomial to be split
+/// * `h` - Polynomial to be split
 /// * `n` - defines length of new polynomials (global variable for prooving system)
-fn split_poly(p1: Seq<Fp>, n: u128) -> Seq<Seq<Fp>> {
-    let no_of_parts = (p1.len() + (n - (2 as u128)) as usize) / ((n - (1 as u128)) as usize);
+fn step_5(h: Seq<Fp>, n: u128) -> Seq<Seq<Fp>> {
+    let no_of_parts = (h.len() + (n - (2 as u128)) as usize) / ((n - (1 as u128)) as usize);
 
     let mut original_index = 0;
     let mut poly_parts: Seq<Seq<Fp>> = Seq::<Seq<Fp>>::create(no_of_parts);
@@ -653,8 +654,8 @@ fn split_poly(p1: Seq<Fp>, n: u128) -> Seq<Seq<Fp>> {
         for j in 0..poly_parts.len() {
             let mut current_poly_part: Seq<Fp> = Seq::<Fp>::create(no_of_parts);
 
-            if original_index < p1.len() {
-                current_poly_part[j] = p1[original_index];
+            if original_index < h.len() {
+                current_poly_part[j] = h[original_index];
                 original_index = original_index + 1;
             }
             poly_parts[j] = current_poly_part;
@@ -663,7 +664,7 @@ fn split_poly(p1: Seq<Fp>, n: u128) -> Seq<Seq<Fp>> {
     poly_parts
 }
 
-/// 6 (in protocol)
+/// Step 6
 ///
 /// commit to each h_i polynomial keeping them in the seq to peserve the power (i)
 ///
@@ -674,8 +675,7 @@ fn split_poly(p1: Seq<Fp>, n: u128) -> Seq<Seq<Fp>> {
 ///
 /// # Constraints
 /// * `r_seq` should be at least as long as the `poly_parts`
-///
-fn commit_to_poly_parts(poly_parts: Seq<Seq<Fp>>, crs: &CRS, r_seq: Seq<Fp>) -> Seq<G1> {
+fn step_6(poly_parts: Seq<Seq<Fp>>, crs: &CRS, r_seq: Seq<Fp>) -> Seq<G1> {
     let mut commitment_seq: Seq<G1> = Seq::<G1>::create(poly_parts.len());
     for i in 0..poly_parts.len() {
         let commitment = commit_polyx(crs, poly_parts[i].clone(), r_seq[i]);
@@ -701,6 +701,7 @@ fn step_7(commitment_seq: Seq<G1>, x: Fp, n: u128) -> G1 {
     result
 }
 
+/// TODO document
 fn step_8(h: Seq<Seq<Fp>>, x: Fp, n: u128) -> Seq<Fp> {
     let mut res = Seq::<Fp>::create((n - (1 as u128)) as usize);
     for i in 0..h.len() {
@@ -714,6 +715,7 @@ fn step_8(h: Seq<Seq<Fp>>, x: Fp, n: u128) -> Seq<Fp> {
     res
 }
 
+/// Step 9
 /// This functions creates a seq filled with a_i from the second part of step 9
 ///
 /// # Arguments
@@ -721,7 +723,6 @@ fn step_8(h: Seq<Seq<Fp>>, x: Fp, n: u128) -> Seq<Fp> {
 /// * `n_e` - Global parameter for the protocol
 /// * `omega` - The generator for the evaluations points also a global parameter for the protocol
 /// * `x`The - challenge from step 7
-///
 fn step_9(a_prime_seq: Seq<Seq<Fp>>, n_e: usize, omega: Fp, x: Fp) -> Seq<Seq<Fp>> {
     let n_a: usize = a_prime_seq.len();
     let mut a_seq: Seq<Seq<Fp>> = Seq::<Seq<Fp>>::create(n_a);
@@ -745,6 +746,7 @@ fn step_9(a_prime_seq: Seq<Seq<Fp>>, n_e: usize, omega: Fp, x: Fp) -> Seq<Seq<Fp
 /// * `i` - the i in σ(i)
 /// * `q` - q, from the protocol represented as seqs of (i, set), s.t. q_i = set
 fn sigma(i: u128, q: Seq<(u128, Seq<u128>)>) -> Seq<u128> {
+    /// TODO this is dummy
     let mut res = Seq::<u128>::create(0);
     for j in 0..q.len() {
         let maybe_i = q[j].0;
@@ -777,7 +779,7 @@ fn step_11(
     a: Seq<G1>,
     q: Seq<(u128, Seq<u128>)>,
 ) -> Seq<G1> {
-    let nq_minus1 = n_q - (1 as u128);
+    let nq_minus1 = n_q - (1 as u128); // TODO should not be decremented here, or in the following steps.
     let mut qs = Seq::<G1>::create(nq_minus1 as usize);
     let na_minus1 = n_a - (1 as u128);
 
@@ -1343,7 +1345,7 @@ fn test_part_8() {
         .collect();
     let p1 = Seq::from_vec(v1);
     let n = 3;
-    let poly_parts = split_poly(p1, n);
+    let poly_parts = step_5(p1, n);
     let x: Fp = Fp::default();
     let res: Seq<Fp> = step_8(poly_parts, x, n);
 }
@@ -1373,8 +1375,8 @@ fn test_commit_to_poly_parts() {
         .collect();
     let p1 = Seq::from_vec(v1);
     let n = 3;
-    let poly_parts = split_poly(p1, n);
-    let commitments = commit_to_poly_parts(poly_parts, &crs, r_seq);
+    let poly_parts = step_5(p1, n);
+    let commitments = step_6(poly_parts, &crs, r_seq);
 }
 
 #[cfg(test)]
@@ -1386,7 +1388,7 @@ fn test_split_poly() {
         .collect();
     let p1 = Seq::from_vec(v1);
     let n = 3;
-    let poly_parts = split_poly(p1, n);
+    let poly_parts = step_5(p1, n);
 }
 
 #[cfg(test)]
