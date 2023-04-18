@@ -350,10 +350,9 @@ fn legrange_basis(points: Seq<(Fp, Fp)>, x: Fp) -> Seq<Fp> {
     division_poly[0] = devisor;
 
     let output = divide_poly(basis, division_poly);
-    let (final_basis,_) = output;
+    let (final_basis, _) = output;
     final_basis
 }
-
 
 // fn legrange_basis(points: Seq<(Fp, Fp)>, x: Fp) -> Seq<Fp> {
 //         let mut basis = Seq::<Fp>::create(points.len());
@@ -1119,8 +1118,8 @@ fn step_24(
         let b_hi = b.slice(b_half, b_half);
 
         // calcuate L_j and R_j, using the right parts of p', G' and b
-        let L_j = calculate_L_or_R(p_prime_hi, b_lo, g_prime_lo, z, U, W);
-        let R_j = calculate_L_or_R(p_prime_lo, b_hi, g_prime_hi, z, U, W);
+        let L_j = calculate_L_or_R(p_prime_hi, b_lo, g_prime_lo.clone(), z, U, W);
+        let R_j = calculate_L_or_R(p_prime_lo, b_hi, g_prime_hi.clone(), z, U, W);
 
         // BULLET 2
         // VERIFIER WORKS HERE
@@ -1128,6 +1127,16 @@ fn step_24(
 
         // BULLET 3
         // VERIFIER & PROVER WORKS HERE
+        let mut new_g_prime = Seq::<G1>::create(g_prime_half);
+        for i in 0..new_g_prime.len() {
+            // TODO, this is entry-wise multiplication and pairwise addition!!!
+            let g_prime_hi_indexed = g_prime_hi[i];
+            let g_prime_lo_indexed = g_prime_lo[i];
+            let rhs_product = g1mul(u_j, g_prime_hi_indexed);
+            let sum = g1add(g_prime_lo_indexed, rhs_product);
+            new_g_prime[i] = sum;
+        }
+        g_prime = new_g_prime;
 
         // BULLET 4
         // PROVER WORKS HERE
@@ -1137,7 +1146,6 @@ fn step_24(
 }
 
 fn open() {}
-
 
 ///Varifiers final check of the protocol
 /// # Arguments
@@ -1152,28 +1160,40 @@ fn open() {}
 /// * `U` - from public parameters
 /// * `f` - blinding factor from step 25
 /// * `W` - from public parameters
-/// 
-fn step_26(u:Seq<Fp>,L:Seq<G1>,P_prime:G1,R:Seq<G1>,c:Fp,G_prime_0:G1,b_0:Fp,z:Fp,U:G1,f:Fp,W:G1)-> bool{
-    let mut first_sum:G1 = (FpCurve::ZERO(),FpCurve::ZERO(),true);
-    for j in 0..u.len(){
+///
+fn step_26(
+    u: Seq<Fp>,
+    L: Seq<G1>,
+    P_prime: G1,
+    R: Seq<G1>,
+    c: Fp,
+    G_prime_0: G1,
+    b_0: Fp,
+    z: Fp,
+    U: G1,
+    f: Fp,
+    W: G1,
+) -> bool {
+    let mut first_sum: G1 = (FpCurve::ZERO(), FpCurve::ZERO(), true);
+    for j in 0..u.len() {
         let u_j_inv: Fp = u[j].inv();
         let L_j: G1 = L[j];
         let prod_j: G1 = g1mul(u_j_inv, L_j);
         first_sum = g1add(first_sum, prod_j);
     }
 
-    let mut second_sum:G1 = (FpCurve::ZERO(),FpCurve::ZERO(),true);
-    for j in 0..u.len(){
+    let mut second_sum: G1 = (FpCurve::ZERO(), FpCurve::ZERO(), true);
+    for j in 0..u.len() {
         let u_j: Fp = u[j];
         let R_j: G1 = R[j];
         let prod_j: G1 = g1mul(u_j, R_j);
         second_sum = g1add(second_sum, prod_j);
     }
-    let lhs:G1 = g1add(first_sum, g1add(P_prime, second_sum));
+    let lhs: G1 = g1add(first_sum, g1add(P_prime, second_sum));
 
     let rhs_term_1: G1 = g1mul(c, G_prime_0);
 
-    let cb_0z:Fp = c * b_0 * z;
+    let cb_0z: Fp = c * b_0 * z;
 
     let rhs_term_2: G1 = g1mul(cb_0z, U);
 
@@ -1183,7 +1203,7 @@ fn step_26(u:Seq<Fp>,L:Seq<G1>,P_prime:G1,R:Seq<G1>,c:Fp,G_prime_0:G1,b_0:Fp,z:F
 
     let check: bool = lhs == rhs;
 
-    check    
+    check
 }
 
 #[cfg(test)]
