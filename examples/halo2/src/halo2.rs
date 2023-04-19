@@ -595,6 +595,20 @@ fn msm(a: Seq<Fp>, g: Seq<G1>) -> G1 {
     res
 }
 
+fn compute_vanishing_polynomial(omega:Fp,n:u128) -> Seq<Fp>{
+    let mut vanishing_poly = Seq::<Fp>::create((n-1 as u128) as usize);
+    vanishing_poly[0] = Fp::ONE();
+    for i in 0..n as usize-1{
+        let eval_point = omega.pow(i as u128);
+        let poly_mul_x = multi_poly_with_x(vanishing_poly.clone());
+        let poly_mul_scalar: Seq<Fp> = mul_scalar_polyx(vanishing_poly.clone(), eval_point.neg());
+        vanishing_poly = add_polyx(poly_mul_x, poly_mul_scalar);
+        
+    }
+    vanishing_poly
+
+}
+
 /// Compute the h(x) polynomial, used in step 4 and 13
 ///
 /// # Arguments
@@ -882,56 +896,60 @@ fn step_12(
 /// # Arguments
 /// * `n_q` - n_q from the protocol
 /// * `n_a` - n_a from the protocol
-/// * `x1` - challenge 1
+/// * `x` - the challenge from step 7
+/// * `x1` - the challenge from step 11
 /// * `r` - the "random" polynomial from step 3
 /// * `s` - s, the computed polynomials from step 10
 /// * `q` - q, from the protocol represented as seqs of (i, set), s.t. q_i = set
 /// * `a` - a', the list of univariate polys from step 1
-fn step_13(
-    n_q: u128,
-    n_a: u128,
-    x1: Fp,
-    r: Seq<Fp>,
-    s: Seq<Seq<Fp>>,
-    q: Seq<(u128, Seq<u128>)>,
-    a: Seq<Seq<Fp>>,
-) -> Seq<Seq<Fp>> {
-    let nq_minus1 = n_q - (1 as u128);
-    let mut rs = Seq::<Seq<Fp>>::create(nq_minus1 as usize);
+/// * `g_prime` - the polynomial from step 2
+// fn step_13(
+//     n_q: u128,
+//     n_a: u128,
+//     x:Fp,
+//     x1: Fp,
+//     r: Seq<Fp>,
+//     s: Seq<Seq<Fp>>,
+//     q: Seq<(u128, Seq<u128>)>,
+//     a: Seq<Seq<Fp>>,
+//     g_prime: Seq<Fp>
+// ) -> Seq<Seq<Fp>> {
+//     let nq_minus1 = n_q - (1 as u128);
+//     let mut rs = Seq::<Seq<Fp>>::create(nq_minus1 as usize);
 
-    // initialize all polys to constant 0
-    for i in 0..rs.len() {
-        rs[i] = Seq::<Fp>::create(1);
-    }
+//     // initialize all polys to constant 0
+//     for i in 0..rs.len() {
+//         rs[i] = Seq::<Fp>::create(1);
+//     }
 
-    let na_minus1 = n_a - (1 as u128);
+//     let na_minus1 = n_a - (1 as u128);
 
-    // bullet 1
-    for i in 0..(na_minus1 as usize) {
-        let s_i = s[i as usize].clone();
-        let sigma_i = sigma(i as u128, q.clone());
-        // TODO is this what is meant by Q_sigma(i) ?
-        for j in 0..sigma_i.len() {
-            let j = sigma_i[j];
-            let r_sigma_i = rs[j as usize].clone();
-            let product = mul_scalar_polyx(r_sigma_i.clone(), x1);
-            rs[j as usize] = add_polyx(product, s_i.clone());
-        }
-    }
+//     // bullet 1
+//     for i in 0..(na_minus1 as usize) {
+//         let s_i = s[i as usize].clone();
+//         let sigma_i = sigma(i as u128, q.clone());
+//         // TODO is this what is meant by Q_sigma(i) ?
+//         for j in 0..sigma_i.len() {
+//             let j = sigma_i[j];
+//             let r_sigma_i = rs[j as usize].clone();
+//             let product = mul_scalar_polyx(r_sigma_i.clone(), x1);
+//             rs[j as usize] = add_polyx(product, s_i.clone());
+//         }
+//     }
 
-    // bullet 2
-    let g_prime = Seq::<Fp>::create(0); // TODO calculate the real g_prime (probably put in a function)
-    let h = compute_h(g_prime);
-    let x1_squared = x1 * x1;
-    let r0 = rs[0 as usize].clone();
-    let product1 = mul_scalar_polyx(r0, x1_squared);
-    let product2 = mul_scalar_polyx(h, x1);
-    let sum1 = add_polyx(product1, product2);
-    let final_sum = add_polyx(sum1, r);
-    rs[0] = final_sum;
+//     // bullet 2
+//     let g_prime_x: Fp  = eval_polyx(g_prime, x); // TODO calculate the real g_prime (probably put in a function)
+//     let h = compute_h(g_prime);
+//     let x1_squared = x1 * x1;
+//     let r0 = rs[0 as usize].clone();
+//     let product1 = mul_scalar_polyx(r0, x1_squared);
+//     let product2 = mul_scalar_polyx(h, x1);
+//     let sum1 = add_polyx(product1, product2);
+//     let final_sum = add_polyx(sum1, r);
+//     rs[0] = final_sum;
 
-    rs
-}
+//     rs
+// }
 
 /// Step 14
 /// Get the commitment Q'
@@ -1135,7 +1153,8 @@ fn step_24(
         // PROVER WORKS HERE
     }
 
-    todo!();
+    // todo!();
+    u
 }
 
 fn step_25() {}
@@ -1609,4 +1628,16 @@ fn test_step12() {
     let r = Seq::create(0);
     let q = Seq::create(0);
     step_12(n_a, n_q, x1, h_prime, r, a, q);
+}
+
+#[cfg(test)]
+#[quickcheck]
+// fn test_vanishing_poly(omega_value:u128, n: u128){
+fn test_vanishing_poly(omega_value:u128, n: u128){
+    let  omega: Fp = Fp::from_literal((omega_value%20)+1);
+    let vanishing_poly = compute_vanishing_polynomial(omega, (n%20)+2);
+    for i in 0..(n%20+1){
+        let should_be_zero = eval_polyx(vanishing_poly.clone(), omega.pow(i));
+        assert_eq!(should_be_zero,Fp::ZERO())
+    }
 }
