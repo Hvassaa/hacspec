@@ -1,6 +1,5 @@
 # Protocol
 
-
 Let $\omega \in \field$ be a $n = 2^k$ primitive root of unity forming the
 domain $D = (\omega^0, \omega^1, ..., \omega^{n - 1})$ with $t(X) = X^n - 1$ the
 vanishing polynomial over this domain. Let $n_g, n_a, n_e$ be positive integers with $n_a, n_e \lt n$ and $n_g \geq 4$.
@@ -57,9 +56,9 @@ In the following protocol, we take it for granted that each polynomial $a_i(X, \
 | [step_22] | 22 |  $\verifier$ sets $P^\prime = P - [v] \mathbf{G}_0 + [\xi] S$. 
 | [step_23] | 23 |  $\prover$ sets $p^\prime(X) = p(X) - p(x_3) + \xi s(X)$ (where $p(x_3)$ should correspond with the verifier^\primes computed value $v$). |
 | [step_24] | 24 |  Initialize $\mathbf{p^\prime}$ as the coefficients of $p^\prime(X)$ and $\mathbf{G^\prime} = \mathbf{G}$ and $\mathbf{b} = (x_3^0, x_3^1, ..., x_3^{n - 1})$. $\prover$ and $\verifier$ will interact in the following $k$ rounds, where in the $j$th round starting in round $j=0$ and ending in round $j=k-1$ :|
-|  |  |   * $\prover$ sends $L_j = \innerprod{\mathbf{p^\prime}_\hi}{\mathbf{G^\prime}_\lo} + [z \innerprod{\mathbf{p^\prime}_\hi}{\mathbf{b}_\lo}] U + [\cdot] W$ and $R_j = \innerprod{\mathbf{p^\prime}_\lo}{\mathbf{G^\prime}_\hi} + [z \innerprod{\mathbf{p^\prime}_\lo}{\mathbf{b}_\hi}] U + [\cdot] W$.|
+|  |  |   * $\prover$ sends $L_j = \innerprod{\mathbf{p^\prime}\hi}{\mathbf{G^\prime}\lo} + [z \innerprod{\mathbf{p^\prime}\hi}{\mathbf{b}\lo}] U + [\cdot] W$ and $R_j = \innerprod{\mathbf{p^\prime}\lo}{\mathbf{G^\prime}\hi} + [z \innerprod{\mathbf{p^\prime}\lo}{\mathbf{b}\hi}] U + [\cdot] W$.|
 |  |  |   * $\verifier$ responds with challenge $u_j$ chosen such that $1 + u_{k-1-j} x_3^{2^j}$ is nonzero.|
-|  |  |   * $\prover$ and $\verifier$ set $\mathbf{G^\prime} := \mathbf{G^\prime}_\lo + u_j \mathbf{G^\prime}_\hi$ and $\mathbf{b} := \mathbf{b}_\lo + u_j \mathbf{b}_\hi$.|
-|  |  |   * $\prover$ sets $\mathbf{p^\prime} := \mathbf{p^\prime}_\lo + u_j^{-1} \mathbf{p^\prime}_\hi$.
+|  |  |   * $\prover$ and $\verifier$ set $\mathbf{G^\prime} := \mathbf{G^\prime}\lo + u_j \mathbf{G^\prime}\hi$ and $\mathbf{b} := \mathbf{b}\lo + u_j \mathbf{b}\hi$.|
+|  |  |   * $\prover$ sets $\mathbf{p^\prime} := \mathbf{p^\prime}\lo + u_j^{-1} \mathbf{p^\prime}\hi$.
 | [step_25] | 25 |  $\prover$ sends $c = \mathbf{p^\prime}_0$ and synthetic blinding factor $f$ computed from the elided blinding factors. |
 | [step_26] | 26 |  $\verifier$ accepts only if $\sum_{j=0}^{k - 1} [u_j^{-1}] L_j + P^\prime + \sum_{j=0}^{k - 1} [u_j] R_j = [c] \mathbf{G^\prime}_0 + [c \mathbf{b}_0 z] U + [f] W$. |
