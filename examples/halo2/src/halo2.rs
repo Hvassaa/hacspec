@@ -1,4 +1,4 @@
-#![doc = include_str!("../protocol.md")]
+#![doc = include_str!("../table.md")]
 #![allow(non_snake_case)]
 #![allow(dead_code)]
 
