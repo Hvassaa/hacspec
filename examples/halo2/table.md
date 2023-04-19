@@ -49,7 +49,7 @@ In the following protocol, we take it for granted that each polynomial $a_i(X, \
 | [step_15] | 15 |  $\verifier$ responds with challenge $x_3$. 
 | [step_16] | 16 |  $\prover$ sends $\mathbf{u} \in \field^{n_q}$ such that $\mathbf{u}_i = q_i(x_3)$ for all $i \in [0, n_q)$. |
 | [step_17] | 17 |  $\verifier$ responds with challenge $x_4$. 
-| [step_18] | 18 |  $\verifier$ sets $P = Q^\prime + x_4 \sum\limits_{i=0}^{n_q - 1} [x_4^i] Q_i$ and $v = \sum\limits_{i=0}^{n_q - 1} \left( x_2^i \left( \frac { \mathbf{u}_i - r_i(x_3) } {\prod\limits_{j=0}^{n_e - 1} \left( x_3 - \omega^{\left( \mathbf{q_i} \right)_j} x \right) } \right) \right) + x_4 \sum\limits_{i=0}^{n_q - 1} x_4 \mathbf{u}_i $ |
+| [step_18] | 18 |  $\verifier$ sets $P = Q^\prime + x_4 \sum\limits_{i=0}^{n_q - 1} [x_4^i] Q_i$ and $v = \sum_{i=0}^{n_q-1} \left( x_2^i\frac{\mathbf{u_i} - r_i(x_3)}{\prod_{j=0}^{n_e-1}\left( x_3 - \omega^{\left( \mathbf{q_i}_j \right)_j} x \right)} + x_4 \mathbf{u_i} \right)$ (note: we use a slightly different notation for v, due to KaTeX funkyness) |
 | [step_19] | 19 |  $\prover$ sets $p(X) = q^\prime(X) + [x_4] \sum\limits_{i=0}^{n_q - 1} x_4^i q_i(X)$. 
 | [step_20] | 20 |  $\prover$ samples a random polynomial $s(X)$ of degree $n - 1$ with a root at $x_3$ and sends a commitment $S = \innerprod{\mathbf{s}}{\mathbf{G}} + [\cdot] W$ where $\mathbf{s}$ defines the coefficients of $s(X)$. |
 | [step_21] | 21 |  $\verifier$ responds with challenges $\xi, z$. 
