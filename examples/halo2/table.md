@@ -5,24 +5,9 @@ domain $D = (\omega^0, \omega^1, ..., \omega^{n - 1})$ with $t(X) = X^n - 1$ the
 vanishing polynomial over this domain. Let $n_g, n_a, n_e$ be positive integers with $n_a, n_e \lt n$ and $n_g \geq 4$.
 We present an interactive argument $\halo = (\setup, \prover, \verifier)$ for
 the relation
-$$
-\relation = \left\{
-\begin{array}{ll}
-&\left(
-\begin{array}{ll}
-\left(
-g(X, C_0, ..., C_{n_a - 1}, a_0(X), ..., a_{n_a - 1}\left(X, C_0, ..., C_{n_a - 1}, a_0(X), ..., a_{n_a - 2}(X) \right))
-\right); \\
-\left(
-a_0(X), a_1(X, C_0, a_0(X)), ..., a_{n_a - 1}\left(X, C_0, ..., C_{n_a - 1}, a_0(X), ..., a_{n_a - 2}(X) \right)
-\right)
-\end{array}
-\right) : \\
-\\
-& g(\omega^i, \cdots) = 0 \, \, \, \, \forall i \in [0, 2^k)
-\end{array}
-\right\}
-$$
+
+$$ \relation = \left\\{ \begin{array}{ll} &\left( \begin{array}{ll} \left( g(X, C_0, ..., C_{n_a - 1}, a_0(X), ..., a_{n_a - 1}\left(X, C_0, ..., C_{n_a - 1}, a_0(X), ..., a_{n_a - 2}(X) \right)) \right); \\ \left( a_0(X), a_1(X, C_0, a_0(X)), ..., a_{n_a - 1}\left(X, C_0, ..., C_{n_a - 1}, a_0(X), ..., a_{n_a - 2}(X) \right) \right) \end{array} \right) : \\ \\ & g(\omega^i, \cdots) = 0 \, \, \, \, \forall i \in [0, 2^k) \end{array} \right\\} $$
+
 where $a_0, a_1, ..., a_{n_a - 1}$ are (multivariate) polynomials with degree $n - 1$ in $X$ and $g$ has degree $n_g(n - 1)$ at most in any indeterminates $X, C_0, C_1, ...$.
 
 $\setup(\sec)$ returns $\pp = (\group, \field, \mathbf{G} \in \group^n, U, W \in \group)$.
