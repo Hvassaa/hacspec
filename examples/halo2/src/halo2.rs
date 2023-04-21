@@ -826,8 +826,26 @@ fn step_9(a_prime_seq: Seq<Seq<Fp>>, n_e: usize, omega: Fp, x: Fp) -> Seq<Seq<Fp
     }
     a_seq
 }
+/// Step 10
+/// This functions initializes the s sequence of length n_a and fills it with polynomials of degree n_e-1 made with legrange interpolation
+/// 
+/// # Arguments
+/// * `omega` - omega from the protocol
+/// * `x` - the challenge from step 7
+/// * `a` - the sequence of sequences from step 9
+/// * `n_a` - n_a from the protocol
+/// * `n_e` - n_e from the protocol
+/// 
+/// NOT DONE, SHOULD USE LEGRANGE INTERPOLATION TO FILL S SEQUENCE!!!!!!
+fn step_10(omega: Fp, p: Seq<Fp>,x:Fp ,a:Seq<Seq<Fp>>,n_a: u128,n_e: u128)-> Seq<Seq<Fp>> {
+    let mut s = Seq::<Seq<Fp>>::create(n_a as usize);
+    for i in 0..n_a as usize{
+        s[i] = Seq::<Fp>::create(n_e as usize);
 
-fn step_10() {}
+    }
+
+    s
+}
 
 /// Step 11
 /// Get the list of Q's (Q_0, ..., Q_{n_q - 1})
