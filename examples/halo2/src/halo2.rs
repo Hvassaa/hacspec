@@ -782,13 +782,19 @@ fn step_7(commitment_seq: Seq<G1>, x: Fp, n: u128) -> G1 {
     result
 }
 
-/// TODO document
-fn step_8(h: Seq<Seq<Fp>>, x: Fp, n: u128) -> Seq<Fp> {
+/// Step 8
+/// This functions calculates h'(X) from the h_i parts created in step 5 and the challenge x
+/// 
+/// # Arguments
+/// * `h_parts` - Sequence of the h_i parts from step 5
+/// * `x` - the challenge from step 5
+/// * `n` - n from the protocol
+fn step_8(h_parts: Seq<Seq<Fp>>, x: Fp, n: u128) -> Seq<Fp> {
     let mut res = Seq::<Fp>::create((n - (1 as u128)) as usize);
-    for i in 0..h.len() {
+    for i in 0..h_parts.len() {
         let ni_prod = n * (i as u128);
         let x_raised = x.pow(ni_prod as u128);
-        let h_i = h[i].clone();
+        let h_i = h_parts[i].clone();
         let aux_prod = mul_scalar_polyx(h_i, x_raised);
         res = add_polyx(res, aux_prod)
     }
