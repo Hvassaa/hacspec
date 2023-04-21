@@ -674,7 +674,20 @@ fn calculate_L_or_R(p_part: Seq<Fp>, b_part: Seq<Fp>, g_part: Seq<G1>, z: Fp, U:
 fn step_1() {}
 fn step_2() {}
 fn step_3() {}
-fn step_4() {}
+/// Step 4
+/// Beginning of the vanishing argument
+/// 
+/// # Arguments
+/// * `g_prime` - polynomial from step 2
+/// * `omega` - a n=2ˆk root of unity (global variable)
+/// * `n` - n=2ˆk (global variable)
+fn step_4(g_prime: Seq<Fp>,omega: Fp,n: u128) -> Seq<Fp> {
+    let vanishing = compute_vanishing_polynomial(omega, n);
+
+    let (h, remainder) = divide_poly(g_prime, vanishing);
+
+    h
+}
 
 /// Step 5
 /// split polynomial of degree n_g(n-1)-n up into n_(g-2) polynomials of degree at most n-1
@@ -1633,10 +1646,34 @@ fn test_step12() {
 #[quickcheck]
 // fn test_vanishing_poly(omega_value:u128, n: u128){
 fn test_vanishing_poly(omega_value:u128, n: u128){
-    let  omega: Fp = Fp::from_literal((omega_value%20)+1);
-    let vanishing_poly = compute_vanishing_polynomial(omega, (n%20)+2);
-    for i in 0..(n%20+1){
+    let  omega: Fp = Fp::from_literal((omega_value%50)+1);
+    let n = n%20 +2;
+    let vanishing_poly = compute_vanishing_polynomial(omega, n);
+    for i in 0..(n-1){
         let should_be_zero = eval_polyx(vanishing_poly.clone(), omega.pow(i));
         assert_eq!(should_be_zero,Fp::ZERO())
     }
 }
+
+
+
+// #[cfg(test)]
+// #[quickcheck]
+// fn test_step_4(omega_value:u128, n: u128, r: u128){
+//     let vanishing_poly_degree = n%50+5;
+//     let g_prime_degree = n%100+55;
+//     let mut r = r;
+
+//     // r cannot be 0 as it would lead to g_prime being all 0
+//     if r == 0{
+//         r = r+2;
+//     }
+
+//     let  omega: Fp = Fp::from_literal((omega_value%50)+1);
+//     let g_prime = compute_vanishing_polynomial(omega, g_prime_degree);
+//     let g_prime = mul_scalar_polyx(g_prime, Fp::from_literal(r));
+//     let h = step_4(g_prime, omega, vanishing_poly_degree);
+//     let h_degree = poly_degree(h);
+//     let expected_h_degree = g_prime_degree - vanishing_poly_degree;
+//     assert_eq!(h_degree,expected_h_degree);
+// }
