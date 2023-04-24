@@ -1228,7 +1228,18 @@ fn step_24(
     (p_prime, g_prime)
 }
 
-fn step_25() {}
+/// Step 25
+///
+/// # Arguments
+/// * `p_prime` - **p**' from [step_24]
+/// * `blinding_factors` - the list of all the elided blinding factors
+fn step_25(p_prime: Seq<Fp>, blinding_factors: Seq<Fp>) -> (Fp, Fp) {
+    let p_prime_0 = p_prime[0];
+    // TODO how is f calculated?
+    let f = Fp::ZERO();
+
+    (p_prime_0, f)
+}
 
 ///Varifiers final check of the protocol
 /// # Arguments
