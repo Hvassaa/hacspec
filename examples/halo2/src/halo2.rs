@@ -614,7 +614,7 @@ fn msm(a: Seq<Fp>, g: Seq<G1>) -> G1 {
 
     res
 }
-/// Compute canishing polynomial over n-order multiplicative subgroup H with root of unity omega
+/// Compute vanishing polynomial over n-order multiplicative subgroup H with root of unity omega
 /// 
 /// # Arguments
 /// * `omega` - root of unity for the H
@@ -836,11 +836,18 @@ fn step_9(a_prime_seq: Seq<Seq<Fp>>, n_e: usize, omega: Fp, x: Fp) -> Seq<Seq<Fp
 /// * `n_a` - n_a from the protocol
 /// * `n_e` - n_e from the protocol
 /// 
-/// NOT DONE, SHOULD USE LEGRANGE INTERPOLATION TO FILL S SEQUENCE!!!!!!
-fn step_10(omega: Fp, p: Seq<Fp>,x:Fp ,a:Seq<Seq<Fp>>,n_a: u128,n_e: u128)-> Seq<Seq<Fp>> {
+fn step_10(omega: Fp, p: Seq<Seq<u128>>,x:Fp ,a:Seq<Seq<Fp>>,n_a: u128,n_e: u128)-> Seq<Seq<Fp>> {
     let mut s = Seq::<Seq<Fp>>::create(n_a as usize);
     for i in 0..n_a as usize{
-        s[i] = Seq::<Fp>::create(n_e as usize);
+        let mut points: Seq<(Fp,Fp)> = Seq::<(Fp,Fp)>::create((n_e-1) as usize);
+        for j in 0..n_e-1{
+            let p_i_j = p[i as usize][j as usize];
+            let x_j = omega.pow(p_i_j)*x;
+            let y_j = a[i as usize][j as usize];
+            points[j as usize] = (x_j,y_j);
+        }
+        let s_i: Seq<Fp> = legrange_poly(points);
+        s[i as usize] = s_i
 
     }
 
@@ -1059,8 +1066,15 @@ fn step_14(
 
     commitment
 }
-
-fn step_15() {}
+/// This function emulates sending a challenge.
+/// It takes a challenge and returns it again.
+/// 
+/// # Arguments
+///  * `x_3` - the challenge to be send
+/// 
+fn step_15(x_3:Fp) {
+    x_3
+}
 
 /// Step 16
 /// Get the u ∈ F^{n_q} vector
@@ -1080,7 +1094,16 @@ fn step_16(n_q: u128, x3: Fp, q_polys: Seq<Seq<Fp>>) -> Seq<Fp> {
     u
 }
 
-fn step_17() {}
+/// This function emulates sending a challenge.
+/// It takes a challenge and returns it again.
+/// 
+/// # Arguments
+///  * `x_4` - the challenge to be send
+/// 
+fn step_17(x_4:Fp) {
+    x_4
+}
+
 fn step_18() {}
 
 /// Step 19
