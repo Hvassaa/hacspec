@@ -26,6 +26,8 @@ pub type G2 = (Fp2, Fp2, bool);
 pub type Fp6 = (Fp2, Fp2, Fp2); //v³ = u + 1
 pub type Fp12 = (Fp6, Fp6); //w² = v
 
+
+
 /* Arithmetic for FP2 elements */
 pub fn fp2fromfp(n: FpCurve) -> Fp2 {
     (n, FpCurve::ZERO())
@@ -215,6 +217,11 @@ pub fn fp12zero() -> Fp12 {
 }
 
 /* Arithmetic in G1 */
+
+// Create 'default' G1 element (0,0,true)
+pub fn g1_default() -> G1 {
+    (FpCurve::ZERO(), FpCurve::ZERO(), true)
+}
 
 //g1 add with no Point at Infinity
 fn g1add_a(p: G1, q: G1) -> G1 {
