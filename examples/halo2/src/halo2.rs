@@ -1137,7 +1137,19 @@ fn step_19(x4: Fp, q_prime: Seq<Fp>, q_polys: Seq<Seq<Fp>>) -> Seq<Fp> {
     p
 }
 
-fn step_20() {}
+/// Step 20
+///
+/// Get the commitment S
+///
+/// # Arguments
+/// * `s` - a randomly sampled poly (degree n-1) with a root at x3 from [step_15]
+/// * `crs` - the common reference string
+/// * `r` - randomness for commiting
+fn step_20(s: Seq<Fp>, crs: CRS, r: Fp) -> G1 {
+    let S = commit_polyx(&crs, s, r);
+
+    S
+}
 
 /// Step 21
 ///
