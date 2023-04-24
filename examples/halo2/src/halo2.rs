@@ -1139,7 +1139,16 @@ fn step_19(x4: Fp, q_prime: Seq<Fp>, q_polys: Seq<Seq<Fp>>) -> Seq<Fp> {
 
 fn step_20() {}
 
-fn step_21() {}
+/// Step 21
+///
+/// Get the xi and z challenges. They have to be fed into hacspec, since there is no randomness.
+///
+/// # Arguments
+/// * `xi` - the ξ challenge
+/// * `z` - the z challenge
+fn step_21(xi: Fp, z: Fp) -> (Fp, Fp) {
+    (xi, z)
+}
 
 /// Step 22
 /// Get the P' curve-point/group-element
