@@ -152,7 +152,6 @@ fn add_scalar_polyx(p: Seq<Fp>, s: Fp) -> Seq<Fp> {
     res
 }
 
-
 /// Subtract a scalar (constant) from a polynomial, return resulting polynomial
 ///
 /// # Arguments
@@ -615,22 +614,20 @@ fn msm(a: Seq<Fp>, g: Seq<G1>) -> G1 {
     res
 }
 /// Compute canishing polynomial over n-order multiplicative subgroup H with root of unity omega
-/// 
+///
 /// # Arguments
 /// * `omega` - root of unity for the H
 /// * `n` - the order of the group
-fn compute_vanishing_polynomial(omega:Fp,n:u128) -> Seq<Fp>{
-    let mut vanishing_poly = Seq::<Fp>::create((n-1 as u128) as usize);
+fn compute_vanishing_polynomial(omega: Fp, n: u128) -> Seq<Fp> {
+    let mut vanishing_poly = Seq::<Fp>::create((n - 1 as u128) as usize);
     vanishing_poly[0] = Fp::ONE();
-    for i in 0..n as usize-1{
+    for i in 0..n as usize - 1 {
         let eval_point = omega.pow(i as u128);
         let poly_mul_x = multi_poly_with_x(vanishing_poly.clone());
         let poly_mul_scalar: Seq<Fp> = mul_scalar_polyx(vanishing_poly.clone(), eval_point.neg());
         vanishing_poly = add_polyx(poly_mul_x, poly_mul_scalar);
-        
     }
     vanishing_poly
-
 }
 
 /// Compute the h(x) polynomial, used in step 4 and 13
@@ -701,12 +698,12 @@ fn step_2() {}
 fn step_3() {}
 /// Step 4
 /// Beginning of the vanishing argument
-/// 
+///
 /// # Arguments
 /// * `g_prime` - polynomial from step 2
 /// * `omega` - a n=2ˆk root of unity (global variable)
 /// * `n` - n=2ˆk (global variable)
-fn step_4(g_prime: Seq<Fp>,omega: Fp,n: u128) -> Seq<Fp> {
+fn step_4(g_prime: Seq<Fp>, omega: Fp, n: u128) -> Seq<Fp> {
     let vanishing = compute_vanishing_polynomial(omega, n);
 
     let (h, remainder) = divide_poly(g_prime, vanishing);
@@ -784,7 +781,7 @@ fn step_7(commitment_seq: Seq<G1>, x: Fp, n: u128) -> G1 {
 
 /// Step 8
 /// This functions calculates h'(X) from the h_i parts created in step 5 and the challenge x
-/// 
+///
 /// # Arguments
 /// * `h_parts` - Sequence of the h_i parts from step 5
 /// * `x` - the challenge from step 5
@@ -828,20 +825,19 @@ fn step_9(a_prime_seq: Seq<Seq<Fp>>, n_e: usize, omega: Fp, x: Fp) -> Seq<Seq<Fp
 }
 /// Step 10
 /// This functions initializes the s sequence of length n_a and fills it with polynomials of degree n_e-1 made with legrange interpolation
-/// 
+///
 /// # Arguments
 /// * `omega` - omega from the protocol
 /// * `x` - the challenge from step 7
 /// * `a` - the sequence of sequences from step 9
 /// * `n_a` - n_a from the protocol
 /// * `n_e` - n_e from the protocol
-/// 
+///
 /// NOT DONE, SHOULD USE LEGRANGE INTERPOLATION TO FILL S SEQUENCE!!!!!!
-fn step_10(omega: Fp, p: Seq<Fp>,x:Fp ,a:Seq<Seq<Fp>>,n_a: u128,n_e: u128)-> Seq<Seq<Fp>> {
+fn step_10(omega: Fp, p: Seq<Fp>, x: Fp, a: Seq<Seq<Fp>>, n_a: u128, n_e: u128) -> Seq<Seq<Fp>> {
     let mut s = Seq::<Seq<Fp>>::create(n_a as usize);
-    for i in 0..n_a as usize{
+    for i in 0..n_a as usize {
         s[i] = Seq::<Fp>::create(n_e as usize);
-
     }
 
     s
@@ -971,13 +967,13 @@ fn step_13(
     n_a: u128,
     n: u128,
     omega: Fp,
-    x:Fp,
+    x: Fp,
     x1: Fp,
     r: Fp,
     s: Seq<Seq<Fp>>,
     q: Seq<(u128, Seq<u128>)>,
     a: Seq<Seq<Fp>>,
-    g_prime: Seq<Fp>
+    g_prime: Seq<Fp>,
 ) -> Seq<Seq<Fp>> {
     let nq_minus1 = n_q - (1 as u128);
     let mut rs = Seq::<Seq<Fp>>::create(nq_minus1 as usize);
@@ -1003,12 +999,12 @@ fn step_13(
     }
 
     // bullet 2
-    let g_prime_x: Fp  = eval_polyx(g_prime, x); 
-    let vanishing_poly:Seq<Fp> = compute_vanishing_polynomial(omega, n);
-    let vanishing_poly_x:Fp = eval_polyx(vanishing_poly, x);
+    let g_prime_x: Fp = eval_polyx(g_prime, x);
+    let vanishing_poly: Seq<Fp> = compute_vanishing_polynomial(omega, n);
+    let vanishing_poly_x: Fp = eval_polyx(vanishing_poly, x);
     let h = g_prime_x / vanishing_poly_x;
-    let x1_squared:Fp = x1 * x1;
-    let r0:Seq<Fp> = rs[0 as usize].clone();
+    let x1_squared: Fp = x1 * x1;
+    let r0: Seq<Fp> = rs[0 as usize].clone();
     let product1 = mul_scalar_polyx(r0, x1_squared);
     let product2 = h * x1;
     let sum1 = add_scalar_polyx(product1, product2);
@@ -1152,38 +1148,43 @@ fn step_23(p: Seq<Fp>, s: Seq<Fp>, x3: Fp, xi: Fp) -> Seq<Fp> {
 }
 
 /// Step 24
-/// Get the p'(X) polynomial
+///
+/// Get **G**' abd **p**'
 ///
 /// # Arguments
-/// * `p` - the polynomial p from step 19
-/// * `s` - the polynomial s from step 20
-/// * `x3` - the challenge from step 15
-/// * `xi` - the ξ challenge from step 21
+/// * `p_prime_poly` - the polynomial p'(X) from [step_23]
+/// * `G` - the vector of group elems from public-params
+/// * `x3` - the challenge from [step_15]
+/// * `z` - the challenge from [step_21]
+/// * `U` - the group elem U from public-params
+/// * `W` - the group elem U from public-params
+/// * `n` - n from the protocol preamble
+/// * `k` - k from the protocol preamble
+/// * `u` - the list of u_j challenges from the verifier // TODO maybe should be interactive
 fn step_24(
     p_prime_poly: Seq<Fp>,
-    g: Seq<G1>,
+    G: Seq<G1>,
     x3: Fp,
     z: Fp,
     U: G1,
     W: G1,
     n: u128,
     k: usize,
-) -> Seq<Fp> {
-    let u = Seq::<Fp>::create(0); // TODO use real u
-
+    u: Seq<Fp>,
+) -> (Seq<Fp>, Seq<G1>) {
     let mut p_prime = p_prime_poly;
-    let mut g_prime = g;
+    let mut g_prime = G;
     let mut b = Seq::<Fp>::create(n as usize);
     for i in 0..b.len() {
         let x3_powered = x3.pow(i as u128);
         b[i] = x3_powered;
     }
 
-    let p_prime_half = p_prime.len() / 2;
-    let g_prime_half = g_prime.len() / 2;
-    let b_half = b.len() / 2;
-
     for j in 0..k {
+        let p_prime_half = p_prime.len() / 2;
+        let g_prime_half = g_prime.len() / 2;
+        let b_half = b.len() / 2;
+
         // BULLET 1
         // PROVER WORKS HERE
         let p_prime_hi = p_prime.slice(0, p_prime_half);
@@ -1196,8 +1197,8 @@ fn step_24(
         let b_hi = b.slice(b_half, b_half);
 
         // calcuate L_j and R_j, using the right parts of p', G' and b
-        let L_j = calculate_L_or_R(p_prime_hi, b_lo, g_prime_lo.clone(), z, U, W);
-        let R_j = calculate_L_or_R(p_prime_lo, b_hi, g_prime_hi.clone(), z, U, W);
+        let L_j = calculate_L_or_R(p_prime_hi.clone(), b_lo, g_prime_lo.clone(), z, U, W);
+        let R_j = calculate_L_or_R(p_prime_lo.clone(), b_hi, g_prime_hi.clone(), z, U, W);
 
         // BULLET 2
         // VERIFIER WORKS HERE
@@ -1218,10 +1219,13 @@ fn step_24(
 
         // BULLET 4
         // PROVER WORKS HERE
+        let u_j_inv = u_j.inv();
+        let rhs = mul_scalar_polyx(p_prime_hi, u_j_inv);
+        let new_p_prime = add_polyx(p_prime_lo, rhs);
+        p_prime = new_p_prime;
     }
 
-    // todo!();
-    u
+    (p_prime, g_prime)
 }
 
 fn step_25() {}
@@ -1700,17 +1704,15 @@ fn test_step12() {
 #[cfg(test)]
 #[quickcheck]
 // fn test_vanishing_poly(omega_value:u128, n: u128){
-fn test_vanishing_poly(omega_value:u128, n: u128){
-    let  omega: Fp = Fp::from_literal((omega_value%50)+1);
-    let n = n%20 +2;
+fn test_vanishing_poly(omega_value: u128, n: u128) {
+    let omega: Fp = Fp::from_literal((omega_value % 50) + 1);
+    let n = n % 20 + 2;
     let vanishing_poly = compute_vanishing_polynomial(omega, n);
-    for i in 0..(n-1){
+    for i in 0..(n - 1) {
         let should_be_zero = eval_polyx(vanishing_poly.clone(), omega.pow(i));
-        assert_eq!(should_be_zero,Fp::ZERO())
+        assert_eq!(should_be_zero, Fp::ZERO())
     }
 }
-
-
 
 // #[cfg(test)]
 // #[quickcheck]
