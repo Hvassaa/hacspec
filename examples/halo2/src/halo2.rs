@@ -325,10 +325,15 @@ fn divide_poly(n: Seq<Fp>, d: Seq<Fp>) -> (Seq<Fp>, Seq<Fp>) {
 
 // TODO document
 fn multi_poly_with_x(p: Seq<Fp>) -> Seq<Fp> {
-    let mut res: Seq<Fp> = Seq::<Fp>::create(p.len() + 1);
+    multi_poly_with_x_pow(p, 1 as usize)
+}
+
+// TODO document
+fn multi_poly_with_x_pow(p: Seq<Fp>, power: usize) -> Seq<Fp> {
+    let mut res: Seq<Fp> = Seq::<Fp>::create(p.len() + power);
 
     for i in 0..p.len() {
-        res[i + 1] = p[i];
+        res[i + power] = p[i];
     }
     res
 }
@@ -1402,6 +1407,33 @@ impl Arbitrary for Points {
 
 #[cfg(test)]
 #[quickcheck]
+fn test_step_5(h: UniPolynomial, n: u8) {
+    let h = h.0;
+    let h = trim_poly(h); // extract polynomial
+    let n = n as u128;
+
+    let h_parts = step_5(h, n); // split the h poly
+
+    let n = n as usize;
+
+    let mut h_summed = Seq::<Fp>::create(1); // initialize a sum to the constant zero poly
+
+    for i in 0..h_parts.len() {
+        let mut hi = h_parts[i];
+        let Xni = n * i;
+        let Xni_times_hi = multi_poly_with_x_pow(hi, Xni as usize);
+        h_summed = add_polyx(h_summed, hi);
+    }
+
+    let h_summed = trim_poly(h_summed);
+    assert_eq!(h.len(), h_summed.len());
+    for i in 0..h.len() {
+        assert_eq!(h[i], h_summed[i]);
+    }
+}
+
+#[cfg(test)]
+#[quickcheck]
 fn test_poly_mul_x(a: UniPolynomial) {
     let p1 = a.0;
     let new_p = &multi_poly_with_x(p1.clone());
@@ -1524,18 +1556,6 @@ fn test_commit_to_poly_parts() {
 
 #[cfg(test)]
 #[test]
-fn test_split_poly() {
-    let v1 = vec![5, 10, 20]
-        .iter()
-        .map(|e| Fp::from_literal((*e) as u128))
-        .collect();
-    let p1 = Seq::from_vec(v1);
-    let n = 3;
-    let poly_parts = step_5(p1, n);
-}
-
-#[cfg(test)]
-#[test]
 fn test_poly_add() {
     let v1 = vec![5, 10, 20]
         .iter()
@@ -1581,12 +1601,6 @@ fn test_poly_eval() {
     let p1 = Seq::from_vec(v1);
 
     assert_eq!(eval_polyx(p1, Fp::TWO()), Fp::from_literal(105));
-}
-
-#[cfg(test)]
-#[test]
-fn test_pr() {
-    let random = ByteSeq::from_hex("1000");
 }
 
 #[cfg(test)]
