@@ -1138,6 +1138,7 @@ fn step_19(x4: Fp, q_prime: Seq<Fp>, q_polys: Seq<Seq<Fp>>) -> Seq<Fp> {
 }
 
 fn step_20() {}
+
 fn step_21() {}
 
 /// Step 22
@@ -1259,6 +1260,8 @@ fn step_24(
 }
 
 /// Step 25
+///
+/// Get the zeroth entry in **p** and synthetic blinding factor f
 ///
 /// # Arguments
 /// * `p_prime` - **p**' from [step_24]
