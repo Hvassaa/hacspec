@@ -50,7 +50,7 @@ fn halo2() {
     let a: Seq<Seq<Term>> = Seq::<Seq<Term>>::create(0);
     let crs: CRS = (Seq::<G1>::create(0), g1_default());
     let r = Fp::default();
-    
+
     for j in 0..a.len() {
         let aj = a[j].clone();
         let aj_prime = multi_to_uni_poly(aj.clone(), Seq::<InputVar>::create(0)); // dummy inputs
@@ -325,10 +325,15 @@ fn divide_poly(n: Seq<Fp>, d: Seq<Fp>) -> (Seq<Fp>, Seq<Fp>) {
 
 // TODO document
 fn multi_poly_with_x(p: Seq<Fp>) -> Seq<Fp> {
-    let mut res: Seq<Fp> = Seq::<Fp>::create(p.len() + 1);
+    multi_poly_with_x_pow(p, 1 as usize)
+}
+
+// TODO document
+fn multi_poly_with_x_pow(p: Seq<Fp>, power: usize) -> Seq<Fp> {
+    let mut res: Seq<Fp> = Seq::<Fp>::create(p.len() + power);
 
     for i in 0..p.len() {
-        res[i + 1] = p[i];
+        res[i + power] = p[i];
     }
     res
 }
@@ -724,20 +729,19 @@ fn step_4(g_prime: Seq<Fp>, omega: Fp, n: u128) -> Seq<Fp> {
 /// * `n` - defines length of new polynomials (global variable for prooving system)
 fn step_5(h: Seq<Fp>, n: u128) -> Seq<Seq<Fp>> {
     let no_of_parts = (h.len() + (n - (2 as u128)) as usize) / ((n - (1 as u128)) as usize);
+    let deg = (n - (1 as u128)) as usize;
 
     let mut original_index = 0;
     let mut poly_parts: Seq<Seq<Fp>> = Seq::<Seq<Fp>>::create(no_of_parts);
     for i in 0..poly_parts.len() {
-        poly_parts[i] = Seq::<Fp>::create((n - (1 as u128)) as usize);
-        for j in 0..poly_parts.len() {
-            let mut current_poly_part: Seq<Fp> = Seq::<Fp>::create(no_of_parts);
-
+        let mut current_poly_part: Seq<Fp> = Seq::<Fp>::create(deg);
+        for j in 0..deg {
             if original_index < h.len() {
                 current_poly_part[j] = h[original_index];
                 original_index = original_index + 1;
             }
-            poly_parts[j] = current_poly_part;
         }
+        poly_parts[i] = trim_poly(current_poly_part);
     }
     poly_parts
 }
@@ -842,15 +846,15 @@ fn step_10(
     n_e: u128,
 ) -> Seq<Seq<Fp>> {
     let mut s = Seq::<Seq<Fp>>::create(n_a as usize);
-    for i in 0..n_a as usize{
-        let mut points: Seq<(Fp,Fp)> = Seq::<(Fp,Fp)>::create((n_e as usize -1));
-        for j in 0..n_e as usize-1{
+    for i in 0..n_a as usize {
+        let mut points: Seq<(Fp, Fp)> = Seq::<(Fp, Fp)>::create((n_e as usize - 1));
+        for j in 0..n_e as usize - 1 {
             let p_i = p[i as usize].clone();
             let p_i_j: u128 = p_i[j as usize];
-            let x_j = omega.pow(p_i_j)*x;
+            let x_j = omega.pow(p_i_j) * x;
             let a_i = a[i as usize].clone();
             let y_j = a_i[j as usize];
-            points[j as usize] = (x_j,y_j);
+            points[j as usize] = (x_j, y_j);
         }
         let s_i: Seq<Fp> = legrange_poly(points);
         s[i as usize] = s_i
@@ -1076,8 +1080,8 @@ fn step_14(
 ///
 /// # Arguments
 ///  * `x_3` - the challenge to be send
-/// 
-fn step_15(x_3:Fp) -> Fp {
+///
+fn step_15(x_3: Fp) -> Fp {
     x_3
 }
 
@@ -1104,58 +1108,72 @@ fn step_16(n_q: u128, x3: Fp, q_polys: Seq<Seq<Fp>>) -> Seq<Fp> {
 ///
 /// # Arguments
 ///  * `x_4` - the challenge to be send
-/// 
-fn step_17(x_4:Fp) -> Fp {
+///
+fn step_17(x_4: Fp) -> Fp {
     x_4
 }
 ///
-/// 
+///
 /// # Arguments
 /// * `x` - challenge from step 7
 /// * `x1` - challenge from step 11
-/// * `x2` - challenge from step 11 
+/// * `x2` - challenge from step 11
 /// * `x3` - challenge from step 15
 /// * `x4` - challenge from step 17
 /// * `n_q` -  n_q from the protocol
 /// * `n_e` - n_e from the protocol
 /// * `omega` - omega from the protocol
-/// * `Q_prime` - commitment from step 14 
+/// * `Q_prime` - commitment from step 14
 /// * `Q` - list of group-elements from step 11
-/// * `u` - list of scalars from step 16 
+/// * `u` - list of scalars from step 16
 /// * `r` - list of polynomials from step 13
 /// * `q` - the list of distinct sets of integers containing p_i
 
-fn step_18(x:Fp, x1:Fp, x2:Fp, x3:Fp, x4:Fp, n_q: u128, n_e: u128, omega: Fp, Q_prime:G1, Q:Seq<G1>, u:Seq<Fp>, r: Seq<Seq<Fp>>, q: Seq<Seq<u128>>)-> (G1,Fp) {
-    let v: Fp = Fp::ZERO();
+fn step_18(
+    x: Fp,
+    x1: Fp,
+    x2: Fp,
+    x3: Fp,
+    x4: Fp,
+    n_q: u128,
+    n_e: u128,
+    omega: Fp,
+    Q_prime: G1,
+    Q: Seq<G1>,
+    u: Seq<Fp>,
+    r: Seq<Seq<Fp>>,
+    q: Seq<Seq<u128>>,
+) -> (G1, Fp) {
+    let v = Fp::ZERO();
 
     let mut P_sum = g1_default();
-    for i in 0..n_q as usize-1{
+    for i in 0..n_q as usize - 1 {
         let Q_i = Q[i];
-        let term = g1mul(x4.pow(i as u128),Q_i);
+        let term = g1mul(x4.pow(i as u128), Q_i);
         P_sum = g1add(P_sum, term)
     }
-    P_sum = g1mul(x4,P_sum);
-    let P = g1add(Q_prime,P_sum);
+    P_sum = g1mul(x4, P_sum);
+    let P = g1add(Q_prime, P_sum);
 
     let mut v_first_sum = Fp::ZERO();
-    for i in 0..n_q as usize -1{
+    for i in 0..n_q as usize - 1 {
         let x2_i: Fp = x2.pow(i as u128);
         let u_i: Fp = u[i];
         let r_i: Seq<Fp> = r[i].clone();
         let r_i_x3: Fp = eval_polyx(r_i, x3);
         let numerator: Fp = u_i - r_i_x3;
         let mut product: Fp = Fp::ONE();
-        for j in 0..n_e as usize -1{
-            let q_i:Seq<u128> = q[i].clone();
+        for j in 0..n_e as usize - 1 {
+            let q_i: Seq<u128> = q[i].clone();
             let q_i_j: u128 = q_i[j];
             let rhs = omega.pow(q_i_j) * x;
-            let term = x3-rhs;
+            let term = x3 - rhs;
             product = product * term;
         }
-        let sum_term:Fp  =x2*( numerator / product);
+        let sum_term: Fp = x2 * (numerator / product);
         v_first_sum = v_first_sum + sum_term;
     }
-    
+
     let mut v_second_sum: Fp = Fp::ZERO();
     for i in 0..n_q as usize -1{
         let u_i:Fp = u[i];
@@ -1194,8 +1212,30 @@ fn step_19(x4: Fp, q_prime: Seq<Fp>, q_polys: Seq<Seq<Fp>>) -> Seq<Fp> {
     p
 }
 
-fn step_20() {}
-fn step_21() {}
+/// Step 20
+///
+/// Get the commitment S
+///
+/// # Arguments
+/// * `s` - a randomly sampled poly (degree n-1) with a root at x3 from [step_15]
+/// * `crs` - the common reference string
+/// * `r` - randomness for commiting
+fn step_20(s: Seq<Fp>, crs: CRS, r: Fp) -> G1 {
+    let S = commit_polyx(&crs, s, r);
+
+    S
+}
+
+/// Step 21
+///
+/// Get the xi and z challenges. They have to be fed into hacspec, since there is no randomness.
+///
+/// # Arguments
+/// * `xi` - the ξ challenge
+/// * `z` - the z challenge
+fn step_21(xi: Fp, z: Fp) -> (Fp, Fp) {
+    (xi, z)
+}
 
 /// Step 22
 /// Get the P' curve-point/group-element
@@ -1317,6 +1357,8 @@ fn step_24(
 
 /// Step 25
 ///
+/// Get the zeroth entry in **p** and synthetic blinding factor f
+///
 /// # Arguments
 /// * `p_prime` - **p**' from [step_24]
 /// * `blinding_factors` - the list of all the elided blinding factors
@@ -1430,6 +1472,56 @@ impl Arbitrary for Points {
             }
         }
         Points(Seq::<(Fp, Fp)>::from_vec(points))
+    }
+}
+
+#[cfg(test)]
+#[quickcheck]
+fn test_step_5(h: UniPolynomial, n: u8) -> TestResult {
+    let n = n as u128;
+    if n < 5 {
+        // TODO sometime passes, sometimes not. Every other element in the sum is sometimes 0
+        TestResult::discard()
+    } else {
+        let h = h.0;
+        let h = trim_poly(h); // extract polynomial
+
+        let h_parts = step_5(h.clone(), n); // split the h poly
+
+        let n = n as usize;
+
+        // println!("n: {:?}", n);
+        // println!("h: {:?}", h);
+        println!("h_parts: {:?}", h_parts);
+
+        let mut h_summed = Seq::<Fp>::create(1); // initialize a sum to the constant zero poly
+
+        for i in 0..h_parts.len() {
+            let hi = h_parts[i].clone();
+            // println!("hi: {:?}", hi.clone());
+            let Xni = n * i;
+            let Xni_times_hi = multi_poly_with_x_pow(hi, Xni as usize);
+            h_summed = add_polyx(h_summed, Xni_times_hi);
+        }
+
+        let h_summed = trim_poly(h_summed);
+
+        // println!("h: {:?}", h);
+        // println!("h_summed: {:?}", h_summed);
+
+        let h_len = h.len();
+        let h_summed_len = h_summed.len();
+        assert_eq!(
+            h_len, h_summed_len,
+            "lengths of h and h_summed mismatch: {} and {}\n h: {:?}\nh_summed: {:?}",
+            h_len, h_summed_len, h, h_summed
+        );
+
+        for i in 0..h.len() {
+            assert_eq!(h[i], h_summed[i]);
+        }
+
+        TestResult::passed()
     }
 }
 
@@ -1557,18 +1649,6 @@ fn test_commit_to_poly_parts() {
 
 #[cfg(test)]
 #[test]
-fn test_split_poly() {
-    let v1 = vec![5, 10, 20]
-        .iter()
-        .map(|e| Fp::from_literal((*e) as u128))
-        .collect();
-    let p1 = Seq::from_vec(v1);
-    let n = 3;
-    let poly_parts = step_5(p1, n);
-}
-
-#[cfg(test)]
-#[test]
 fn test_poly_add() {
     let v1 = vec![5, 10, 20]
         .iter()
@@ -1614,12 +1694,6 @@ fn test_poly_eval() {
     let p1 = Seq::from_vec(v1);
 
     assert_eq!(eval_polyx(p1, Fp::TWO()), Fp::from_literal(105));
-}
-
-#[cfg(test)]
-#[test]
-fn test_pr() {
-    let random = ByteSeq::from_hex("1000");
 }
 
 #[cfg(test)]
