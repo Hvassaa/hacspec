@@ -1517,6 +1517,43 @@ fn test_step_5(h: UniPolynomial, n: u8) -> TestResult {
 }
 
 #[cfg(test)]
+// #[quickcheck]
+#[test]
+fn test_step_7() {
+    // if n < 2 {
+    // return TestResult::discard();
+    // }
+    let n = 5;
+    let h = Seq::<Fp>::from_vec(vec![]);
+    let n = n as u128;
+    // let h = h.0;
+    let h = trim_poly(h); // extract polynomial
+    let h_parts: Seq<Seq<Fp>> = step_5(h, n);
+    let parts_len: &Seq<Fp> = (&h_parts[0]);
+    let parts_len = parts_len.len();
+
+    let mut gd = Seq::<G1>::create(parts_len);
+    let mut rs = Seq::<Fp>::create(parts_len);
+    for i in 0..gd.len() {
+        gd[i] = (FpCurve::ONE(), FpCurve::ONE(), false);
+        rs[i] = Fp::ONE();
+    }
+
+    let crs: CRS = (gd, g1_default());
+
+    let Hs = step_6(h_parts.clone(), &crs, rs);
+    let x = Fp::TWO();
+
+    let H_prime = step_7(Hs, x, n);
+    let h_prime = step_8(h_parts.clone(), x, n);
+    let h_prime_commitment = commit_polyx(&crs, h_prime, Fp::from_literal(h_parts.len() as u128));
+
+    assert_eq!(H_prime, h_prime_commitment);
+
+    // TestResult::passed()
+}
+
+#[cfg(test)]
 #[quickcheck]
 fn test_poly_mul_x(a: UniPolynomial) {
     let p1 = a.0;
