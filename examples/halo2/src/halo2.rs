@@ -1126,7 +1126,7 @@ fn step_17(x_4:Fp) -> Fp {
 /// * `q` - the list of distinct sets of integers containing p_i
 
 fn step_18(x:Fp, x1:Fp, x2:Fp, x3:Fp, x4:Fp, n_q: u128, n_e: u128, omega: Fp, Q_prime:G1, Q:Seq<G1>, u:Seq<Fp>, r: Seq<Seq<Fp>>, q: Seq<Seq<u128>>)-> (G1,Fp) {
-    let v = Fp::ZERO();
+    let v: Fp = Fp::ZERO();
 
     let mut P_sum = g1_default();
     for i in 0..n_q as usize-1{
@@ -1157,6 +1157,12 @@ fn step_18(x:Fp, x1:Fp, x2:Fp, x3:Fp, x4:Fp, n_q: u128, n_e: u128, omega: Fp, Q_
     }
     
     let mut v_second_sum: Fp = Fp::ZERO();
+    for i in 0..n_q as usize -1{
+        let u_i:Fp = u[i];
+        let term: Fp = x4 * u_i;
+        v_second_sum = v_second_sum + term;
+    }
+    let v = v_first_sum + x4*v_second_sum;
     (P,v)
 }
 
