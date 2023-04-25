@@ -728,10 +728,6 @@ fn step_4(g_prime: Seq<Fp>, omega: Fp, n: u128) -> Seq<Fp> {
 /// # Arguments
 /// * `h` - Polynomial to be split
 /// * `n` - defines length of new polynomials (global variable for prooving system)
-///
-/// # Test
-/// [step_7]
-/// [test_step_5]
 fn step_5(h: Seq<Fp>, n: u128) -> Seq<Seq<Fp>> {
     let h = trim_poly(h);
     let no_of_parts = (h.len() + (n - (2 as u128)) as usize) / ((n - (1 as u128)) as usize);
