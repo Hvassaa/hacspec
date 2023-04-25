@@ -804,28 +804,42 @@ fn step_8(h_parts: Seq<Seq<Fp>>, x: Fp, n: u128) -> Seq<Fp> {
 }
 
 /// Step 9
-/// This functions creates a seq filled with a_i from the second part of step 9
+/// This functions returns r(x) and creates a seq filled with a_i from the second part of step 9
 ///
 /// # Arguments
+/// * `r` - the polynomial from step 3
 /// * `a_prime_seq` - A sequence of the a' polynomials from step 1
 /// * `n_e` - Global parameter for the protocol
+/// * `n_a` - Global parameter for the protocol
 /// * `omega` - The generator for the evaluations points also a global parameter for the protocol
-/// * `x`The - challenge from step 7
-fn step_9(a_prime_seq: Seq<Seq<Fp>>, n_e: usize, omega: Fp, x: Fp) -> Seq<Seq<Fp>> {
-    let n_a: usize = a_prime_seq.len();
+/// * `p` - a list of sets p_i which contains integers from the protocol
+/// * `x` - The challenge from step 7
+///
+///
+fn step_9(
+    r: Seq<Fp>,
+    a_prime_seq: Seq<Seq<Fp>>,
+    n_e: usize,
+    n_a: usize,
+    omega: Fp,
+    p: Seq<Seq<u128>>,
+    x: Fp,
+) -> (Fp, Seq<Seq<Fp>>) {
     let mut a_seq: Seq<Seq<Fp>> = Seq::<Seq<Fp>>::create(n_a);
     for i in 0..n_a {
         let a_prime_i: Seq<Fp> = a_prime_seq[i].clone();
         let mut a_i_seq: Seq<Fp> = Seq::<Fp>::create(n_e);
+        let p_i = p[i].clone();
         for j in 0..a_prime_i.len() {
-            let power: u32 = 2; //This is a dummy val as we need to figure the p_i sets out
-            let argument: Fp = omega.exp(power).mul(x);
+            let p_i_j: u128 = p_i[j];
+            let argument: Fp = omega.pow(p_i_j).mul(x);
             let a_i_j: Fp = eval_polyx(a_prime_i.clone(), argument);
             a_i_seq[j] = a_i_j;
         }
         a_seq[i] = a_i_seq;
     }
-    a_seq
+    let r_x = eval_polyx(r, x);
+    (r_x, a_seq)
 }
 /// Step 10
 /// This functions initializes the s sequence of length n_a and fills it with polynomials of degree n_e-1 made with legrange interpolation
