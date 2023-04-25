@@ -1175,13 +1175,13 @@ fn step_18(
     }
 
     let mut v_second_sum: Fp = Fp::ZERO();
-    for i in 0..n_q as usize -1{
-        let u_i:Fp = u[i];
+    for i in 0..n_q as usize - 1 {
+        let u_i: Fp = u[i];
         let term: Fp = x4 * u_i;
         v_second_sum = v_second_sum + term;
     }
-    let v = v_first_sum + x4*v_second_sum;
-    (P,v)
+    let v = v_first_sum + x4 * v_second_sum;
+    (P, v)
 }
 
 /// Step 19
