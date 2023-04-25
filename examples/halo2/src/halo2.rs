@@ -91,7 +91,7 @@ fn add_polyx(p1: Seq<Fp>, p2: Seq<Fp>) -> Seq<Fp> {
         res[i] = p1[i] + p2[i];
     }
 
-    res
+    trim_poly(res)
 }
 
 /// Subtract two polynomials, return resulting polynomial
@@ -330,6 +330,7 @@ fn multi_poly_with_x(p: Seq<Fp>) -> Seq<Fp> {
 
 // TODO document
 fn multi_poly_with_x_pow(p: Seq<Fp>, power: usize) -> Seq<Fp> {
+    let p = trim_poly(p);
     let mut res: Seq<Fp> = Seq::<Fp>::create(p.len() + power);
 
     for i in 0..p.len() {
@@ -727,15 +728,22 @@ fn step_4(g_prime: Seq<Fp>, omega: Fp, n: u128) -> Seq<Fp> {
 /// # Arguments
 /// * `h` - Polynomial to be split
 /// * `n` - defines length of new polynomials (global variable for prooving system)
+///
+/// # Test
+/// [step_7]
+/// [test_step_5]
 fn step_5(h: Seq<Fp>, n: u128) -> Seq<Seq<Fp>> {
+    let h = trim_poly(h);
     let no_of_parts = (h.len() + (n - (2 as u128)) as usize) / ((n - (1 as u128)) as usize);
-    let deg = (n - (1 as u128)) as usize;
+    let n = n as usize;
+
+    let mut poly_parts: Seq<Seq<Fp>> = Seq::<Seq<Fp>>::create(no_of_parts);
 
     let mut original_index = 0;
     let mut poly_parts: Seq<Seq<Fp>> = Seq::<Seq<Fp>>::create(no_of_parts);
     for i in 0..poly_parts.len() {
-        let mut current_poly_part: Seq<Fp> = Seq::<Fp>::create(deg);
-        for j in 0..deg {
+        let mut current_poly_part: Seq<Fp> = Seq::<Fp>::create(n);
+        for j in 0..n {
             if original_index < h.len() {
                 current_poly_part[j] = h[original_index];
                 original_index = original_index + 1;
@@ -1473,36 +1481,28 @@ impl Arbitrary for Points {
 #[quickcheck]
 fn test_step_5(h: UniPolynomial, n: u8) -> TestResult {
     let n = n as u128;
-    if n < 5 {
-        // TODO sometime passes, sometimes not. Every other element in the sum is sometimes 0
+    let h = h.0;
+    let h = trim_poly(h); // extract polynomial
+    if n < 2 {
+        // discard if n is too small (step_5 requires a n>2 to make sense)
         TestResult::discard()
     } else {
-        let h = h.0;
-        let h = trim_poly(h); // extract polynomial
-
         let h_parts = step_5(h.clone(), n); // split the h poly
-
         let n = n as usize;
-
-        // println!("n: {:?}", n);
-        // println!("h: {:?}", h);
-        println!("h_parts: {:?}", h_parts);
 
         let mut h_summed = Seq::<Fp>::create(1); // initialize a sum to the constant zero poly
 
+        // h(x) = sum from 0 to n_g-2 (X^ni h_i(X))
         for i in 0..h_parts.len() {
             let hi = h_parts[i].clone();
-            // println!("hi: {:?}", hi.clone());
-            let Xni = n * i;
-            let Xni_times_hi = multi_poly_with_x_pow(hi, Xni as usize);
+            let n_times_i = n * i;
+            let Xni_times_hi = multi_poly_with_x_pow(hi, n_times_i as usize);
             h_summed = add_polyx(h_summed, Xni_times_hi);
         }
 
         let h_summed = trim_poly(h_summed);
 
-        // println!("h: {:?}", h);
-        // println!("h_summed: {:?}", h_summed);
-
+        // assert the original and the summed polys have same length
         let h_len = h.len();
         let h_summed_len = h_summed.len();
         assert_eq!(
@@ -1511,6 +1511,7 @@ fn test_step_5(h: UniPolynomial, n: u8) -> TestResult {
             h_len, h_summed_len, h, h_summed
         );
 
+        // assert pairwise equality
         for i in 0..h.len() {
             assert_eq!(h[i], h_summed[i]);
         }
