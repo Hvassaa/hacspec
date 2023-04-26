@@ -1480,83 +1480,216 @@ impl Arbitrary for Points {
 }
 
 #[cfg(test)]
-#[quickcheck]
-fn test_step_5(h: UniPolynomial, n: u8) -> TestResult {
-    let n = n as u128;
-    let h = h.0;
-    let h = trim_poly(h); // extract polynomial
-    if n < 2 {
-        // discard if n is too small (step_5 requires a n>2 to make sense)
-        TestResult::discard()
-    } else {
-        let h_parts = step_5(h.clone(), n); // split the h poly
-        let n = n as usize;
+#[derive(Clone, Debug)]
+pub struct G1Container(G1);
 
-        let mut h_summed = Seq::<Fp>::create(1); // initialize a sum to the constant zero poly
-
-        // h(x) = sum from 0 to n_g-2 (X^ni h_i(X))
-        for i in 0..h_parts.len() {
-            let hi = h_parts[i].clone();
-            let n_times_i = n * i;
-            let Xni_times_hi = multi_poly_with_x_pow(hi, n_times_i as usize);
-            h_summed = add_polyx(h_summed, Xni_times_hi);
-        }
-
-        let h_summed = trim_poly(h_summed);
-
-        // assert the original and the summed polys have same length
-        let h_len = h.len();
-        let h_summed_len = h_summed.len();
-        assert_eq!(
-            h_len, h_summed_len,
-            "lengths of h and h_summed mismatch: {} and {}\n h: {:?}\nh_summed: {:?}",
-            h_len, h_summed_len, h, h_summed
-        );
-
-        // assert pairwise equality
-        for i in 0..h.len() {
-            assert_eq!(h[i], h_summed[i]);
-        }
-
-        TestResult::passed()
+#[cfg(test)]
+impl Arbitrary for G1Container {
+    fn arbitrary(g: &mut Gen) -> G1Container {
+        let a = Fp::from_literal(u128::arbitrary(g));
+        let generator = g1_generator();
+        G1Container(g1mul(a, generator))
     }
 }
 
 #[cfg(test)]
-// #[quickcheck]
-#[test]
-fn test_step_7() {
-    // if n < 2 {
-    // return TestResult::discard();
-    // }
-    let n = 5;
-    let h = Seq::<Fp>::from_vec(vec![]);
+#[quickcheck]
+fn test_step_5(h: UniPolynomial, n: u8) -> TestResult {
+    if n < 2 {
+        // discard if n is too small (step_5 requires a n>2 to make sense)
+        return TestResult::discard();
+    }
     let n = n as u128;
-    // let h = h.0;
+    let h = h.0;
+    let h = trim_poly(h); // extract polynomial
+    let h_parts = step_5(h.clone(), n); // split the h poly
+    let n = n as usize;
+
+    let mut h_summed = Seq::<Fp>::create(1); // initialize a sum to the constant zero poly
+
+    // h(x) = sum from 0 to n_g-2 (X^ni h_i(X))
+    for i in 0..h_parts.len() {
+        let hi = h_parts[i].clone();
+        let n_times_i = n * i;
+        let Xni_times_hi = multi_poly_with_x_pow(hi, n_times_i as usize);
+        h_summed = add_polyx(h_summed, Xni_times_hi);
+    }
+
+    let h_summed = trim_poly(h_summed);
+
+    // assert the original and the summed polys have same length
+    let h_len = h.len();
+    let h_summed_len = h_summed.len();
+    assert_eq!(
+        h_len, h_summed_len,
+        "lengths of h and h_summed mismatch: {} and {}\n h: {:?}\nh_summed: {:?}",
+        h_len, h_summed_len, h, h_summed
+    );
+
+    // assert pairwise equality
+    for i in 0..h.len() {
+        assert_eq!(h[i], h_summed[i]);
+    }
+
+    TestResult::passed()
+}
+
+// Generators taken from:
+// https://o1-labs.github.io/proof-systems/specs/pasta.html#pallas
+// (mina generator: (1,12418654782883325593414442427049395787963493412651469444558597405572177144507))
+#[cfg(test)]
+fn g1_generator() -> G1 {
+    (
+        FpCurve::from_hex("1"),
+        FpCurve::from_hex("1B74B5A30A12937C53DFA9F06378EE548F655BD4333D477119CF7A23CAED2ABB"),
+        false,
+    )
+}
+
+#[cfg(test)]
+#[quickcheck]
+fn test_step_7(h: UniPolynomial, W_power: u128, n: u8, x: u8) -> TestResult {
+    let W = g1mul(Fp::from_literal(W_power), g1_generator());
+    if n < 2 {
+        // discard if n is too small (step_5 requires a n>2 to make sense)
+        return TestResult::discard();
+    }
+    let n = n as u128;
+    let h = h.0;
     let h = trim_poly(h); // extract polynomial
     let h_parts: Seq<Seq<Fp>> = step_5(h, n);
+    let no_of_h_parts = h_parts.len();
+
+    // get the length of the each h_i parts (the first shows the longest length)
     let parts_len: &Seq<Fp> = (&h_parts[0]);
     let parts_len = parts_len.len();
 
-    let mut gd = Seq::<G1>::create(parts_len);
-    let mut rs = Seq::<Fp>::create(parts_len);
-    for i in 0..gd.len() {
-        gd[i] = (FpCurve::ONE(), FpCurve::ONE(), false);
-        rs[i] = Fp::ONE();
+    // G^n for CRS (strictly not needed to be n, but at least the length of the parts)
+    let mut Gd = Seq::<G1>::create(parts_len);
+    // list of randomness for step 6
+    let mut rs = Seq::<Fp>::create(no_of_h_parts);
+
+    for i in 0..Gd.len() {
+        Gd[i] = (FpCurve::from_literal(1), FpCurve::from_literal(1), false); // TODO, this could be random curve elements
     }
 
-    let crs: CRS = (gd, g1_default());
+    // sum the randomness used
+    let mut rs_sum = Fp::ZERO();
+    let mut ran = 1;
+    for i in 0..rs.len() {
+        rs[i] = Fp::from_literal(ran); // TODO, this could be properly random
+        rs_sum = rs_sum + rs[i];
+        ran += ran;
+    }
 
+    // construct the common reference string
+    let crs: CRS = (Gd, W);
+
+    // pick some x, for the challenge
+    let x = Fp::from_literal(x as u128);
+
+    // call step_6 to get the H_i's
     let Hs = step_6(h_parts.clone(), &crs, rs);
-    let x = Fp::TWO();
 
+    // call step_7 to get the H' commitment
     let H_prime = step_7(Hs, x, n);
+
+    // call step_8 to get the h' polynomial
     let h_prime = step_8(h_parts.clone(), x, n);
-    let h_prime_commitment = commit_polyx(&crs, h_prime, Fp::from_literal(h_parts.len() as u128));
+
+    // commit to h', using the same values as for step 6
+    // notice that summing the randomness and multiplying with W
+    // is the same as multiplying by each randomness and the summing
+    let h_prime_commitment = commit_polyx(&crs, h_prime, rs_sum);
 
     assert_eq!(H_prime, h_prime_commitment);
 
-    // TestResult::passed()
+    TestResult::passed()
+}
+
+#[cfg(test)]
+#[test]
+fn tt() {
+    let x = Fp::TWO();
+    let W = g1mul(Fp::TWO(), g1_generator()); // TODO make the scalar random
+    let n = 5 as u128;
+    let h = Seq::<Fp>::from_vec(vec![
+        Fp::from_literal(1),
+        Fp::from_literal(2),
+        Fp::from_literal(3),
+        Fp::from_literal(4),
+        Fp::from_literal(5),
+        Fp::from_literal(6),
+        Fp::from_literal(7),
+        Fp::from_literal(8),
+        Fp::from_literal(9),
+        Fp::from_literal(10),
+    ]);
+
+    let h_parts = step_5(h, n);
+    let no_of_parts = h_parts.len();
+    let part_len: &Seq<Fp> = (&h_parts[0]);
+    let part_len = part_len.len();
+
+    let mut Gd = Seq::<G1>::create(part_len);
+    let mut randomness = Seq::<Fp>::create(no_of_parts);
+
+    for i in 0..Gd.len() {
+        Gd[i] = g1mul(Fp::from_literal(7), g1_generator()); // TODO, make each entry random
+    }
+
+    for i in 0..randomness.len() {
+        randomness[i] = Fp::TWO(); // TODO make each entry random
+    }
+
+    let mut r_prime = Fp::ZERO();
+    for i in 0..no_of_parts {
+        r_prime = r_prime + (x.pow(n * i as u128) * randomness[i]);
+    }
+
+    let crs: CRS = (Gd, W);
+    let Hs = step_6(h_parts.clone(), &crs, randomness);
+    let H_prime = step_7(Hs, x, n);
+    let h_prime = step_8(h_parts, x, n);
+
+    let commit_of_h_prime = commit_polyx(&crs, h_prime, r_prime);
+
+    assert_eq!(H_prime, commit_of_h_prime);
+}
+
+#[cfg(test)]
+#[test]
+fn testmsm() {
+    let fs1 = Seq::<Fp>::from_vec(vec![
+        Fp::from_literal(144),
+        Fp::from_literal(22),
+        Fp::from_literal(3),
+        Fp::from_literal(74),
+        Fp::from_literal(79),
+    ]);
+
+    let fs2 = Seq::<Fp>::from_vec(vec![
+        Fp::from_literal(112),
+        Fp::from_literal(2231),
+        Fp::from_literal(88),
+        Fp::from_literal(9),
+        Fp::from_literal(98),
+    ]);
+    let gs = Seq::<G1>::from_vec(vec![
+        (FpCurve::from_literal(2), FpCurve::from_literal(2), false),
+        (FpCurve::from_literal(2), FpCurve::from_literal(5), false),
+        (FpCurve::from_literal(5), FpCurve::from_literal(3), false),
+        (FpCurve::from_literal(6), FpCurve::from_literal(8), false),
+        (FpCurve::from_literal(2), FpCurve::from_literal(5), false),
+    ]);
+    let msmed1 = msm(fs1.clone(), gs.clone());
+    let msmed2 = msm(fs2.clone(), gs.clone());
+    let msm_sum = g1add(msmed1, msmed2);
+    let mut fs_sum = add_polyx(fs1, fs2);
+    let sum_sum = msm(fs_sum, gs);
+
+    println!("{:?}", msm_sum);
+    println!("{:?}", sum_sum);
 }
 
 #[cfg(test)]
