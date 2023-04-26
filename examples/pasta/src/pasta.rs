@@ -172,20 +172,20 @@ impl Arbitrary for Fp {
 
 #[cfg(test)]
 #[derive(Clone, Debug)]
-struct G1_container(G1);
+pub struct G1Container(G1);
 
 #[cfg(test)]
-impl Arbitrary for G1_container {
-    fn arbitrary(g: &mut Gen) -> G1_container {
+impl Arbitrary for G1Container {
+    fn arbitrary(g: &mut Gen) -> G1Container {
         let a = Fp::from_literal(u128::arbitrary(g));
         let generator = g1_generator();
-        G1_container(g1mul(a, generator))
+        G1Container(g1mul(a, generator))
     }
 }
 
 #[cfg(test)]
 #[quickcheck]
-fn test_g1_closure(a: G1_container, b: G1_container) {
+fn test_g1_closure(a: G1Container, b: G1Container) {
     let a = a.0;
     let b = b.0;
 
@@ -195,7 +195,7 @@ fn test_g1_closure(a: G1_container, b: G1_container) {
 
 #[cfg(test)]
 #[quickcheck]
-fn test_g1_associativity(a: G1_container, b: G1_container, c: G1_container) {
+fn test_g1_associativity(a: G1Container, b: G1Container, c: G1Container) {
     let a = a.0;
     let b = b.0;
     let c = c.0;
@@ -207,7 +207,7 @@ fn test_g1_associativity(a: G1_container, b: G1_container, c: G1_container) {
 
 #[cfg(test)]
 #[quickcheck]
-fn test_g1_identity(a: G1_container) {
+fn test_g1_identity(a: G1Container) {
     let a = a.0;
     let identity = g1_default();
 
@@ -218,7 +218,7 @@ fn test_g1_identity(a: G1_container) {
 
 #[cfg(test)]
 #[quickcheck]
-fn test_g1_inverse(a: G1_container) {
+fn test_g1_inverse(a: G1Container) {
     let a = a.0;
     let a_neg = g1neg(a);
 
