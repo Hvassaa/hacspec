@@ -343,7 +343,7 @@ fn multi_poly_with_x_pow(p: Seq<Fp>, power: usize) -> Seq<Fp> {
 /// # Arguments
 /// * `points`is a sequence of points `(Fp,Fp)` that the polynomial must pass through
 /// # Assertions
-/// * No two points may have the same x-value
+/// * No two points may have the same x-value.
 fn legrange_poly(points: Seq<(Fp, Fp)>) -> Seq<Fp> {
     let mut poly = Seq::<Fp>::create(points.len());
 
@@ -808,28 +808,50 @@ fn step_8(h_parts: Seq<Seq<Fp>>, x: Fp, n: u128) -> Seq<Fp> {
 }
 
 /// Step 9
-/// This functions creates a seq filled with a_i from the second part of step 9
+/// This functions returns r(x) and creates a seq filled with a_i from the second part of step 9
 ///
 /// # Arguments
+/// * `r` - the polynomial from step 3
 /// * `a_prime_seq` - A sequence of the a' polynomials from step 1
 /// * `n_e` - Global parameter for the protocol
+/// * `n_a` - Global parameter for the protocol
 /// * `omega` - The generator for the evaluations points also a global parameter for the protocol
-/// * `x`The - challenge from step 7
-fn step_9(a_prime_seq: Seq<Seq<Fp>>, n_e: usize, omega: Fp, x: Fp) -> Seq<Seq<Fp>> {
-    let n_a: usize = a_prime_seq.len();
+/// * `p` - a list of sets p_i which contains integers from the protocol
+/// * `x` - The challenge from step 7
+///
+///
+fn step_9(
+    r: Seq<Fp>,
+    a_prime_seq: Seq<Seq<Fp>>,
+    n_e: usize,
+    n_a: usize,
+    omega: Fp,
+    p: Seq<Seq<u128>>,
+    x: Fp,
+) -> (Fp, Seq<Seq<Fp>>) {
     let mut a_seq: Seq<Seq<Fp>> = Seq::<Seq<Fp>>::create(n_a);
-    for i in 0..n_a {
+    let mut i_range: usize = n_a - 1;
+    if i_range > p.len() {
+        i_range = p.len();
+    }
+    for i in 0..i_range {
         let a_prime_i: Seq<Fp> = a_prime_seq[i].clone();
         let mut a_i_seq: Seq<Fp> = Seq::<Fp>::create(n_e);
-        for j in 0..a_prime_i.len() {
-            let power: u32 = 2; //This is a dummy val as we need to figure the p_i sets out
-            let argument: Fp = omega.exp(power).mul(x);
+        let p_i: Seq<u128> = p[i].clone();
+        let mut j_range: usize = n_e - 1;
+        if j_range > p_i.len() {
+            j_range = p_i.len();
+        }
+        for j in 0..j_range {
+            let p_i_j: u128 = p_i[j];
+            let argument: Fp = omega.pow(p_i_j).mul(x);
             let a_i_j: Fp = eval_polyx(a_prime_i.clone(), argument);
             a_i_seq[j] = a_i_j;
         }
         a_seq[i] = a_i_seq;
     }
-    a_seq
+    let r_x = eval_polyx(r, x);
+    (r_x, a_seq)
 }
 /// Step 10
 /// This functions initializes the s sequence of length n_a and fills it with polynomials of degree n_e-1 made with legrange interpolation
@@ -850,13 +872,23 @@ fn step_10(
     n_e: u128,
 ) -> Seq<Seq<Fp>> {
     let mut s = Seq::<Seq<Fp>>::create(n_a as usize);
-    for i in 0..n_a as usize {
+    let mut i_range: usize = n_a as usize - 1;
+    if i_range > p.len() {
+        i_range = p.len();
+    }
+    for i in 0..i_range as usize {
+        let a_i = a[i as usize].clone();
+
+        let p_i = p[i].clone();
+
+        let mut j_range: usize = n_e as usize - 1;
+        if j_range > p_i.len() {
+            j_range = p_i.len();
+        }
         let mut points: Seq<(Fp, Fp)> = Seq::<(Fp, Fp)>::create((n_e as usize - 1));
-        for j in 0..n_e as usize - 1 {
-            let p_i = p[i as usize].clone();
-            let p_i_j: u128 = p_i[j as usize];
+        for j in 0..j_range {
+            let p_i_j: u128 = p_i[j];
             let x_j = omega.pow(p_i_j) * x;
-            let a_i = a[i as usize].clone();
             let y_j = a_i[j as usize];
             points[j as usize] = (x_j, y_j);
         }
@@ -1442,21 +1474,65 @@ extern crate quickcheck_macros;
 use quickcheck::*;
 
 #[cfg(test)]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 struct UniPolynomial(Seq<Fp>);
+
+#[cfg(test)]
+#[derive(Clone, Debug)]
+struct SeqOfUniPoly(Seq<Seq<Fp>>);
+
+#[cfg(test)]
+#[derive(Clone, Debug)]
+struct PorQ(Seq<Seq<u128>>);
 
 #[cfg(test)]
 impl Arbitrary for UniPolynomial {
     fn arbitrary(g: &mut quickcheck::Gen) -> UniPolynomial {
-        let size = u8::arbitrary(g) % 20;
-        let mut v = vec![];
+        let size = u8::arbitrary(g) % 20 + 1;
+        let mut v: Vec<Fp> = vec![];
         for _ in 0..size {
-            v.push(Fp::from_literal(u128::arbitrary(g)));
+            let new_val: Fp = Fp::from_literal(u128::arbitrary(g));
+            v.push(new_val);
         }
         UniPolynomial(Seq::<Fp>::from_vec(v))
     }
 }
 
+#[cfg(test)]
+impl Arbitrary for SeqOfUniPoly {
+    fn arbitrary(g: &mut quickcheck::Gen) -> SeqOfUniPoly {
+        let size = u8::arbitrary(g) % 20;
+        let mut seq_of_uni_poly = Seq::<Seq<Fp>>::create(size as usize);
+        for i in 0..size {
+            let uni_poly = (UniPolynomial::arbitrary(g));
+            seq_of_uni_poly[i] = uni_poly.0
+        }
+        SeqOfUniPoly(seq_of_uni_poly)
+    }
+}
+
+#[cfg(test)]
+impl Arbitrary for PorQ {
+    fn arbitrary(g: &mut quickcheck::Gen) -> PorQ {
+        let size = u8::arbitrary(g) % 20;
+        let mut p_or_q: Seq<Seq<u128>> = Seq::<Seq<u128>>::create(size as usize);
+        for j in 0..size {
+            let inner_size: u8 = u8::arbitrary(g) % 20 + 3;
+            // let mut inner_seq = Seq::<u128>::create(inner_size as usize);
+            let mut v: Vec<u128> = vec![];
+            for i in 0..inner_size {
+                let new_val: u128 = u128::arbitrary(g);
+                if !v.contains(&new_val) {
+                    v.push(new_val);
+                }
+                // inner_seq[i] = u128::arbitrary(g) % 10;
+            }
+            // let inner_seq: Seq<u128> =
+            p_or_q[j] = Seq::<u128>::from_vec(v);
+        }
+        PorQ(p_or_q)
+    }
+}
 #[cfg(test)]
 #[derive(Clone, Debug)]
 struct Points(Seq<(Fp, Fp)>);
@@ -1694,6 +1770,63 @@ fn testmsm() {
 
 #[cfg(test)]
 #[quickcheck]
+fn test_step_9_10(
+    a_prime_seq: SeqOfUniPoly,
+    omega_value: u128,
+    p: PorQ,
+    x_value: u128,
+) -> TestResult {
+    let r = Seq::<Fp>::from_vec(vec![Fp::ZERO()]);
+    if p.0.len() == 0 {
+        return TestResult::discard();
+    }
+    let omega: Fp = Fp::from_literal(omega_value % 55);
+    let x: Fp = Fp::from_literal(x_value % 55);
+
+    let p: Seq<Seq<u128>> = p.0;
+    let a: &Seq<u128> = &p[0];
+    let n_e: usize = a.len();
+    let n_a: usize = a_prime_seq.0.len();
+    if n_e == 0 {
+        return TestResult::discard();
+    }
+    if n_a == 0 {
+        return TestResult::discard();
+    }
+    if x_value % 55 < 2 {
+        return TestResult::discard();
+    }
+    if omega_value % 55 < 3 {
+        return TestResult::discard();
+    }
+    let (_, a) = step_9(r, a_prime_seq.0, n_e, n_a, omega, p.clone(), x);
+    let s = step_10(omega, p.clone(), x, a.clone(), n_a as u128, n_e as u128);
+    let mut i_range: usize = n_a - 1;
+    if i_range > p.len() {
+        i_range = p.len();
+    }
+    for i in 0..i_range {
+        let p_i: Seq<u128> = p[i].clone();
+        let s_i: Seq<Fp> = s[i].clone();
+        let a_i: Seq<Fp> = a[i].clone();
+        let mut j_range: usize = n_e - 1;
+        if j_range > p_i.len() {
+            j_range = p_i.len();
+        }
+        for j in 0..j_range {
+            let p_i_j = p_i[j];
+            let function_arg: Fp = omega.pow(p_i_j) * x;
+            let s_eval: Fp = eval_polyx(s_i.clone(), function_arg);
+            let a_i_j: Fp = a_i[j];
+            assert_eq!(s_eval, a_i_j);
+        }
+    }
+
+    TestResult::passed()
+}
+
+#[cfg(test)]
+#[quickcheck]
 fn test_poly_mul_x(a: UniPolynomial) {
     let p1 = a.0;
     let new_p = &multi_poly_with_x(p1.clone());
@@ -1741,36 +1874,35 @@ fn test_legrange_basis(a: Points) {
 
 #[cfg(test)]
 #[test]
-fn test_step_9() {
-    use std::clone;
+// fn test_step_9() {
+//     use std::clone;
 
-    let v1 = vec![1, 1, 1]
-        .iter()
-        .map(|e| Fp::from_literal((*e) as u128))
-        .collect();
-    let v2: Vec<Fp> = vec![1, 1, 1]
-        .iter()
-        .map(|e| Fp::from_literal((*e) as u128))
-        .collect();
-    let v3: Vec<Fp> = vec![1, 1, 1]
-        .iter()
-        .map(|e| Fp::from_literal((*e) as u128))
-        .collect();
-    let p1 = Seq::from_vec(v1);
-    let p2: Seq<Fp> = Seq::from_vec(v2);
-    let p3: Seq<Fp> = Seq::from_vec(v3);
-    let mut a_prime_seq: Seq<Seq<Fp>> = Seq::<Seq<Fp>>::create(3);
-    a_prime_seq[0] = p1;
-    a_prime_seq[1] = p2;
-    a_prime_seq[2] = p3;
-    let n_e = 3;
-    let x: Fp = Fp::from_literal(1);
-    let omega: Fp = Fp::from_literal(2);
-    let a_seq: Seq<Seq<Fp>> = step_9(a_prime_seq, n_e, omega, x);
-    let a_i_seq: &Seq<Fp> = &a_seq[1];
-    assert_eq!(a_i_seq[1], Fp::from_literal(21));
-}
-
+//     let v1 = vec![1, 1, 1]
+//         .iter()
+//         .map(|e| Fp::from_literal((*e) as u128))
+//         .collect();
+//     let v2: Vec<Fp> = vec![1, 1, 1]
+//         .iter()
+//         .map(|e| Fp::from_literal((*e) as u128))
+//         .collect();
+//     let v3: Vec<Fp> = vec![1, 1, 1]
+//         .iter()
+//         .map(|e| Fp::from_literal((*e) as u128))
+//         .collect();
+//     let p1 = Seq::from_vec(v1);
+//     let p2: Seq<Fp> = Seq::from_vec(v2);
+//     let p3: Seq<Fp> = Seq::from_vec(v3);
+//     let mut a_prime_seq: Seq<Seq<Fp>> = Seq::<Seq<Fp>>::create(3);
+//     a_prime_seq[0] = p1;
+//     a_prime_seq[1] = p2;
+//     a_prime_seq[2] = p3;
+//     let n_e = 3;
+//     let x: Fp = Fp::from_literal(1);
+//     let omega: Fp = Fp::from_literal(2);
+//     let a_seq: Seq<Seq<Fp>> = step_9(a_prime_seq, n_e, omega, x);
+//     let a_i_seq: &Seq<Fp> = &a_seq[1];
+//     assert_eq!(a_i_seq[1], Fp::from_literal(21));
+// }
 #[cfg(test)]
 #[test]
 fn test_part_8() {
