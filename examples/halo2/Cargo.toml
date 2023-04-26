@@ -10,12 +10,10 @@ path = "src/halo2.rs"
 [dependencies]
 hacspec-lib = { path = "../../lib" }
 hacspec-pasta = { path = "../pasta" }
-hacspec-sha256 = { path = "../sha256" }
 
 [dev-dependencies]
 quickcheck = "1"
 quickcheck_macros = "1"
-polynomial = "0.2.5"
 
 [[bench]]
 name = "benchmarks"
