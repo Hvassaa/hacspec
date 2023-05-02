@@ -1624,7 +1624,13 @@ fn g1_generator() -> G1 {
 
 #[cfg(test)]
 #[quickcheck]
-fn test_step_7(h: UniPolynomial, W_power: u128, n: u8, x: u8) -> TestResult {
+fn test_step_5_6_7_8_9(
+    h: UniPolynomial,
+    W_power: u128,
+    random_G_power: u128,
+    n: u8,
+    x: u8,
+) -> TestResult {
     let W = g1mul(Fp::from_literal(W_power), g1_generator());
     if n < 2 {
         // discard if n is too small (step_5 requires a n>2 to make sense)
@@ -1645,17 +1651,20 @@ fn test_step_7(h: UniPolynomial, W_power: u128, n: u8, x: u8) -> TestResult {
     // list of randomness for step 6
     let mut rs = Seq::<Fp>::create(no_of_h_parts);
 
+    let mut random_G_power = random_G_power;
     for i in 0..Gd.len() {
-        Gd[i] = (FpCurve::from_literal(1), FpCurve::from_literal(1), false); // TODO, this could be random curve elements
+        let random_group_elem = g1mul(Fp::from_literal(random_G_power), g1_generator());
+        Gd[i] = random_group_elem;
+        random_G_power += random_G_power * 3; // TODO, this could be properly random
     }
 
     // sum the randomness used
     let mut rs_sum = Fp::ZERO();
     let mut ran = 1;
     for i in 0..rs.len() {
-        rs[i] = Fp::from_literal(ran); // TODO, this could be properly random
+        rs[i] = Fp::from_literal(ran);
         rs_sum = rs_sum + rs[i];
-        ran += ran;
+        ran += ran * 7; // TODO, this could be properly random
     }
 
     // construct the common reference string
