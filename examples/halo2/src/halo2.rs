@@ -1833,37 +1833,6 @@ fn test_legrange_basis(a: Points) {
 
 #[cfg(test)]
 #[test]
-// fn test_step_9() {
-//     use std::clone;
-
-//     let v1 = vec![1, 1, 1]
-//         .iter()
-//         .map(|e| Fp::from_literal((*e) as u128))
-//         .collect();
-//     let v2: Vec<Fp> = vec![1, 1, 1]
-//         .iter()
-//         .map(|e| Fp::from_literal((*e) as u128))
-//         .collect();
-//     let v3: Vec<Fp> = vec![1, 1, 1]
-//         .iter()
-//         .map(|e| Fp::from_literal((*e) as u128))
-//         .collect();
-//     let p1 = Seq::from_vec(v1);
-//     let p2: Seq<Fp> = Seq::from_vec(v2);
-//     let p3: Seq<Fp> = Seq::from_vec(v3);
-//     let mut a_prime_seq: Seq<Seq<Fp>> = Seq::<Seq<Fp>>::create(3);
-//     a_prime_seq[0] = p1;
-//     a_prime_seq[1] = p2;
-//     a_prime_seq[2] = p3;
-//     let n_e = 3;
-//     let x: Fp = Fp::from_literal(1);
-//     let omega: Fp = Fp::from_literal(2);
-//     let a_seq: Seq<Seq<Fp>> = step_9(a_prime_seq, n_e, omega, x);
-//     let a_i_seq: &Seq<Fp> = &a_seq[1];
-//     assert_eq!(a_i_seq[1], Fp::from_literal(21));
-// }
-#[cfg(test)]
-#[test]
 fn test_part_8() {
     let v1 = vec![5, 10, 20]
         .iter()
