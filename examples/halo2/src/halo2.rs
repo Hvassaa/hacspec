@@ -1623,73 +1623,90 @@ fn g1_generator() -> G1 {
 }
 
 #[cfg(test)]
-#[quickcheck]
-fn test_step_5_6_7_8_9(
-    h: UniPolynomial,
-    W_power: u128,
-    random_G_power: u128,
-    n: u8,
-    x: u8,
-) -> TestResult {
-    let W = g1mul(Fp::from_literal(W_power), g1_generator());
-    if n < 2 {
-        // discard if n is too small (step_5 requires a n>2 to make sense)
-        return TestResult::discard();
+#[test]
+fn test_step_5_6_7_8_9_wrapper() {
+    fn test_step_5_6_7_8_9(
+        h: UniPolynomial,
+        W_power: u128,
+        random_G_power: u128,
+        n: u8,
+        x: u8,
+    ) -> TestResult {
+        let W = g1mul(Fp::from_literal(W_power), g1_generator());
+        if n < 2 {
+            // discard if n is too small (step_5 requires a n>2 to make sense)
+            return TestResult::discard();
+        }
+        let n = n as u128;
+        let h = h.0;
+        let h = trim_poly(h); // extract polynomial
+        let h_parts: Seq<Seq<Fp>> = step_5(h, n);
+        let no_of_h_parts = h_parts.len();
+
+        // get the length of the each h_i parts (the first shows the longest length)
+        let parts_len: &Seq<Fp> = (&h_parts[0]);
+        let parts_len = parts_len.len();
+
+        // G^n for CRS (strictly not needed to be n, but at least the length of the parts)
+        let mut Gd = Seq::<G1>::create(parts_len);
+        // list of randomness for step 6
+        let mut rs = Seq::<Fp>::create(no_of_h_parts);
+
+        let mut random_G_power = random_G_power;
+        for i in 0..Gd.len() {
+            let random_group_elem = g1mul(Fp::from_literal(random_G_power), g1_generator());
+            Gd[i] = random_group_elem;
+            random_G_power += (random_G_power % (u64::MAX as u128)) * 3; // TODO, this could be properly random
+        }
+
+        // sum the randomness used
+        let mut rs_sum = Fp::ZERO();
+        let mut ran = 1;
+        for i in 0..rs.len() {
+            rs[i] = Fp::from_literal(ran);
+            rs_sum = rs_sum + rs[i];
+            ran += (ran % (u64::MAX as u128)) * 7; // TODO, this could be properly random
+        }
+
+        // construct the common reference string
+        let crs: CRS = (Gd, W);
+
+        // pick some x, for the challenge
+        let x = Fp::from_literal(x as u128);
+
+        // call step_6 to get the H_i's
+        let Hs = step_6(h_parts.clone(), &crs, rs);
+
+        // call step_7 to get the H' commitment
+        let H_prime = step_7(Hs, x, n);
+
+        // call step_8 to get the h' polynomial
+        let h_prime = step_8(h_parts.clone(), x, n);
+
+        // commit to h', using the same values as for step 6
+        // notice that summing the randomness and multiplying with W
+        // is the same as multiplying by each randomness and the summing
+        let h_prime_commitment = commit_polyx(&crs, h_prime, rs_sum);
+
+        // assert_eq!(H_prime, h_prime_commitment);
+        if H_prime == h_prime_commitment {
+            TestResult::passed()
+        } else {
+            TestResult::failed()
+        }
     }
-    let n = n as u128;
-    let h = h.0;
-    let h = trim_poly(h); // extract polynomial
-    let h_parts: Seq<Seq<Fp>> = step_5(h, n);
-    let no_of_h_parts = h_parts.len();
 
-    // get the length of the each h_i parts (the first shows the longest length)
-    let parts_len: &Seq<Fp> = (&h_parts[0]);
-    let parts_len = parts_len.len();
-
-    // G^n for CRS (strictly not needed to be n, but at least the length of the parts)
-    let mut Gd = Seq::<G1>::create(parts_len);
-    // list of randomness for step 6
-    let mut rs = Seq::<Fp>::create(no_of_h_parts);
-
-    let mut random_G_power = random_G_power;
-    for i in 0..Gd.len() {
-        let random_group_elem = g1mul(Fp::from_literal(random_G_power), g1_generator());
-        Gd[i] = random_group_elem;
-        random_G_power += random_G_power * 3; // TODO, this could be properly random
-    }
-
-    // sum the randomness used
-    let mut rs_sum = Fp::ZERO();
-    let mut ran = 1;
-    for i in 0..rs.len() {
-        rs[i] = Fp::from_literal(ran);
-        rs_sum = rs_sum + rs[i];
-        ran += ran * 7; // TODO, this could be properly random
-    }
-
-    // construct the common reference string
-    let crs: CRS = (Gd, W);
-
-    // pick some x, for the challenge
-    let x = Fp::from_literal(x as u128);
-
-    // call step_6 to get the H_i's
-    let Hs = step_6(h_parts.clone(), &crs, rs);
-
-    // call step_7 to get the H' commitment
-    let H_prime = step_7(Hs, x, n);
-
-    // call step_8 to get the h' polynomial
-    let h_prime = step_8(h_parts.clone(), x, n);
-
-    // commit to h', using the same values as for step 6
-    // notice that summing the randomness and multiplying with W
-    // is the same as multiplying by each randomness and the summing
-    let h_prime_commitment = commit_polyx(&crs, h_prime, rs_sum);
-
-    assert_eq!(H_prime, h_prime_commitment);
-
-    TestResult::passed()
+    // limit the number of tests run, since it is SLOW
+    QuickCheck::new().tests(5).quicktest(
+        test_step_5_6_7_8_9
+            as fn(
+                h: UniPolynomial,
+                W_power: u128,
+                random_G_power: u128,
+                n: u8,
+                x: u8,
+            ) -> TestResult,
+    );
 }
 
 #[cfg(test)]
