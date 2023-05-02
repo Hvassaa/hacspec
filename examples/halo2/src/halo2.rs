@@ -1631,13 +1631,19 @@ fn test_step_5_6_7_8_9_wrapper() {
         random_G_power: u128,
         n: u8,
         x: u8,
-    ) -> TestResult {
+        blinding: u8,
+    ) -> bool {
+        // n has to be >= 2
+        let n = match n.checked_add(2) {
+            Some(x) => x,
+            None => 2,
+        };
+        // W_power being 0 would destroy commitment
+        let W_power = match W_power.checked_add(1) {
+            Some(x) => x,
+            None => 1,
+        };
         let W = g1mul(Fp::from_literal(W_power), g1_generator());
-        if n < 2 {
-            // discard if n is too small (step_5 requires a n>2 to make sense)
-            // println!("SKIPPED");
-            return TestResult::discard();
-        }
         let n = n as u128;
         let h = h.0;
         let h = trim_poly(h); // extract polynomial
@@ -1653,20 +1659,20 @@ fn test_step_5_6_7_8_9_wrapper() {
         // list of randomness for step 6
         let mut rs = Seq::<Fp>::create(no_of_h_parts);
 
-        let mut random_G_power = random_G_power;
+        let mut random_G_power = Fp::from_literal(random_G_power);
         for i in 0..Gd.len() {
-            let random_group_elem = g1mul(Fp::from_literal(random_G_power), g1_generator());
+            let random_group_elem = g1mul(random_G_power, g1_generator());
             Gd[i] = random_group_elem;
-            random_G_power += (random_G_power % (u64::MAX as u128)) * 3; // TODO, this could be properly random
+            random_G_power = random_G_power + Fp::from_literal(3); // TODO, this could be properly random
         }
 
         // sum the randomness used
         let mut rs_sum = Fp::ZERO();
-        let mut ran = 1;
+        let mut blinding = Fp::from_literal(blinding as u128);
         for i in 0..rs.len() {
-            rs[i] = Fp::from_literal(ran);
+            rs[i] = blinding;
             rs_sum = rs_sum + rs[i];
-            ran += (ran % (u64::MAX as u128)) * 7; // TODO, this could be properly random
+            blinding = blinding + blinding * Fp::from_literal(7); // TODO, this could be properly random
         }
 
         // construct the common reference string
@@ -1688,18 +1694,18 @@ fn test_step_5_6_7_8_9_wrapper() {
         // notice that summing the randomness and multiplying with W
         // is the same as multiplying by each randomness and the summing
         let h_prime_commitment = commit_polyx(&crs, h_prime, rs_sum);
+        // let h_prime_commitment = commit_polyx(&crs, h_prime, Fp::from_literal(123));
 
-        // println!("{:?}", H_prime);
-        // println!("{:?}", h_prime_commitment);
         if H_prime == h_prime_commitment {
-            return TestResult::passed();
+            println!("PASSED");
         } else {
-            return TestResult::failed();
+            println!("FAILED");
         }
+        H_prime == h_prime_commitment
     }
 
     // limit the number of tests run, since it is SLOW
-    QuickCheck::new().tests(5).quickcheck(
+    QuickCheck::new().max_tests(2).quickcheck(
         test_step_5_6_7_8_9
             as fn(
                 h: UniPolynomial,
@@ -1707,7 +1713,8 @@ fn test_step_5_6_7_8_9_wrapper() {
                 random_G_power: u128,
                 n: u8,
                 x: u8,
-            ) -> TestResult,
+                blinding: u8,
+            ) -> bool,
     );
 }
 
