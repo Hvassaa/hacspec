@@ -1694,56 +1694,6 @@ fn test_step_5_6_7_8_9(
 
 #[cfg(test)]
 #[test]
-fn tt() {
-    let x = Fp::TWO();
-    let W = g1mul(Fp::TWO(), g1_generator()); // TODO make the scalar random
-    let n = 5 as u128;
-    let h = Seq::<Fp>::from_vec(vec![
-        Fp::from_literal(1),
-        Fp::from_literal(2),
-        Fp::from_literal(3),
-        Fp::from_literal(4),
-        Fp::from_literal(5),
-        Fp::from_literal(6),
-        Fp::from_literal(7),
-        Fp::from_literal(8),
-        Fp::from_literal(9),
-        Fp::from_literal(10),
-    ]);
-
-    let h_parts = step_5(h, n);
-    let no_of_parts = h_parts.len();
-    let part_len: &Seq<Fp> = (&h_parts[0]);
-    let part_len = part_len.len();
-
-    let mut Gd = Seq::<G1>::create(part_len);
-    let mut randomness = Seq::<Fp>::create(no_of_parts);
-
-    for i in 0..Gd.len() {
-        Gd[i] = g1mul(Fp::from_literal(7), g1_generator()); // TODO, make each entry random
-    }
-
-    for i in 0..randomness.len() {
-        randomness[i] = Fp::TWO(); // TODO make each entry random
-    }
-
-    let mut r_prime = Fp::ZERO();
-    for i in 0..no_of_parts {
-        r_prime = r_prime + (x.pow(n * i as u128) * randomness[i]);
-    }
-
-    let crs: CRS = (Gd, W);
-    let Hs = step_6(h_parts.clone(), &crs, randomness);
-    let H_prime = step_7(Hs, x, n);
-    let h_prime = step_8(h_parts, x, n);
-
-    let commit_of_h_prime = commit_polyx(&crs, h_prime, r_prime);
-
-    assert_eq!(H_prime, commit_of_h_prime);
-}
-
-#[cfg(test)]
-#[test]
 fn testmsm() {
     let fs1 = Seq::<Fp>::from_vec(vec![
         Fp::from_literal(144),
