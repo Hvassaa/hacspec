@@ -1635,6 +1635,7 @@ fn test_step_5_6_7_8_9_wrapper() {
         let W = g1mul(Fp::from_literal(W_power), g1_generator());
         if n < 2 {
             // discard if n is too small (step_5 requires a n>2 to make sense)
+            // println!("SKIPPED");
             return TestResult::discard();
         }
         let n = n as u128;
@@ -1688,16 +1689,17 @@ fn test_step_5_6_7_8_9_wrapper() {
         // is the same as multiplying by each randomness and the summing
         let h_prime_commitment = commit_polyx(&crs, h_prime, rs_sum);
 
-        // assert_eq!(H_prime, h_prime_commitment);
+        // println!("{:?}", H_prime);
+        // println!("{:?}", h_prime_commitment);
         if H_prime == h_prime_commitment {
-            TestResult::passed()
+            return TestResult::passed();
         } else {
-            TestResult::failed()
+            return TestResult::failed();
         }
     }
 
     // limit the number of tests run, since it is SLOW
-    QuickCheck::new().tests(5).quicktest(
+    QuickCheck::new().tests(5).quickcheck(
         test_step_5_6_7_8_9
             as fn(
                 h: UniPolynomial,
