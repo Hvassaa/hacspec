@@ -1620,9 +1620,10 @@ fn g1_generator() -> G1 {
     )
 }
 
+// this hardcoded test for creating a real quickcheck test of step 5,6,7,8
 #[cfg(test)]
-#[quicktest]
-fn test_s() {
+#[quickcheck]
+fn test_s(x: u8, w: u8) -> bool {
     // h: UniPolynomial,
     // W_power: u8,
     // random_G_power: u8,
@@ -1640,9 +1641,9 @@ fn test_s() {
         Fp::from_literal(35),
     ]);
     let n = 4;
-    let x = Fp::from_literal(1);
+    let x = Fp::from_literal(x as u128);
     let blinding = Fp::from_literal(345);
-    let W = g1mul(Fp::TWO(), g1_generator());
+    let W = g1mul(Fp::from_literal(w as u128), g1_generator());
     // there should be as many G elements as there are elements in the h_i polys
     let G = Seq::<G1>::from_vec(vec![
         g1mul(Fp::ONE(), g1_generator()),
@@ -1656,146 +1657,93 @@ fn test_s() {
 
     let h_s = step_5(h, n);
     let H_s = step_6(h_s.clone(), &(G.clone(), W), randomness.clone());
-    println!("===>h_s len: {:?}, H_s len: {}", h_s.len(), H_s.len());
+    // println!("===>h_s len: {:?}, H_s len: {}", h_s.len(), H_s.len());
     let H_prime = step_7(H_s, x, n);
     let h_prime = step_8(h_s, x, n);
 
     let mut randomness_sum = Fp::ZERO();
     for i in 0..randomness.len() {
         let x_pow_ni = x.pow(n * (i as u128));
-        println!("SUM {}", (randomness[i] * x_pow_ni));
+        // println!("SUM {}", (randomness[i] * x_pow_ni));
         randomness_sum = randomness_sum + (randomness[i] * x_pow_ni);
     }
-    println!("{}", randomness_sum);
+    // println!("{}", randomness_sum);
     let h_prime_com = commit_polyx(&(G, W), h_prime, randomness_sum);
     // println!("{:?}", H_prime);
     // println!("{:?}", h_prime_com);
     assert_eq!(H_prime, h_prime_com);
+    H_prime == h_prime_com
 }
 
 #[cfg(test)]
 #[test]
-fn test_step_5_6_7_8_9_wrapper() {
-    fn test_step_5_6_7_8_9(
-        h: UniPolynomial,
-        W_power: u8,
-        random_G_power: u8,
-        n: u8,
-        x: u8,
-        blinding: u8,
-    ) -> bool {
-        // n has to be >= 2
-        let n = match n {
-            0 => 1,
-            x => x,
-        };
-        let n: u128 = 2.exp((n % 7) as u32);
-        // W_power being 0 would destroy commitment
-        let W_power = match W_power {
-            0 => 1,
-            x => x,
-        };
-        let random_G_power = match random_G_power {
-            0 => 1,
-            x => x,
-        };
-        let x = match x {
-            0 => 1,
-            x => x,
-        };
-
-        let blinding = match blinding {
-            0 => 1,
-            x => x,
-        };
-        println!(
-            "{}, {}, {}, {}, {}",
-            W_power, random_G_power, n, x, blinding
-        );
-        let W = g1mul(Fp::from_literal(W_power as u128), g1_generator());
-        // println!("{}", g1_on_curve(W));
-        let n = n as u128;
+fn test_step_5_6_7_8() {
+    fn a(h: UniPolynomial, n: u8, x: u8, w: u8, randomness_seed: u8, G_seed: u8) -> bool {
         let h = h.0;
-        let h = trim_poly(h); // extract polynomial
-        let h_parts: Seq<Seq<Fp>> = step_5(h, n);
-        let no_of_h_parts = h_parts.len();
 
-        // get the length of the each h_i parts (the first shows the longest length)
-        let parts_len: &Seq<Fp> = (&h_parts[0]);
-        let parts_len = parts_len.len();
+        // n should no be too small (for step 5)
+        let n = n as u128 + 5;
 
-        // G^n for CRS (strictly not needed to be n, but at least the length of the parts)
-        let mut Gd = Seq::<G1>::create(parts_len);
-        // list of randomness for step 6
-        let mut rs = Seq::<Fp>::create(no_of_h_parts);
+        // STEP 5
+        let h_s = step_5(h, n);
 
-        let mut random_G_power = Fp::from_literal(random_G_power as u128);
-        for i in 0..Gd.len() {
-            let random_group_elem = g1mul(random_G_power, g1_generator());
-            // println!("{}", g1_on_curve(random_group_elem));
-            Gd[i] = random_group_elem;
-            // let new_g_power = random_G_power + Fp::from_literal(3);
-            // println!("new blind is smaller {}", new_g_power < random_G_power);
-            // random_G_power = new_g_power; // TODO, this could be properly random
-        }
-
-        // sum the randomness used
-        let mut rs_sum = Fp::ZERO();
-        let mut blinding = Fp::from_literal(blinding as u128);
-        for i in 0..rs.len() {
-            rs[i] = blinding;
-            rs_sum = rs_sum + rs[i];
-            // let new_blinding = blinding + blinding * Fp::from_literal(7);
-            // println!("new blind is smaller {}", new_blinding < blinding);
-            // blinding = new_blinding // TODO, this could be properly random
-        }
-
-        // construct the common reference string
-        let crs: CRS = (Gd, W);
-
-        // pick some x, for the challenge
+        ////////////////////////////////////////////////////////////////////////////////////
+        /// SETTING UP THE REQUIRED VALUES (W, G, x, commitment-randomness), NOT INTERESTING
+        ////////////////////////////////////////////////////////////////////////////////////
         let x = Fp::from_literal(x as u128);
+        let W = g1mul(Fp::from_literal(w as u128), g1_generator());
 
-        // call step_6 to get the H_i's
-        let Hs = step_6(h_parts.clone(), &crs, rs);
+        // get the length of a h_i, which is the same as the length of G
+        let h_i_len: &Seq<Fp> = &(h_s[0]);
+        let h_i_len = h_i_len.len();
+        // get the number of h_i polys, which is the same as the number
+        // of random elements for comitting
+        let h_s_len = h_s.len();
 
-        // call step_7 to get the H' commitment
-        let H_prime = step_7(Hs, x, n);
+        // there should be as many G elements as there are elements in the h_i polys
+        let mut G = Seq::<G1>::create(h_i_len);
+        let G_seed = Fp::from_literal(G_seed as u128 + 1); // +1, so it non-zero
 
-        // call step_8 to get the h' polynomial
-        let h_prime = step_8(h_parts.clone(), x, n);
-
-        // commit to h', using the same values as for step 6
-        // notice that summing the randomness and multiplying with W
-        // is the same as multiplying by each randomness and the summing
-        let h_prime_commitment = commit_polyx(&crs, h_prime, rs_sum);
-
-        if H_prime == h_prime_commitment {
-            println!("PASSED");
-        } else {
-            println!("FAILED");
-            println!("====");
-            println!("W_power: {}", W_power);
-            println!("random_G_power: {}", random_G_power);
-            println!("n: {}", n);
-            println!("x: {}", x);
-            println!("blinding: {}", blinding);
-            println!("====");
+        // create some "randomness" for G
+        G[0] = g1mul(G_seed, g1_generator());
+        for i in 1..G.len() {
+            G[i] = g1mul(G_seed, G[i - 1]);
         }
-        H_prime == h_prime_commitment
+
+        // there should be as many random elements as there are h_i polys
+        let mut randomness = Seq::<Fp>::create(h_s_len);
+        // create some "randomness" for commitments
+        randomness[0] = Fp::from_literal(randomness_seed as u128 + 1); // +1, so it non-zero
+        for i in 1..randomness.len() {
+            randomness[i] = (randomness[i - 1] + Fp::ONE()) * Fp::TWO();
+        }
+        //////////////////////////////////////////////////////////////////////////////////
+        /// SETTING UP VALUES DONE
+        //////////////////////////////////////////////////////////////////////////////////
+
+        // STEP 6
+        let H_s = step_6(h_s.clone(), &(G.clone(), W), randomness.clone());
+        // STEP 7
+        let H_prime = step_7(H_s, x, n);
+        // STEP 8
+        let h_prime = step_8(h_s, x, n);
+
+        // sum the randomess corresponding (see the thesis for furhter explanation)
+        let mut randomness_sum = Fp::ZERO();
+        for i in 0..randomness.len() {
+            let x_pow_ni = x.pow(n * (i as u128));
+            randomness_sum = randomness_sum + (randomness[i] * x_pow_ni);
+        }
+
+        // commit to h_prime
+        let h_prime_com = commit_polyx(&(G, W), h_prime, randomness_sum);
+        assert_eq!(H_prime, h_prime_com);
+        H_prime == h_prime_com
     }
 
-    // limit the number of tests run, since it is SLOW
-    QuickCheck::new().max_tests(10).quickcheck(
-        test_step_5_6_7_8_9
-            as fn(
-                h: UniPolynomial,
-                W_power: u8,
-                random_G_power: u8,
-                n: u8,
-                x: u8,
-                blinding: u8,
-            ) -> bool,
+    // limit the number of tests, since it is SLOW
+    QuickCheck::new().tests(50).quickcheck(
+        a as fn(h: UniPolynomial, n: u8, x: u8, w: u8, randomness_seed: u8, G_seed: u8) -> bool,
     );
 }
 
