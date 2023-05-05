@@ -907,7 +907,7 @@ fn step_10(
 /// * `H_prime` - H', the computed sum from step 7
 /// * `R` - R, commitment from step 3
 /// * `a` - A, the list of hiding commitments for a_i's
-/// * `q` - q, from the protocol represented as seqs of (i, set), s.t. q_i = set
+/// * `q` - q, from the protocol represented as Seq<Seq<u128>>, s.t. sigma(i) = q[i]
 fn step_11(
     n_q: u128,
     n_a: u128,
@@ -915,22 +915,28 @@ fn step_11(
     H_prime: G1,
     R: G1,
     a: Seq<G1>,
-    q: Seq<(u128, Seq<u128>)>,
+    q: Seq<Seq<u128>>,
 ) -> Seq<G1> {
-    let nq_minus1 = n_q - (1 as u128); // TODO should not be decremented here, or in the following steps.
-    let mut qs = Seq::<G1>::create(nq_minus1 as usize);
-    let na_minus1 = n_a - (1 as u128);
+    let mut qs = Seq::<G1>::create(n_q as usize);
+    for i in 0..qs.len() {
+        qs[i] = g1_default();
+    }
 
     // bullet 1
-    for i in 0..(na_minus1 as usize) {
+    for i in 0..(n_a as usize) {
         let a_i = a[i as usize];
-        let sigma_i = sigma(i as u128, q.clone());
+        // let sigma_i = sigma(i as u128, q.clone());
         // TODO is this what is meant by Q_sigma(i) ?
+        let sigma_i = q[i].clone();
         for j in 0..sigma_i.len() {
             let j = sigma_i[j];
             let q_sigma_i = qs[j as usize];
+            println!("==>{}:{},", i, j,);
+            println!("Q_{}: {:?}", i, q_sigma_i);
             let product = g1mul(x1, q_sigma_i);
+            println!("product: {:?}", product);
             qs[j as usize] = g1add(product, a_i);
+            println!("sum: {:?}", qs[j as usize]);
         }
     }
 
@@ -1749,6 +1755,50 @@ fn test_step_5_6_7_8() {
 
 #[cfg(test)]
 #[test]
+fn test_step11() {
+    // TODO dont use dummy values
+    let x1 = Fp::default();
+    let a = Seq::<G1>::create(1);
+    let n_a = u128::TWO();
+    let n_q = u128::TWO();
+    let h_prime = g1_default();
+    let r = g1_default();
+    let q = Seq::create(0);
+    step_11(n_a, n_q, x1, h_prime, r, a, q);
+}
+#[cfg(test)]
+#[test]
+fn test_step_11() {
+    let n_q = 5;
+    let n_a = 3;
+    let x1 = Fp::TWO();
+    let H_prime = g1mul(Fp::TWO(), g1_generator());
+    let R = g1_generator();
+    let a = Seq::<G1>::from_vec(vec![
+        g1mul(Fp::from_literal(2), g1_generator()),
+        g1mul(Fp::from_literal(3), g1_generator()),
+        g1mul(Fp::from_literal(4), g1_generator()),
+    ]);
+    let q = Seq::<Seq<u128>>::from_vec(vec![
+        (Seq::<u128>::from_vec(vec![0])),
+        (Seq::<u128>::from_vec(vec![1, 2, 3])),
+        (Seq::<u128>::from_vec(vec![2, 3, 4])),
+    ]);
+    let Q_s = step_11(n_q, n_a, x1, H_prime, R, a, q);
+
+    // testing BULLET 1
+    // Q_i = [x1]Q_i + A_i, for every time i is in some sigma(j)
+    assert_eq!(g1mul(Fp::from_literal(3), g1_generator()), Q_s[1]);
+    assert_eq!(g1mul(Fp::from_literal(10), g1_generator()), Q_s[2]);
+    assert_eq!(g1mul(Fp::from_literal(10), g1_generator()), Q_s[3]);
+    assert_eq!(g1mul(Fp::from_literal(4), g1_generator()), Q_s[4]);
+
+    // testing BULLET 2
+    // TODO
+}
+
+#[cfg(test)]
+#[test]
 fn testmsm() {
     let fs1 = Seq::<Fp>::from_vec(vec![
         Fp::from_literal(144),
@@ -2125,20 +2175,6 @@ fn test_poly_div() {
     assert_eq!(q[0], Fp::TWO());
     assert_eq!(q[1], Fp::ONE());
     assert!(!check_not_zero(r));
-}
-
-#[cfg(test)]
-#[test]
-fn test_step11() {
-    // TODO dont use dummy values
-    let x1 = Fp::default();
-    let a = Seq::<G1>::create(1);
-    let n_a = u128::TWO();
-    let n_q = u128::TWO();
-    let h_prime = g1_default();
-    let r = g1_default();
-    let q = Seq::create(0);
-    step_11(n_a, n_q, x1, h_prime, r, a, q);
 }
 
 #[cfg(test)]
