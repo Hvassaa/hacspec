@@ -931,12 +931,12 @@ fn step_11(
         for j in 0..sigma_i.len() {
             let j = sigma_i[j];
             let q_sigma_i = qs[j as usize];
-            println!("==>{}:{},", i, j,);
-            println!("Q_{}: {:?}", i, q_sigma_i);
+            // println!("==>{}:{},", i, j,);
+            // println!("Q_{}: {:?}", i, q_sigma_i);
             let product = g1mul(x1, q_sigma_i);
-            println!("product: {:?}", product);
+            // println!("product: {:?}", product);
             qs[j as usize] = g1add(product, a_i);
-            println!("sum: {:?}", qs[j as usize]);
+            // println!("sum: {:?}", qs[j as usize]);
         }
     }
 
@@ -1478,6 +1478,11 @@ extern crate quickcheck_macros;
 use quickcheck::*;
 
 #[cfg(test)]
+use rand::seq::SliceRandom;
+#[cfg(test)]
+use rand::thread_rng;
+
+#[cfg(test)]
 #[derive(Clone, Debug, Default)]
 struct UniPolynomial(Seq<Fp>);
 
@@ -1629,7 +1634,7 @@ fn g1_generator() -> G1 {
 // this hardcoded test for creating a real quickcheck test of step 5,6,7,8
 #[cfg(test)]
 #[quickcheck]
-fn test_s(x: u8, w: u8) -> bool {
+fn test_step_5_6_7_8_manual(x: u8, w: u8) -> bool {
     // h: UniPolynomial,
     // W_power: u8,
     // random_G_power: u8,
@@ -1753,22 +1758,10 @@ fn test_step_5_6_7_8() {
     );
 }
 
+// hardcoded test, results calculated on the "blackboard"
 #[cfg(test)]
 #[test]
-fn test_step11() {
-    // TODO dont use dummy values
-    let x1 = Fp::default();
-    let a = Seq::<G1>::create(1);
-    let n_a = u128::TWO();
-    let n_q = u128::TWO();
-    let h_prime = g1_default();
-    let r = g1_default();
-    let q = Seq::create(0);
-    step_11(n_a, n_q, x1, h_prime, r, a, q);
-}
-#[cfg(test)]
-#[test]
-fn test_step_11() {
+fn test_step_11_manual() {
     let n_q = 5;
     let n_a = 3;
     let x1 = Fp::TWO();
@@ -1787,14 +1780,81 @@ fn test_step_11() {
     let Q_s = step_11(n_q, n_a, x1, H_prime, R, a, q);
 
     // testing BULLET 1
-    // Q_i = [x1]Q_i + A_i, for every time i is in some sigma(j)
+    // Q_i = [x1]Q_i + A_j, for every time i is in some sigma(j)
     assert_eq!(g1mul(Fp::from_literal(3), g1_generator()), Q_s[1]);
     assert_eq!(g1mul(Fp::from_literal(10), g1_generator()), Q_s[2]);
     assert_eq!(g1mul(Fp::from_literal(10), g1_generator()), Q_s[3]);
     assert_eq!(g1mul(Fp::from_literal(4), g1_generator()), Q_s[4]);
 
     // testing BULLET 2
-    // TODO
+    assert_eq!(g1mul(Fp::from_literal(13), g1_generator()), Q_s[0]);
+}
+
+#[cfg(test)]
+#[test]
+fn test_step_11() {
+    fn a(x1: u8, R_power: u8, H_power: u8, a_seed: u8) -> bool {
+        let n_q: u8 = 5;
+        let n_a: u8 = 3;
+
+        let x1 = Fp::from_literal(x1 as u128);
+        let H_prime = g1mul(Fp::from_literal(H_power as u128), g1_generator());
+        let R = g1mul(Fp::from_literal(R_power as u128), g1_generator());
+
+        let mut a = Seq::<G1>::create(n_a as usize);
+        a[0] = g1mul(Fp::from_literal(a_seed as u128), g1_generator());
+        for i in 1..a.len() {
+            a[i] = g1mul(Fp::from_literal(a_seed as u128), a[i - 1]);
+        }
+
+        let mut q = Seq::<Seq<u128>>::create(n_q as usize);
+        q[0] = Seq::<u128>::from_vec(vec![0]);
+        for i in 0..q.len() {
+            let mut v: Vec<u128> = vec![];
+            for j in 0..n_a {
+                v.push(j as u128);
+            }
+            v.shuffle(&mut thread_rng());
+            // TODO only take n_q items
+        }
+        let Q_s = step_11(
+            n_q as u128,
+            n_a as u128,
+            x1,
+            H_prime,
+            R,
+            a.clone(),
+            q.clone(),
+        );
+
+        for i in 0..n_q {
+            let mut Q = g1_default();
+            // BULLET 1
+            // Q_i = [x1]Q_i + A_j, for every time i is in some sigma(j)
+            for j in 0..q.len() {
+                for k in 0..q[j].len() {
+                    if i == q[j][k] as u8 {
+                        Q = g1add(g1mul(x1, Q), a[j]);
+                    }
+                }
+            }
+            // BULLET 2
+            if i == 0 {
+                Q = g1mul(x1.pow(2), Q);
+                Q = g1add(Q, g1mul(x1, H_prime));
+                Q = g1add(Q, R);
+            }
+            if Q != Q_s[i as usize] {
+                return false;
+            }
+        }
+
+        true
+    }
+    // limit the number of tests, since it is SLOW
+    QuickCheck::new()
+        .tests(2)
+        .quickcheck(a as fn(x1: u8, R_power: u8, H_power: u8, a_seed: u8) -> bool);
 }
 
 #[cfg(test)]
