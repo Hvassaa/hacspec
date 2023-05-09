@@ -925,18 +925,13 @@ fn step_11(
     // bullet 1
     for i in 0..(n_a as usize) {
         let a_i = a[i as usize];
-        // let sigma_i = sigma(i as u128, q.clone());
         // TODO is this what is meant by Q_sigma(i) ?
         let sigma_i = q[i].clone();
         for j in 0..sigma_i.len() {
             let j = sigma_i[j];
             let q_sigma_i = qs[j as usize];
-            // println!("==>{}:{},", i, j,);
-            // println!("Q_{}: {:?}", i, q_sigma_i);
             let product = g1mul(x1, q_sigma_i);
-            // println!("product: {:?}", product);
             qs[j as usize] = g1add(product, a_i);
-            // println!("sum: {:?}", qs[j as usize]);
         }
     }
 
@@ -962,7 +957,7 @@ fn step_11(
 /// * `h_prime` - h', the computed polynomial from [step_8]
 /// * `r` - the "random" polynomial from [step_3]
 /// * `a_prime` - a', the list of univariate polys from [step_1]
-/// * `q` - q, from the protocol represented as seqs of (i, set), s.t. q_i = set
+/// * `q` - q, from the protocol represented as Seq<Seq<u128>>, s.t. sigma(i) = q[i]
 fn step_12(
     n_q: u128,
     n_a: u128,
@@ -970,22 +965,19 @@ fn step_12(
     h_prime: Seq<Fp>,
     r: Seq<Fp>,
     a_prime: Seq<Seq<Fp>>,
-    q: Seq<(u128, Seq<u128>)>,
+    q: Seq<Seq<u128>>,
 ) -> Seq<Seq<Fp>> {
-    let nq_minus1 = n_q - (1 as u128);
-    let mut qs = Seq::<Seq<Fp>>::create(nq_minus1 as usize);
+    let mut qs = Seq::<Seq<Fp>>::create(n_q as usize);
 
     // initialize all polys to constant 0
     for i in 0..qs.len() {
         qs[i] = Seq::<Fp>::create(1);
     }
 
-    let na_minus1 = n_a - (1 as u128);
-
     // bullet 1
-    for i in 0..(na_minus1 as usize) {
+    for i in 0..(n_a as usize) {
         let a_i = a_prime[i as usize].clone();
-        let sigma_i = sigma(i as u128, q.clone());
+        let sigma_i = q[i].clone();
         // TODO is this what is meant by Q_sigma(i) ?
         for j in 0..sigma_i.len() {
             let j = sigma_i[j];
@@ -1510,7 +1502,7 @@ impl Arbitrary for UniPolynomial {
 #[cfg(test)]
 impl Arbitrary for SeqOfUniPoly {
     fn arbitrary(g: &mut quickcheck::Gen) -> SeqOfUniPoly {
-        let size = u8::arbitrary(g) % 20;
+        let size = (u8::arbitrary(g) % 100 + 1); // min 1, max 100
         let mut seq_of_uni_poly = Seq::<Seq<Fp>>::create(size as usize);
         for i in 0..size {
             let uni_poly = (UniPolynomial::arbitrary(g));
@@ -1797,8 +1789,8 @@ fn test_step_11() {
         ////////////////////////////////////////////////////////////////////////////////////
         /// SETTING UP THE REQUIRED VALUES (n_a, n_q, x1, H', R, the q list, the A commitemtns), NOT INTERESTING
         ////////////////////////////////////////////////////////////////////////////////////
-        let n_a: u8 = n_a + 1; // make it non-zero
-        let n_q: u8 = n_q + 1; // make it non-zero
+        let n_a: u8 = ((n_a as u128) + 1) as u8; // make it non-zero
+        let n_q: u8 = ((n_q as u128) + 1) as u8; // make it non-zero
         let x1 = Fp::from_literal(x1 as u128);
         let H_prime = g1mul(Fp::from_literal(H_power as u128), g1_generator());
         let R = g1mul(Fp::from_literal(R_power as u128), g1_generator());
@@ -1866,6 +1858,109 @@ fn test_step_11() {
     );
 }
 
+#[cfg(test)]
+#[test]
+fn test_step_12() {
+    fn a(
+        n_a: u8,
+        n_q: u8,
+        x1: u8,
+        r: UniPolynomial,
+        h: UniPolynomial,
+        a_polys: SeqOfUniPoly,
+    ) -> bool {
+        ////////////////////////////////////////////////////////////////////////////////////
+        /// SETTING UP THE REQUIRED VALUES (n_a, n_q, x1, H', R, the q list, the A commitemtns), NOT INTERESTING
+        ////////////////////////////////////////////////////////////////////////////////////
+        let n_a: u8 = ((n_a as u128) + 1) as u8; // make it non-zero
+        let n_q: u8 = ((n_q as u128) + 1) as u8; // make it non-zero
+        let x1 = Fp::from_literal(x1 as u128);
+
+        let mut q = Seq::<Seq<u128>>::create(n_a as usize);
+        // create some random values for q, each entry with len n_q/2
+        q[0] = Seq::<u128>::from_vec(vec![0]); // q[0]={0} by definition
+        for i in 1..q.len() {
+            let mut v: Vec<u128> = vec![];
+            for j in 0..n_q {
+                v.push(j as u128);
+            }
+            v.shuffle(&mut thread_rng());
+            let v = &v[0..((n_q / 2) as usize)];
+            q[i] = Seq::from_vec(v.to_vec());
+        }
+
+        // a_polys is a number of random polys, but there should be n_a of them
+        // (SeqOfUniPoly generates a fixed length seq of polys)
+        let mut a_polys = a_polys.0;
+        if a_polys.len() > n_a as usize {
+            a_polys = Seq::from_vec(a_polys.native_slice()[0..(n_a as usize)].to_vec());
+        } else if a_polys.len() < n_a as usize {
+            let diff = n_a as usize - a_polys.len();
+            for _ in 0..diff {
+                // if wrong size, just use 0
+                a_polys = a_polys.push(&Seq::<Fp>::from_vec(vec![Fp::ZERO()]));
+            }
+        }
+        // println!("{:?}", a_polys);
+        //////////////////////////////////////////////////////////////////////////////////
+        /// SETTING UP VALUES DONE
+        //////////////////////////////////////////////////////////////////////////////////
+        let h = h.0;
+        let r = r.0;
+        let q_s = step_12(
+            n_q as u128,
+            n_a as u128,
+            x1,
+            h.clone(),
+            r.clone(),
+            a_polys.clone(),
+            q.clone(),
+        );
+        // calculate each Q_i and check that it corresponds with the output of step_11
+        for i in 0..n_q {
+            let mut q_poly = Seq::<Fp>::create(1);
+            // BULLET 1
+            // Q_i := [x1]Q_i + A_j, for every time i is in some sigma(j)
+            for j in 0..q.len() {
+                for k in 0..q[j].len() {
+                    if i == q[j][k] as u8 {
+                        q_poly = add_polyx(mul_scalar_polyx(q_poly, x1), a_polys[j].clone())
+                    }
+                }
+            }
+            // BULLET 2
+            // Q_0 := [x1^2]Q_0 + [x1]H' + R
+            if i == 0 {
+                q_poly = mul_scalar_polyx(q_poly, x1.pow(2));
+                q_poly = add_polyx(q_poly, mul_scalar_polyx(h.clone(), x1));
+                q_poly = add_polyx(q_poly, r.clone());
+            }
+            q_poly = trim_poly(q_poly);
+            let expected = trim_poly(q_s[i as usize].clone());
+            if q_poly.len() != expected.len() {
+                return false;
+            }
+            for j in 0..q_poly.len() {
+                if q_poly[j] != expected[j] {
+                    return false;
+                }
+            }
+        }
+
+        true
+    }
+    // limit the number of tests, since it is SLOW
+    QuickCheck::new().tests(5).quickcheck(
+        a as fn(
+            n_a: u8,
+            n_q: u8,
+            x1: u8,
+            r: UniPolynomial,
+            h: UniPolynomial,
+            a_polys: SeqOfUniPoly,
+        ) -> bool,
+    );
+}
 #[cfg(test)]
 #[test]
 fn testmsm() {
