@@ -1797,6 +1797,9 @@ fn test_step_11() {
         let n_q: u8 = 5;
         let n_a: u8 = 3;
 
+        ////////////////////////////////////////////////////////////////////////////////////
+        /// SETTING UP THE REQUIRED VALUES (x1, H', R, the q list, the A commitemtns), NOT INTERESTING
+        ////////////////////////////////////////////////////////////////////////////////////
         let x1 = Fp::from_literal(x1 as u128);
         let H_prime = g1mul(Fp::from_literal(H_power as u128), g1_generator());
         let R = g1mul(Fp::from_literal(R_power as u128), g1_generator());
@@ -1807,16 +1810,21 @@ fn test_step_11() {
             a[i] = g1mul(Fp::from_literal(a_seed as u128), a[i - 1]);
         }
 
-        let mut q = Seq::<Seq<u128>>::create(n_q as usize);
-        q[0] = Seq::<u128>::from_vec(vec![0]);
-        for i in 0..q.len() {
+        let mut q = Seq::<Seq<u128>>::create(n_a as usize);
+        // create some random values for q, each entry with len n_q/2
+        q[0] = Seq::<u128>::from_vec(vec![0]); // q[0]={0} by definition
+        for i in 1..q.len() {
             let mut v: Vec<u128> = vec![];
-            for j in 0..n_a {
+            for j in 0..n_q {
                 v.push(j as u128);
             }
             v.shuffle(&mut thread_rng());
-            // TODO only take n_q items
+            let v = &v[0..((n_q / 2) as usize)];
+            q[i] = Seq::from_vec(v.to_vec());
         }
+        //////////////////////////////////////////////////////////////////////////////////
+        /// SETTING UP VALUES DONE
+        //////////////////////////////////////////////////////////////////////////////////
         let Q_s = step_11(
             n_q as u128,
             n_a as u128,
@@ -1827,10 +1835,11 @@ fn test_step_11() {
             q.clone(),
         );
 
+        // calculate each Q_i and check that it corresponds with the output of step_11
         for i in 0..n_q {
             let mut Q = g1_default();
             // BULLET 1
-            // Q_i = [x1]Q_i + A_j, for every time i is in some sigma(j)
+            // Q_i := [x1]Q_i + A_j, for every time i is in some sigma(j)
             for j in 0..q.len() {
                 for k in 0..q[j].len() {
                     if i == q[j][k] as u8 {
@@ -1839,6 +1848,7 @@ fn test_step_11() {
                 }
             }
             // BULLET 2
+            // Q_0 := [x1^2]Q_0 + [x1]H' + R
             if i == 0 {
                 Q = g1mul(x1.pow(2), Q);
                 Q = g1add(Q, g1mul(x1, H_prime));
