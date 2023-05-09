@@ -1793,13 +1793,12 @@ fn test_step_11_manual() {
 #[cfg(test)]
 #[test]
 fn test_step_11() {
-    fn a(x1: u8, R_power: u8, H_power: u8, a_seed: u8) -> bool {
-        let n_q: u8 = 5;
-        let n_a: u8 = 3;
-
+    fn a(n_a: u8, n_q: u8, x1: u8, R_power: u8, H_power: u8, a_seed: u8) -> bool {
         ////////////////////////////////////////////////////////////////////////////////////
-        /// SETTING UP THE REQUIRED VALUES (x1, H', R, the q list, the A commitemtns), NOT INTERESTING
+        /// SETTING UP THE REQUIRED VALUES (n_a, n_q, x1, H', R, the q list, the A commitemtns), NOT INTERESTING
         ////////////////////////////////////////////////////////////////////////////////////
+        let n_a: u8 = n_a + 1; // make it non-zero
+        let n_q: u8 = n_q + 1; // make it non-zero
         let x1 = Fp::from_literal(x1 as u128);
         let H_prime = g1mul(Fp::from_literal(H_power as u128), g1_generator());
         let R = g1mul(Fp::from_literal(R_power as u128), g1_generator());
@@ -1862,9 +1861,9 @@ fn test_step_11() {
         true
     }
     // limit the number of tests, since it is SLOW
-    QuickCheck::new()
-        .tests(2)
-        .quickcheck(a as fn(x1: u8, R_power: u8, H_power: u8, a_seed: u8) -> bool);
+    QuickCheck::new().tests(1).quickcheck(
+        a as fn(n_a: u8, n_q: u8, x1: u8, R_power: u8, H_power: u8, a_seed: u8) -> bool,
+    );
 }
 
 #[cfg(test)]
