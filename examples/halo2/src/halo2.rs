@@ -1097,9 +1097,6 @@ fn step_14(
         let mut divisor: Seq<Fp> = Seq::<Fp>::create(q_i.len() + 1 as usize);
         divisor[0] = Fp::ONE();
 
-        // println!("devisor before");
-
-        // println!("{:?}", divisor);
         for j in 0..(q_i.len()) {
             let q_i_j = q_i[j];
             let scalar = omega.pow(q_i_j).mul(x);
@@ -1107,15 +1104,9 @@ fn step_14(
             let divisor_mul_scalar = mul_scalar_polyx(divisor.clone(), scalar.neg());
             divisor = add_polyx(divisor_mul_x, divisor_mul_scalar);
         }
-        // println!("{:?}", q_i_sub_r_i);
-        // println!("devisor");
 
-        // println!("{:?}", divisor);
+        let (divided_poly, remainder) = divide_poly(q_i_sub_r_i.clone(), divisor); // TODO what to do with remainder?
 
-        let (divided_poly, remainder) = divide_poly(q_i_sub_r_i, divisor); // TODO what to do with remainder?
-                                                                           // println!("divided");
-
-        // println!("{:?}", divided_poly);
         let multed_poly = mul_scalar_polyx(divided_poly, x2_powered);
 
         q_prime = add_polyx(q_prime, multed_poly);
@@ -1677,20 +1668,15 @@ fn test_step_5_6_7_8_manual(x: u8, w: u8) -> bool {
 
     let h_s = step_5(h, n);
     let H_s = step_6(h_s.clone(), &(G.clone(), W), randomness.clone());
-    // println!("===>h_s len: {:?}, H_s len: {}", h_s.len(), H_s.len());
     let H_prime = step_7(H_s, x, n);
     let h_prime = step_8(h_s, x, n);
 
     let mut randomness_sum = Fp::ZERO();
     for i in 0..randomness.len() {
         let x_pow_ni = x.pow(n * (i as u128));
-        // println!("SUM {}", (randomness[i] * x_pow_ni));
         randomness_sum = randomness_sum + (randomness[i] * x_pow_ni);
     }
-    // println!("{}", randomness_sum);
     let h_prime_com = commit_polyx(&(G, W), h_prime, randomness_sum);
-    // println!("{:?}", H_prime);
-    // println!("{:?}", h_prime_com);
     assert_eq!(H_prime, h_prime_com);
     H_prime == h_prime_com
 }
@@ -1889,8 +1875,14 @@ fn test_step_12() {
         ////////////////////////////////////////////////////////////////////////////////////
         /// SETTING UP THE REQUIRED VALUES (n_a, n_q, x1, H', R, the q list, the A commitemtns), NOT INTERESTING
         ////////////////////////////////////////////////////////////////////////////////////
-        let n_a: u8 = ((n_a as u128) + 1) as u8; // make it non-zero
-        let n_q: u8 = ((n_q as u128) + 1) as u8; // make it non-zero
+        let mut n_a: u8 = n_a; // make it non-zero
+        if n_a == 0 {
+            n_a = 1;
+        }
+        let mut n_q: u8 = n_q; // make it non-zero
+        if n_q == 0 {
+            n_q = 1;
+        }
         let x1 = Fp::from_literal(x1 as u128);
 
         let mut q = Seq::<Seq<u128>>::create(n_a as usize);
@@ -1966,7 +1958,7 @@ fn test_step_12() {
         true
     }
     // limit the number of tests, since it is SLOW
-    QuickCheck::new().tests(5).quickcheck(
+    QuickCheck::new().tests(100).quickcheck(
         a as fn(
             n_a: u8,
             n_q: u8,
@@ -2273,156 +2265,150 @@ fn test_step_14() {
         r_polys: SeqOfUniPoly,
         r: u8,
         omega: u8,
+        G_seed: u8,
     ) -> bool {
         ////////////////////////////////////////////////////////////////////////////////////
         /// SETTING UP THE REQUIRED VALUES (n_a, n_q, x1, H', R, the q list, the A commitemtns), NOT INTERESTING
         ////////////////////////////////////////////////////////////////////////////////////
-        let w = 3;
+        // let w = 3;
         // W and G from CRS
         let W = g1mul(Fp::from_literal(w as u128), g1_generator());
-        // there should be as many G elements as there are elements in the h_i polys
-        let G = Seq::<G1>::from_vec(vec![
-            g1mul(Fp::ONE(), g1_generator()),
-            g1mul(Fp::TWO(), g1_generator()),
-            g1mul(Fp::from_literal(3), g1_generator()),
-            g1mul(Fp::from_literal(4), g1_generator()),
-        ]);
+        // there should be as many G elements as there are elements in the polys
+        // let G = Seq::<G1>::from_vec(vec![
+        //     g1mul(Fp::ONE(), g1_generator()),
+        //     g1mul(Fp::TWO(), g1_generator()),
+        //     g1mul(Fp::from_literal(3), g1_generator()),
+        //     g1mul(Fp::from_literal(4), g1_generator()),
+        // ]);
         // let crs: CRS = (G, W);
 
-        // let x2 = Fp::from_literal(x as u128);
-        let x = Fp::TWO(); // Dummy
+        let x = Fp::from_literal(x as u128);
+        // let x = Fp::TWO(); // Dummy
 
-        let x2 = x.mul(x);
+        let x2 = x.mul(x.add(Fp::TWO().pow(19)));
 
         let omega: Fp = Fp::TWO();
 
-        // let n_q = ((n_a as u128) + 1); // make it non-zero
-        let n_q = 3; // Dummy
+        // let n_q = ((n_q as u128) + 1); // make it non-zero
+        // let n_q = 3; // Dummy
+        let r_polys = r_polys.0;
+        let q_polys = q_polys.0;
 
         // let n_e = ((n_q as u128) + 1); // make it non-zero
-        let q_polys: Seq<Seq<Fp>> = Seq::<Seq<Fp>>::from_vec(vec![
-            Seq::from_vec(vec![
-                Fp::from_literal(1),
-                Fp::from_literal(2),
-                Fp::from_literal(3),
-            ]),
-            Seq::from_vec(vec![
-                Fp::from_literal(4),
-                Fp::from_literal(5),
-                Fp::from_literal(6),
-            ]),
-            Seq::from_vec(vec![
-                Fp::from_literal(7),
-                Fp::from_literal(8),
-                Fp::from_literal(9),
-            ]),
-        ]);
-        let r_polys: Seq<Seq<Fp>> = Seq::<Seq<Fp>>::from_vec(vec![
-            Seq::from_vec(vec![
-                Fp::from_literal(9),
-                Fp::from_literal(8),
-                Fp::from_literal(7),
-            ]),
-            Seq::from_vec(vec![
-                Fp::from_literal(6),
-                Fp::from_literal(5),
-                Fp::from_literal(4),
-            ]),
-            Seq::from_vec(vec![
-                Fp::from_literal(3),
-                Fp::from_literal(2),
-                Fp::from_literal(1),
-            ]),
-        ]);
-        // let r = Fp::from_literal(r as u128);
-        let r = Fp::ONE(); // Dummy
+        // let q_polys: Seq<Seq<Fp>> = Seq::<Seq<Fp>>::from_vec(vec![
+        //     Seq::from_vec(vec![
+        //         Fp::from_literal(1),
+        //         Fp::from_literal(2),
+        //         Fp::from_literal(3),
+        //     ]),
+        //     Seq::from_vec(vec![
+        //         Fp::from_literal(4),
+        //         Fp::from_literal(5),
+        //         Fp::from_literal(6),
+        //     ]),
+        //     Seq::from_vec(vec![
+        //         Fp::from_literal(7),
+        //         Fp::from_literal(8),
+        //         Fp::from_literal(9),
+        //     ]),
+        // ]);
+        // let r_polys: Seq<Seq<Fp>> = Seq::<Seq<Fp>>::from_vec(vec![
+        //     Seq::from_vec(vec![
+        //         Fp::from_literal(9),
+        //         Fp::from_literal(8),
+        //         Fp::from_literal(7),
+        //     ]),
+        //     Seq::from_vec(vec![
+        //         Fp::from_literal(6),
+        //         Fp::from_literal(5),
+        //         Fp::from_literal(4),
+        //     ]),
+        //     Seq::from_vec(vec![
+        //         Fp::from_literal(3),
+        //         Fp::from_literal(2),
+        //         Fp::from_literal(1),
+        //     ]),
+        // ]);
+        let r = Fp::from_literal(r as u128);
+        let mut n_q = q_polys.len() as u128;
+        if n_q > r_polys.len() as u128 {
+            n_q = r_polys.len() as u128
+        }
+        // let r = Fp::ONE(); // Dummy
 
         // create some random values for q, each entry with len n_q/2
-        let q = Seq::<Seq<u128>>::from_vec(vec![
-            Seq::from_vec(vec![0]),
-            Seq::from_vec(vec![0, 1, 2]),
-            Seq::from_vec(vec![0, 1, 2]),
-        ]);
+        let mut q = Seq::<Seq<u128>>::create(n_q as usize);
+        q[0] = Seq::<u128>::from_vec(vec![0]); // q[0]={0} by definition
+        for i in 1..q.len() {
+            let mut v: Vec<u128> = vec![];
+            for j in 0..n_q {
+                v.push(j as u128);
+            }
+            v.shuffle(&mut thread_rng());
+            let v = &v[0..((n_q / 2) as usize)];
+            q[i] = Seq::from_vec(v.to_vec());
+        }
 
         //////////////////////////////////////////////////////////////////////////////////
         /// SETTING UP VALUES DONE
         //////////////////////////////////////////////////////////////////////////////////
-        let q_prime: G1 = step_14(&(G.clone(), W), x2, n_q, q_polys, r_polys, q, r, omega, x);
 
         //////////////////////////////////////////////////////////////////////////////////
         /// MANUEL CALCULATION
         //////////////////////////////////////////////////////////////////////////////////
+        let mut sum_result = Seq::from_vec(vec![Fp::from_literal(0)]);
 
-        /// i = 0 in outer sum
-        let mut i_0_dividend = sub_polyx(
-            Seq::from_vec(vec![
-                Fp::from_literal(1),
-                Fp::from_literal(2),
-                Fp::from_literal(3),
-            ]),
-            Seq::from_vec(vec![
-                Fp::from_literal(9),
-                Fp::from_literal(8),
-                Fp::from_literal(7),
-            ]),
+        for i in 0..(n_q as usize) as usize {
+            let dividend_lhs: Seq<Fp> = mul_scalar_polyx(q_polys[i].clone(), x2.pow(i as u128));
+            let dividend_rhs: Seq<Fp> = mul_scalar_polyx(r_polys[i].clone(), x2.pow(i as u128));
+            let dividend: Seq<Fp> = sub_polyx(dividend_lhs, dividend_rhs);
+
+            let q_i = q[i].clone();
+            let n_e = q[i].len();
+            // let mut divisor: Seq<Fp> = Seq::from_vec(vec![Fp::from_literal(1)]);
+            let mut divisor: Seq<Fp> = Seq::<Fp>::create(q_i.len() + 1 as usize);
+            divisor[0] = Fp::ONE();
+
+            for j in 0..n_e as usize {
+                let divisor_lhs: Seq<Fp> = multi_poly_with_x(divisor.clone());
+                let q_i_j: u128 = q_i[j];
+                let rhs_scalar: Fp = omega.pow(q_i_j).mul(x).neg();
+                let divisor_rhs_mult: Seq<Fp> = mul_scalar_polyx(divisor, rhs_scalar);
+                divisor = add_polyx(divisor_lhs, divisor_rhs_mult);
+            }
+            let division: Seq<Fp> = divide_poly(dividend.clone(), divisor).0;
+
+            sum_result = add_polyx(sum_result, division);
+        }
+
+        //////////////////////////////
+        /// CREATE G WITH CORRECT LENGTH - NEEDS TO BE SAME LENGTH AS POLY YOU WANT TO COMMIT TO
+        //////////////////////////////
+        let mut G = Seq::<G1>::create(sum_result.clone().len());
+        let G_seed = Fp::from_literal(G_seed as u128 + 1); // +1, so it non-zero
+
+        // create some "randomness" for G
+        G[0] = g1mul(G_seed, g1_generator());
+        for i in 1..G.len() {
+            G[i] = g1mul(G_seed, G[i - 1]);
+        }
+        /////////////////////////////
+        /// FINISHED CREATHING G
+        /////////////////////////////
+        let q_prime_test = commit_polyx(&(G.clone(), W), sum_result, r);
+        let q_prime: G1 = step_14(
+            &(G.clone(), W),
+            x2,
+            n_q,
+            q_polys.clone(),
+            r_polys.clone(),
+            q.clone(),
+            r,
+            omega,
+            x,
         );
-        let i_0_divisor = Seq::from_vec(vec![Fp::from_literal(2).neg(), Fp::from_literal(1)]);
-        let i_0_division = divide_poly(i_0_dividend, i_0_divisor).0;
-        let i_0 = mul_scalar_polyx(i_0_division, Fp::ONE());
 
-        // i = 1 in outer sum
-        let i_1_dividend: Seq<Fp> = sub_polyx(
-            Seq::from_vec(vec![
-                Fp::from_literal(4),
-                Fp::from_literal(5),
-                Fp::from_literal(6),
-            ]),
-            Seq::from_vec(vec![
-                Fp::from_literal(6),
-                Fp::from_literal(5),
-                Fp::from_literal(4),
-            ]),
-        );
-        let mut i_1_divisor = Seq::from_vec(vec![
-            Fp::from_literal(1),
-            Fp::from_literal(0),
-            Fp::from_literal(0),
-            Fp::from_literal(0),
-        ]);
-        let mul_x = multi_poly_with_x(i_1_divisor.clone());
-        let mul_scalar: Seq<Fp> = mul_scalar_polyx(i_1_divisor.clone(), Fp::from_literal(2).neg());
-        i_1_divisor = add_polyx(mul_x, mul_scalar);
-
-        let mul_x = multi_poly_with_x(i_1_divisor.clone());
-        let mul_scalar: Seq<Fp> = mul_scalar_polyx(i_1_divisor, Fp::from_literal(4).neg());
-        i_1_divisor = add_polyx(mul_x, mul_scalar);
-
-        let mul_x = multi_poly_with_x(i_1_divisor.clone());
-        let mul_scalar: Seq<Fp> = mul_scalar_polyx(i_1_divisor.clone(), Fp::from_literal(8).neg());
-        i_1_divisor = add_polyx(mul_x, mul_scalar);
-
-        let i_1_division = divide_poly(i_1_dividend, i_1_divisor.clone()).0;
-        let i_1 = mul_scalar_polyx(i_1_division, Fp::from_literal(4));
-
-        // i=2 in outer sum
-
-        let i_2_dividend: Seq<Fp> = sub_polyx(
-            Seq::from_vec(vec![
-                Fp::from_literal(7),
-                Fp::from_literal(8),
-                Fp::from_literal(9),
-            ]),
-            Seq::from_vec(vec![
-                Fp::from_literal(3),
-                Fp::from_literal(2),
-                Fp::from_literal(1),
-            ]),
-        );
-        let i_2_division = divide_poly(i_2_dividend, i_1_divisor).0;
-        let i_2 = mul_scalar_polyx(i_2_division, Fp::from_literal(16));
-        let result = add_polyx(i_0, add_polyx(i_1, i_2));
-        let commitment: (FpCurve, FpCurve, bool) = commit_polyx(&(G.clone(), W), result, r);
-        assert_eq!(commitment, q_prime);
+        assert_eq!(q_prime, q_prime_test);
         true
     }
     // limit the number of tests, since it is SLOW
@@ -2435,8 +2421,31 @@ fn test_step_14() {
             r_polys: SeqOfUniPoly,
             r: u8,
             omega: u8,
+            G_seed: u8,
         ) -> bool,
     );
+}
+
+#[cfg(test)]
+#[test]
+fn test_step_16() {
+    fn a(x3: u8, q_polys: SeqOfUniPoly) -> bool {
+        let q_polys: Seq<Seq<Fp>> = q_polys.0;
+        let n_q: u128 = q_polys.len() as u128;
+        let x3: Fp = Fp::from_literal(x3 as u128);
+        let u: Seq<Fp> = step_16(n_q, x3, q_polys.clone());
+        for i in 0..u.len() as usize {
+            let u_i: Fp = u[i];
+            let q_i: Seq<Fp> = q_polys[i].clone();
+            let q_i_eval: Fp = eval_polyx(q_i, x3);
+            assert_eq!(u_i, q_i_eval);
+        }
+        true
+    }
+    // limit the number of tests, since it is SLOW
+    QuickCheck::new()
+        .tests(50)
+        .quickcheck(a as fn(x3: u8, q_polys: SeqOfUniPoly) -> bool);
 }
 
 #[cfg(test)]
@@ -2469,9 +2478,6 @@ fn testmsm() {
     let msm_sum = g1add(msmed1, msmed2);
     let mut fs_sum = add_polyx(fs1, fs2);
     let sum_sum = msm(fs_sum, gs);
-
-    println!("{:?}", msm_sum);
-    println!("{:?}", sum_sum);
 }
 
 #[cfg(test)]
@@ -2817,20 +2823,6 @@ fn test_poly_div() {
     assert_eq!(q[0], Fp::TWO());
     assert_eq!(q[1], Fp::ONE());
     assert!(!check_not_zero(r));
-}
-
-#[cfg(test)]
-#[test]
-fn test_step12() {
-    // TODO dont use dummy values
-    let x1 = Fp::default();
-    let a = Seq::create(0);
-    let n_a = u128::TWO();
-    let n_q = u128::ONE();
-    let h_prime = Seq::create(0);
-    let r = Seq::create(0);
-    let q = Seq::create(0);
-    step_12(n_a, n_q, x1, h_prime, r, a, q);
 }
 
 #[cfg(test)]
