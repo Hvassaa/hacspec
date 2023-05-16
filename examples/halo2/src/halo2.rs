@@ -1262,7 +1262,6 @@ fn step_19(x4: Fp, q_prime: Seq<Fp>, q_polys: Seq<Seq<Fp>>) -> Seq<Fp> {
 /// * `r` - randomness for commiting
 fn step_20(s: Seq<Fp>, crs: CRS, r: Fp) -> G1 {
     let S = commit_polyx(&crs, s, r);
-
     S
 }
 
@@ -2422,6 +2421,29 @@ fn test_step_19() {
     QuickCheck::new()
         .tests(50)
         .quickcheck(a as fn(x4: u8, q_prime: UniPolynomial, q_polys: SeqOfUniPoly) -> bool);
+}
+
+#[cfg(test)]
+#[test]
+fn test_step_22() {
+    fn a(p_val: u8, g0_val: u8, s_val: u8, v_val: u8, xi_val: u8) -> bool {
+        let p: G1 = g1mul(Fp::from_literal(p_val as u128), g1_generator());
+        let g0: G1 = g1mul(Fp::from_literal(g0_val as u128), g1_generator());
+        let s: G1 = g1mul(Fp::from_literal(s_val as u128), g1_generator());
+        let v: Fp = Fp::from_literal(v_val as u128);
+        let xi: Fp = Fp::from_literal(xi_val as u128);
+
+        let test_result = g1add(p, g1add(g1neg(g1mul(v, g0)), g1mul(xi, s)));
+
+        let p_prime: G1 = step_22(p, g0, s, v, xi);
+
+        assert_eq!(p_prime, test_result);
+
+        true
+    }
+    QuickCheck::new()
+        .tests(50)
+        .quickcheck(a as fn(p_val: u8, g0_val: u8, s_val: u8, v_val: u8, xi_val: u8) -> bool);
 }
 
 #[cfg(test)]
