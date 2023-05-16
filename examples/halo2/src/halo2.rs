@@ -2433,7 +2433,7 @@ fn test_step_22() {
         let v: Fp = Fp::from_literal(v_val as u128);
         let xi: Fp = Fp::from_literal(xi_val as u128);
 
-        let test_result = g1add(p, g1add(g1neg(g1mul(v, g0)), g1mul(xi, s)));
+        let test_result: G1 = g1add(p, g1add(g1neg(g1mul(v, g0)), g1mul(xi, s)));
 
         let p_prime: G1 = step_22(p, g0, s, v, xi);
 
@@ -2444,6 +2444,30 @@ fn test_step_22() {
     QuickCheck::new()
         .tests(50)
         .quickcheck(a as fn(p_val: u8, g0_val: u8, s_val: u8, v_val: u8, xi_val: u8) -> bool);
+}
+
+#[cfg(test)]
+#[test]
+fn test_step_23() {
+    fn a(p: UniPolynomial, s: UniPolynomial, x3: u8, xi: u8) -> bool {
+        let p: Seq<Fp> = p.0;
+        let s: Seq<Fp> = s.0;
+        let x3: Fp = Fp::from_literal(x3 as u128);
+        let xi: Fp = Fp::from_literal(xi as u128);
+        let test_result = add_polyx(
+            add_scalar_polyx(p.clone(), eval_polyx(p.clone(), x3).neg()),
+            mul_scalar_polyx(s.clone(), xi),
+        );
+        let p_prime: Seq<Fp> = step_23(p, s, x3, xi);
+        assert_eq!(p_prime.len(), test_result.len());
+        for i in 0..p_prime.len() {
+            assert_eq!(p_prime[i], test_result[i])
+        }
+        true
+    }
+    QuickCheck::new()
+        .tests(50)
+        .quickcheck(a as fn(p: UniPolynomial, s: UniPolynomial, x3: u8, xi: u8) -> bool);
 }
 
 #[cfg(test)]
