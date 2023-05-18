@@ -1165,7 +1165,7 @@ fn step_18(
     let v = Fp::ZERO();
 
     let mut P_sum = g1_default();
-    for i in 0..n_q as usize - 1 {
+    for i in 0..n_q {
         let Q_i = Q[i];
         let term = g1mul(x4.pow(i as u128), Q_i);
         P_sum = g1add(P_sum, term)
@@ -1183,18 +1183,19 @@ fn step_18(
         let r_i_x3: Fp = eval_polyx(r_i, x3);
         let numerator: Fp = u_i - r_i_x3;
         let mut product: Fp = Fp::ONE();
-        for j in 0..n_e as usize - 1 {
+        for j in 0..n_e {
             let q_i_j: u128 = q_i[j];
             let rhs = omega.pow(q_i_j) * x;
             let term = x3 - rhs;
             product = product * term;
         }
-        let sum_term: Fp = x2 * (numerator / product);
+        let sum_term: Fp = x2.pow(i as u128) * (numerator / product);
+
         v_first_sum = v_first_sum + sum_term;
     }
 
     let mut v_second_sum: Fp = Fp::ZERO();
-    for i in 0..n_q as usize - 1 {
+    for i in 0..n_q {
         let u_i: Fp = u[i];
         let term: Fp = x4 * u_i;
         v_second_sum = v_second_sum + term;
@@ -2385,35 +2386,224 @@ fn test_step_16() {
         .quickcheck(a as fn(x3: u8, q_polys: SeqOfUniPoly) -> bool);
 }
 
-// #[cfg(test)]
-// #[test]
-// fn test_step_18() {
-//     fn a(
-//         x: Fp,
-//         x1: Fp,
-//         x2: Fp,
-//         x3: Fp,
-//         x4: Fp,
-//         omega: Fp,
-//         Q_prime: G1,
-//         Q: Seq<G1>,
-//         u: Seq<Fp>,
-//         r: Seq<Seq<Fp>>,
-//         q: Seq<Seq<u128>>,
-//     ) -> bool {
-//         let x: Fp = Fp::from_literal(83729);
-//         let x1: Fp = Fp::from_literal(1209837);
-//         let x2: Fp = Fp::from_literal(5423890);
-//         let x3: Fp = Fp::from_literal(2);
-//         let x4: Fp = Fp::from_literal(2340938);
+#[cfg(test)]
+#[test]
+fn test_step_18_manuel() {
+    let x: Fp = Fp::from_literal(83729);
+    let x1: Fp = Fp::from_literal(1209837);
+    let x2: Fp = Fp::from_literal(5423890);
+    let x3: Fp = Fp::from_literal(2);
+    let x4: Fp = Fp::from_literal(2340938);
+    let omega: Fp = Fp::from_literal(929392);
+    let Q_prime: G1 = g1mul(Fp::from_literal(123231), g1_generator());
+    let Q: Seq<G1> = Seq::<G1>::from_vec(vec![
+        g1mul(Fp::from_literal(2), g1_generator()),
+        g1mul(Fp::from_literal(3), g1_generator()),
+        g1mul(Fp::from_literal(4), g1_generator()),
+    ]);
+    let q: Seq<Seq<u128>> = Seq::<Seq<u128>>::from_vec(vec![
+        (Seq::<u128>::from_vec(vec![0])),
+        (Seq::<u128>::from_vec(vec![1, 2, 0])),
+        (Seq::<u128>::from_vec(vec![2, 0, 2])),
+    ]);
+    let u: Seq<Fp> = Seq::<Fp>::from_vec(vec![
+        Fp::from_literal(2123),
+        Fp::from_literal(0),
+        Fp::from_literal(2),
+    ]);
+    let r: Seq<Seq<Fp>> = Seq::<Seq<Fp>>::from_vec(vec![
+        (Seq::<Fp>::from_vec(vec![
+            Fp::from_literal(123),
+            Fp::from_literal(4322),
+            Fp::from_literal(99283),
+        ])),
+        (Seq::<Fp>::from_vec(vec![
+            Fp::from_literal(2839),
+            Fp::from_literal(2123),
+            Fp::from_literal(0),
+        ])),
+        (Seq::<Fp>::from_vec(vec![
+            Fp::from_literal(1919919191),
+            Fp::from_literal(0),
+            Fp::from_literal(11183),
+        ])),
+    ]);
 
-//         true
-//     }
+    let P_sum_0: (FpCurve, FpCurve, bool) = Q[0];
+    let P_sum_1: (FpCurve, FpCurve, bool) = g1mul(x4, Q[1]);
+    let P_sum_2: (FpCurve, FpCurve, bool) = g1mul(x4.pow(2), Q[2]);
+    let P_sum: (FpCurve, FpCurve, bool) = g1add(g1add(P_sum_0, P_sum_1), P_sum_2);
+    let P_test: (FpCurve, FpCurve, bool) = g1add(g1mul(x4, P_sum), Q_prime);
+    let (P, v) = step_18(
+        x,
+        x1,
+        x2,
+        x3,
+        x4,
+        omega,
+        Q_prime,
+        Q,
+        u.clone(),
+        r.clone(),
+        q,
+    );
+    assert_eq!(P_test, P);
+    //Calculate v
+    let r_clone: Seq<Seq<Fp>> = r.clone();
+    let first_sum_0_dividend = u[0]
+        - eval_polyx(
+            Seq::<Fp>::from_vec(vec![
+                Fp::from_literal(123),
+                Fp::from_literal(4322),
+                Fp::from_literal(99283),
+            ]),
+            x3,
+        );
+    let mut first_sum_0_divisor: Fp = x3 - x;
+    let first_sum_0: Fp = first_sum_0_dividend / first_sum_0_divisor;
 
-//     QuickCheck::new()
-//         .tests(50)
-//         .quickcheck(a as fn(x4: u8, q_prime: UniPolynomial, q_polys: SeqOfUniPoly) -> bool);
-// }
+    let first_sum_1_dividend = u[1]
+        - eval_polyx(
+            Seq::<Fp>::from_vec(vec![
+                Fp::from_literal(2839),
+                Fp::from_literal(2123),
+                Fp::from_literal(0),
+            ]),
+            x3,
+        );
+
+    let mut first_sum_1_divisor: Fp = x3 - (omega * x);
+    first_sum_1_divisor = first_sum_1_divisor * (x3 - (omega.pow(2) * x));
+    first_sum_1_divisor = first_sum_1_divisor * (x3 - x);
+    let first_sum_1: Fp = x2 * (first_sum_1_dividend / first_sum_1_divisor);
+
+    let first_sum_2_dividend = u[2]
+        - eval_polyx(
+            Seq::<Fp>::from_vec(vec![
+                Fp::from_literal(1919919191),
+                Fp::from_literal(0),
+                Fp::from_literal(11183),
+            ]),
+            x3,
+        );
+
+    let mut first_sum_2_divisor: Fp = (x3 - (omega.pow(2) * x));
+    first_sum_2_divisor = first_sum_2_divisor * (x3 - x);
+    first_sum_2_divisor = first_sum_2_divisor * (x3 - (omega.pow(2) * x));
+    let first_sum_2: Fp = x2.pow(2) * (first_sum_2_dividend / first_sum_2_divisor);
+
+    let first_sum: Fp = first_sum_0 + first_sum_1 + first_sum_2;
+
+    let second_sum_0: Fp = x4 * u[0];
+    let second_sum_1: Fp = x4 * u[1];
+    let second_sum_2: Fp = x4 * u[2];
+
+    let second_sum: Fp = x4 * (second_sum_0 + second_sum_1 + second_sum_2);
+
+    let test_v: Fp = first_sum + second_sum;
+
+    assert_eq!(test_v, v)
+}
+
+#[cfg(test)]
+#[test]
+fn test_step_18() {
+    fn a(rnd1: u8, rnd2: u8, omega: u8, r: SeqOfUniPoly) -> bool {
+        let r: Seq<Seq<Fp>> = r.0;
+        let n_q: usize = r.len();
+        let mut x1: Fp = Fp::from_literal(rnd1 as u128).pow(123);
+        if x1 == Fp::ZERO() {
+            x1 = Fp::ONE()
+        }
+        let mut x2: Fp = x1.pow(rnd1 as u128);
+        if x2 == Fp::ZERO() {
+            x2 = Fp::ONE()
+        }
+        let mut x3: Fp = x2 + x1 + Fp::from_literal(rnd2 as u128 + 7).pow(42);
+        if x3 == Fp::ZERO() {
+            x3 = Fp::ONE()
+        }
+        let mut x4: Fp = x1 * x2 + Fp::from_literal(929299292);
+        if x4 == Fp::ZERO() {
+            x4 = Fp::ONE()
+        }
+        let mut x: Fp = Fp::from_literal(rnd1 as u128);
+        if x == Fp::ZERO() {
+            x = Fp::ONE()
+        }
+        let mut omega: Fp = Fp::from_literal(omega as u128);
+        if omega == Fp::ZERO() {
+            omega = Fp::from_literal(123)
+        }
+        let Q_prime: G1 = g1mul(Fp::from_literal(rnd2 as u128), g1_generator());
+        let mut Q: Seq<(FpCurve, FpCurve, bool)> = Seq::<G1>::create(n_q);
+        for i in 0..n_q {
+            let g1_seed: Fp = Fp::from_literal(rnd1 as u128 % (i + 1) as u128).pow(rnd2 as u128);
+            Q[i] = g1mul(g1_seed, g1_generator());
+        }
+        let mut u: Seq<Fp> = Seq::<Fp>::create(n_q);
+        for i in 0..n_q {
+            let random_Fp: Fp = Fp::from_literal(rnd2 as u128 % (i + 1) as u128).pow(rnd1 as u128);
+            u[i] = random_Fp;
+        }
+
+        let mut q: Seq<Seq<u128>> = Seq::<Seq<u128>>::create(n_q as usize);
+        q[0] = Seq::<u128>::from_vec(vec![0]); // q[0]={0} by definition
+        for i in 1..q.len() {
+            let mut v: Vec<u128> = vec![];
+            for j in 0..n_q {
+                v.push(j as u128);
+            }
+            v.shuffle(&mut thread_rng());
+            let v = &v[0..((n_q / 2) as usize)];
+            q[i] = Seq::from_vec(v.to_vec());
+        }
+        let (P, v) = step_18(
+            x,
+            x1,
+            x2,
+            x3,
+            x4,
+            omega,
+            Q_prime,
+            Q.clone(),
+            u.clone(),
+            r.clone(),
+            q.clone(),
+        );
+
+        ///////////TEST IMPLEMENTATION FOR P////////////////////
+        let mut test_P: G1 = Q_prime;
+        for i in 0..n_q {
+            test_P = g1add(test_P, g1mul(x4.pow(i as u128 + 1), Q[i]));
+        }
+        let mut test_v = Fp::ZERO();
+        assert_eq!(P, test_P);
+        ////////////TEST IMPLEMENTATION FOR v//////////////////
+        // let mut second_sum: Fp = Fp::ZERO();
+        let mut first_sum: Fp = Fp::ZERO();
+        let mut second_sum: Fp = Fp::ZERO();
+        for i in 0..n_q {
+            let first_sum_dividend: Fp = x2.pow(i as u128) * (u[i] - eval_polyx(r[i].clone(), x3));
+            let q_i = q[i].clone();
+            let mut first_sum_divisor = Fp::ONE();
+            for j in 0..q_i.len() {
+                first_sum_divisor = first_sum_divisor * (x3 - omega.pow(q_i[j]) * x);
+            }
+            second_sum = second_sum + x4 * x4 * u[i];
+            first_sum = first_sum + (first_sum_dividend / first_sum_divisor);
+        }
+        let test_v: Fp = first_sum + second_sum;
+
+        assert_eq!(v, test_v);
+
+        true
+    }
+    // limit the number of tests, since it is SLOW
+    QuickCheck::new()
+        .tests(5)
+        .quickcheck(a as fn(rnd1: u8, rnd2: u8, omega: u8, r: SeqOfUniPoly) -> bool);
+}
 
 #[cfg(test)]
 #[test]
