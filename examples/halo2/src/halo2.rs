@@ -679,22 +679,28 @@ fn sigma(i: u128, q: Seq<(u128, Seq<u128>)>) -> Seq<u128> {
 /// * `z` - the challenge z from step 21
 /// * `U` - group element U from pp
 /// * `W` - group element W from pp
-fn calculate_L_or_R(p_part: Seq<Fp>, b_part: Seq<Fp>, g_part: Seq<G1>, z: Fp, U: G1, W: G1) -> G1 {
+fn calculate_L_or_R(
+    p_part: Seq<Fp>,
+    b_part: Seq<Fp>,
+    g_part: Seq<G1>,
+    z: Fp,
+    U: G1,
+    W: G1,
+    blinding: Fp,
+) -> G1 {
     // <p'_part, G'_part>
-    let p_g_msm = msm(p_part.clone(), g_part);
+    let p_g_msm: G1 = msm(p_part.clone(), g_part);
 
-    let p_b_ip = inner_product(p_part, b_part);
-    let z_ip = z * p_b_ip;
+    let p_b_ip: Fp = inner_product(p_part, b_part);
+    let z_ip: Fp = z * p_b_ip;
     // [z<p'_part, b_part>]U
-    let z_ip_U = g1mul(z_ip, U);
-
-    let r = Fp::ZERO(); // TODO use real randomness
+    let z_ip_U: G1 = g1mul(z_ip, U);
 
     // [*]W
-    let multed_W = g1mul(r, W);
+    let multed_W: G1 = g1mul(blinding, W);
 
     // calculate part j (L_j or R_j)
-    let mut part_j = g1add(p_g_msm, z_ip_U);
+    let mut part_j: G1 = g1add(p_g_msm, z_ip_U);
     part_j = g1add(part_j, multed_W);
 
     part_j
@@ -1307,6 +1313,12 @@ fn step_23(p: Seq<Fp>, s: Seq<Fp>, x3: Fp, xi: Fp) -> Seq<Fp> {
 /// * `n` - n from the protocol preamble
 /// * `k` - k from the protocol preamble
 /// * `u` - the list of u_j challenges from the verifier // TODO maybe should be interactive
+///
+/// # Returns
+/// * `p_prime` - `Seq<Fp>`
+/// * `G_prime` - `Seq<G1>`
+/// * `L` - `Seq<G1>` the sequence of all `L_j`
+/// * `R` - `Seq<G1>` the sequence of all `R_j`
 fn step_24(
     p_prime_poly: Seq<Fp>,
     G: Seq<G1>,
@@ -1317,61 +1329,87 @@ fn step_24(
     n: u128,
     k: usize,
     u: Seq<Fp>,
-) -> (Seq<Fp>, Seq<G1>) {
-    let mut p_prime = p_prime_poly;
-    let mut g_prime = G;
-    let mut b = Seq::<Fp>::create(n as usize);
+    blinding: Fp,
+) -> (Seq<Fp>, Seq<G1>, Seq<G1>, Seq<G1>) {
+    let mut p_prime: Seq<Fp> = p_prime_poly;
+    let mut g_prime: Seq<G1> = G;
+    let mut b: Seq<Fp> = Seq::<Fp>::create(n as usize);
+    let mut L: Seq<G1> = Seq::<G1>::create(k);
+    let mut R: Seq<G1> = Seq::<G1>::create(k);
+
     for i in 0..b.len() {
-        let x3_powered = x3.pow(i as u128);
+        let x3_powered: Fp = x3.pow(i as u128);
         b[i] = x3_powered;
     }
 
     for j in 0..k {
-        let p_prime_half = p_prime.len() / 2;
-        let g_prime_half = g_prime.len() / 2;
-        let b_half = b.len() / 2;
+        let p_prime_half: usize = p_prime.len() / 2;
+        let g_prime_half: usize = g_prime.len() / 2;
+        let b_half: usize = b.len() / 2;
 
         // BULLET 1
         // PROVER WORKS HERE
-        let p_prime_hi = p_prime.slice(0, p_prime_half);
-        let p_prime_lo = p_prime.slice(p_prime_half, p_prime_half);
+        let p_prime_lo: Seq<Fp> = p_prime.slice(0, p_prime_half);
+        let p_prime_hi: Seq<Fp> = p_prime.slice(p_prime_half, p_prime_half);
 
-        let g_prime_hi = g_prime.slice(0, g_prime_half);
-        let g_prime_lo = g_prime.slice(g_prime_half, g_prime_half);
+        let g_prime_lo: Seq<G1> = g_prime.slice(0, g_prime_half);
+        let g_prime_hi: Seq<G1> = g_prime.slice(g_prime_half, g_prime_half);
 
-        let b_lo = b.slice(0, b_half);
-        let b_hi = b.slice(b_half, b_half);
+        let b_lo: Seq<Fp> = b.slice(0, b_half);
+        let b_hi: Seq<Fp> = b.slice(b_half, b_half);
 
         // calcuate L_j and R_j, using the right parts of p', G' and b
-        let L_j = calculate_L_or_R(p_prime_hi.clone(), b_lo, g_prime_lo.clone(), z, U, W);
-        let R_j = calculate_L_or_R(p_prime_lo.clone(), b_hi, g_prime_hi.clone(), z, U, W);
+        let L_j: G1 = calculate_L_or_R(
+            p_prime_hi.clone(),
+            b_lo.clone(),
+            g_prime_lo.clone(),
+            z,
+            U,
+            W,
+            blinding,
+        );
+        L[j] = L_j;
+
+        let R_j: G1 = calculate_L_or_R(
+            p_prime_lo.clone(),
+            b_hi.clone(),
+            g_prime_hi.clone(),
+            z,
+            U,
+            W,
+            blinding,
+        );
+        R[j] = R_j;
 
         // BULLET 2
         // VERIFIER WORKS HERE
-        let u_j = u[j];
+        let u_j: Fp = u[j];
 
         // BULLET 3
         // VERIFIER & PROVER WORKS HERE
-        let mut new_g_prime = Seq::<G1>::create(g_prime_half);
+        let mut new_g_prime: Seq<G1> = Seq::<G1>::create(g_prime_half);
         for i in 0..new_g_prime.len() {
             // TODO, this is entry-wise multiplication and pairwise addition!!!
-            let g_prime_hi_indexed = g_prime_hi[i];
-            let g_prime_lo_indexed = g_prime_lo[i];
-            let rhs_product = g1mul(u_j, g_prime_hi_indexed);
-            let sum = g1add(g_prime_lo_indexed, rhs_product);
+            let g_prime_hi_indexed: G1 = g_prime_hi[i];
+            let g_prime_lo_indexed: G1 = g_prime_lo[i];
+            let rhs_product: G1 = g1mul(u_j, g_prime_hi_indexed);
+            let sum: G1 = g1add(g_prime_lo_indexed, rhs_product);
             new_g_prime[i] = sum;
         }
         g_prime = new_g_prime;
 
+        let rhs: Seq<Fp> = mul_scalar_polyx(b_hi.clone(), u_j);
+        let new_b: Seq<Fp> = add_polyx(b_lo.clone(), rhs);
+        b = new_b;
         // BULLET 4
         // PROVER WORKS HERE
-        let u_j_inv = u_j.inv();
-        let rhs = mul_scalar_polyx(p_prime_hi, u_j_inv);
-        let new_p_prime = add_polyx(p_prime_lo, rhs);
+        let u_j_inv: Fp = u_j.inv();
+        let rhs: Seq<Fp> = mul_scalar_polyx(p_prime_hi.clone(), u_j_inv);
+        let new_p_prime: Seq<Fp> = add_polyx(p_prime_lo.clone(), rhs);
         p_prime = new_p_prime;
     }
 
-    (p_prime, g_prime)
+    (p_prime, g_prime, L, R)
 }
 
 /// Step 25
@@ -1441,7 +1479,7 @@ fn step_26(
 
     let rhs_term_3: G1 = g1mul(f, W);
 
-    let rhs = g1add(rhs_term_1, g1add(rhs_term_2, rhs_term_3));
+    let rhs: G1 = g1add(rhs_term_1, g1add(rhs_term_2, rhs_term_3));
 
     let check: bool = lhs == rhs;
 
@@ -2676,6 +2714,139 @@ fn test_step_23() {
     QuickCheck::new()
         .tests(50)
         .quickcheck(a as fn(p: UniPolynomial, s: UniPolynomial, x3: u8, xi: u8) -> bool);
+}
+
+#[cfg(test)]
+#[test]
+fn test_step_24() {
+    // p_prime_poly: Seq<Fp>,
+    // G: Seq<G1>,
+    // x3: Fp,
+    // z: Fp,
+    // U: G1,
+    // W: G1,
+    // n: u128,
+    // k: usize,
+    // u: Seq<Fp>,
+
+    use hacspec_lib::num::traits::Pow;
+    let p_prime_poly: Seq<Fp> = Seq::<Fp>::from_vec(vec![
+        Fp::from_literal(12398129),
+        Fp::from_literal(2222),
+        Fp::from_literal(3038300),
+        Fp::from_literal(4),
+    ]);
+    let G: Seq<G1> = Seq::<G1>::from_vec(vec![
+        g1mul(Fp::from_literal(2123), g1_generator()),
+        g1mul(Fp::from_literal(30283), g1_generator()),
+        g1mul(Fp::from_literal(4), g1_generator()),
+        g1mul(Fp::from_literal(999999999999), g1_generator()),
+    ]);
+    let x3: Fp = Fp::from_literal(981298129832983298);
+    let z: Fp = Fp::from_literal(9812398329834298123123);
+    let U: G1 = g1mul(Fp::from_literal(99), g1_generator());
+    let W: G1 = g1mul(Fp::from_literal(42), g1_generator());
+    let k: usize = 2;
+    let n: usize = 2.exp(2) as usize;
+    let blinding = x3 + z;
+    let mut L: Seq<G1> = Seq::<G1>::create(k);
+    let mut R: Seq<G1> = Seq::<G1>::create(k);
+
+    let u: Seq<Fp> = Seq::<Fp>::from_vec(vec![
+        Fp::from_literal(1),
+        Fp::from_literal(2),
+        Fp::from_literal(3),
+        Fp::from_literal(4),
+    ]);
+    let (real_p_prime, real_G_prime, real_L, real_R) = step_24(
+        p_prime_poly.clone(),
+        G.clone(),
+        x3,
+        z,
+        U,
+        W,
+        n as u128,
+        k,
+        u.clone(),
+        blinding,
+    );
+
+    ////////manuel calculation////////////////
+    let mut G_prime: Seq<G1> = G.clone();
+
+    //First round
+    let p_prime_lo: Seq<Fp> = Seq::<Fp>::from_vec(vec![p_prime_poly[0], p_prime_poly[1]]);
+    let p_prime_hi: Seq<Fp> = Seq::<Fp>::from_vec(vec![p_prime_poly[2], p_prime_poly[3]]);
+    let G_prime_lo: Seq<G1> = Seq::<G1>::from_vec(vec![G[0], G[1]]);
+    let G_prime_hi: Seq<G1> = Seq::<G1>::from_vec(vec![G[2], G[3]]);
+    let b_lo: Seq<Fp> = Seq::<Fp>::from_vec(vec![x3.pow(0), x3.pow(1)]);
+    let b_hi: Seq<Fp> = Seq::<Fp>::from_vec(vec![x3.pow(2), x3.pow(3)]);
+    let L_0: G1 = g1add(
+        g1add(
+            msm(p_prime_hi.clone(), G_prime_lo.clone()),
+            g1mul(z * inner_product(p_prime_hi.clone(), b_lo.clone()), U),
+        ),
+        g1mul(blinding, W),
+    );
+    L[0] = L_0;
+
+    let R_0: G1 = g1add(
+        g1add(
+            msm(p_prime_lo.clone(), G_prime_hi.clone()),
+            g1mul(z * inner_product(p_prime_lo.clone(), b_hi.clone()), U),
+        ),
+        g1mul(blinding, W),
+    );
+    R[0] = R_0;
+
+    G_prime = Seq::<G1>::from_vec(vec![
+        g1add(G_prime_lo[0], g1mul(u[0], G_prime_hi[0])),
+        g1add(G_prime_lo[1], g1mul(u[0], G_prime_hi[1])),
+    ]);
+    let mut b: Seq<Fp> =
+        Seq::<Fp>::from_vec(vec![b_lo[0] + u[0] * b_hi[0], b_lo[1] + u[0] * b_hi[1]]);
+    let u_j: Fp = u[0];
+    let mut p_prime: Seq<Fp> = Seq::<Fp>::from_vec(vec![
+        p_prime_lo[0] + u_j.inv() * p_prime_hi[0],
+        p_prime_lo[1] + u_j.inv() * p_prime_hi[1],
+    ]);
+
+    //second round
+    let p_prime_lo: Seq<Fp> = Seq::<Fp>::from_vec(vec![p_prime[0]]);
+    let p_prime_hi: Seq<Fp> = Seq::<Fp>::from_vec(vec![p_prime[1]]);
+    let G_prime_lo: Seq<G1> = Seq::<G1>::from_vec(vec![G_prime[0]]);
+    let G_prime_hi: Seq<G1> = Seq::<G1>::from_vec(vec![G_prime[1]]);
+    let b_lo: Seq<Fp> = Seq::<Fp>::from_vec(vec![b[0]]);
+    let b_hi: Seq<Fp> = Seq::<Fp>::from_vec(vec![b[1]]);
+    let L_1: G1 = g1add(
+        g1add(
+            msm(p_prime_hi.clone(), G_prime_lo.clone()),
+            g1mul(z * inner_product(p_prime_hi.clone(), b_lo.clone()), U),
+        ),
+        g1mul(blinding, W),
+    );
+    L[1] = L_1;
+
+    let R_1: G1 = g1add(
+        g1add(
+            msm(p_prime_lo.clone(), G_prime_hi.clone()),
+            g1mul(z * inner_product(p_prime_lo.clone(), b_hi.clone()), U),
+        ),
+        g1mul(blinding, W),
+    );
+    R[1] = R_1;
+
+    G_prime = Seq::<G1>::from_vec(vec![g1add(G_prime_lo[0], g1mul(u[1], G_prime_hi[0]))]);
+    b = Seq::<Fp>::from_vec(vec![b_lo[0] + u[0] * b_hi[0]]);
+    let u_j: Fp = u[1];
+
+    p_prime = Seq::<Fp>::from_vec(vec![p_prime_lo[0] + u_j.inv() * p_prime_hi[0]]);
+    assert_eq!(G_prime[0], real_G_prime[0]);
+    assert_eq!(p_prime[0], real_p_prime[0]);
+    assert_eq!(L[0], real_L[0]);
+    assert_eq!(L[1], real_L[1]);
+    assert_eq!(R[0], real_R[0]);
+    assert_eq!(R[1], real_R[1]);
 }
 
 #[cfg(test)]
