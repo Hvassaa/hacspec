@@ -146,7 +146,7 @@ fn add_scalar_polyx(p: Seq<Fp>, s: Fp) -> Seq<Fp> {
         res = Seq::<Fp>::create(1);
     }
 
-    // do the subtraction on constant term
+    // do the addition on constant term
     res[0] = res[0] + s;
 
     res
@@ -524,14 +524,14 @@ fn eval_multi_poly(p: Seq<Term>, inputs: Seq<Fp>) -> Fp {
 ///
 /// * `crs` - the common reference string
 /// * `a` - the "vector"
-/// * `r` - the "randomness"
-fn commit_polyx(crs: &CRS, a: Seq<Fp>, r: Fp) -> G1 {
-    let (g, h) = crs;
-    let (f1, f2, b) = h;
+/// * `blinding` - blinding factor
+fn commit_polyx(crs: &CRS, a: Seq<Fp>, blinding: Fp) -> G1 {
+    let (G, W) = crs;
+    // let (f1, f2, b) = h;
 
-    let lhs = msm(a, g.clone());
-    let rhs = g1mul(r, (f1.clone(), f2.clone(), b.clone()));
-    let res = g1add(lhs, rhs);
+    let lhs: G1 = msm(a, G.clone());
+    let rhs: G1 = g1mul(blinding, W.clone());
+    let res: G1 = g1add(lhs, rhs);
 
     res
 }
@@ -625,6 +625,9 @@ fn msm(a: Seq<Fp>, g: Seq<G1>) -> G1 {
 /// * `omega` - root of unity for the H
 /// * `n` - the order of the group
 fn compute_vanishing_polynomial(omega: Fp, n: u128) -> Seq<Fp> {
+    println!("compute vanishing");
+    println!("{:?}", n);
+
     let mut vanishing_poly = Seq::<Fp>::create((n - 1 as u128) as usize);
     vanishing_poly[0] = Fp::ONE();
     for i in 0..n as usize - 1 {
@@ -1068,7 +1071,7 @@ fn step_14(
     q_polys: Seq<Seq<Fp>>,
     r_polys: Seq<Seq<Fp>>,
     q: Seq<Seq<u128>>,
-    r: Fp,
+    blinding: Fp,
     omega: Fp,
     x: Fp,
 ) -> G1 {
@@ -1097,7 +1100,7 @@ fn step_14(
 
         q_prime = add_polyx(q_prime, multed_poly);
     }
-    let commitment = commit_polyx(crs, q_prime, r);
+    let commitment = commit_polyx(crs, q_prime, blinding);
 
     commitment
 }
@@ -1329,7 +1332,8 @@ fn step_24(
     n: u128,
     k: usize,
     u: Seq<Fp>,
-    blinding: Fp,
+    L_blinding: Seq<Fp>,
+    R_blinding: Seq<Fp>,
 ) -> (Seq<Fp>, Seq<G1>, Seq<G1>, Seq<G1>) {
     let mut p_prime: Seq<Fp> = p_prime_poly;
     let mut g_prime: Seq<G1> = G;
@@ -1366,7 +1370,7 @@ fn step_24(
             z,
             U,
             W,
-            blinding,
+            L_blinding[j],
         );
         L[j] = L_j;
 
@@ -1377,7 +1381,7 @@ fn step_24(
             z,
             U,
             W,
-            blinding,
+            R_blinding[j],
         );
         R[j] = R_j;
 
@@ -1419,10 +1423,25 @@ fn step_24(
 /// # Arguments
 /// * `p_prime` - **p**' from [step_24]
 /// * `blinding_factors` - the list of all the elided blinding factors
-fn step_25(p_prime: Seq<Fp>, blinding_factors: Seq<Fp>) -> (Fp, Fp) {
+fn step_25(
+    p_prime: Seq<Fp>,
+    L_blinding: Seq<Fp>,
+    R_blinding: Seq<Fp>,
+    s_blind: Fp,
+    q_prime_blind: Fp,
+    xi: Fp,
+    u: Seq<Fp>,
+) -> (Fp, Fp) {
     let p_prime_0 = p_prime[0];
-    // TODO how is f calculated?
-    let f = Fp::ZERO();
+    let mut f: Fp = q_prime_blind + (s_blind * xi);
+    for j in 0..L_blinding.len() {
+        let u_j: Fp = u[j];
+        let u_j_inv: Fp = u_j.inv();
+        let L_j_blinding: Fp = L_blinding[j];
+        let R_j_blinding: Fp = R_blinding[j];
+        f = f + L_j_blinding * u_j_inv;
+        f = f + R_j_blinding * u_j;
+    }
 
     (p_prime_0, f)
 }
@@ -1592,6 +1611,38 @@ impl Arbitrary for G1Container {
         let generator = g1_generator();
         G1Container(g1mul(a, generator))
     }
+}
+
+#[cfg(test)]
+#[test]
+fn test_step_4() {
+    fn a(omega_value: u8, n: u8, r: u8) -> bool {
+        let g_prime_degree = n as u128 + 5;
+
+        let vanishing_poly_degree = n as u128 % g_prime_degree + 5;
+        let mut r = r as u128;
+
+        // r cannot be 0 as it would lead to g_prime being all 0
+        if r == 0 {
+            r = r + 2;
+        }
+        println!("{:?}", vanishing_poly_degree);
+        println!("{:?}", g_prime_degree);
+        println!("{:?}", r);
+
+        let omega: Fp = Fp::from_literal((omega_value as u128) + 1);
+        let g_prime = compute_vanishing_polynomial(omega, g_prime_degree as u128);
+        let g_prime = mul_scalar_polyx(g_prime, Fp::from_literal(r));
+        let h = step_4(g_prime, omega, vanishing_poly_degree);
+        let h_degree = poly_degree(h);
+        let expected_h_degree = g_prime_degree - vanishing_poly_degree;
+        assert_eq!(h_degree, expected_h_degree);
+        true
+    }
+    // limit the number of tests, since it is SLOW
+    QuickCheck::new()
+        .tests(5)
+        .quickcheck(a as fn(omega_value: u8, n: u8, r: u8) -> bool);
 }
 
 #[cfg(test)]
@@ -2719,16 +2770,6 @@ fn test_step_23() {
 #[cfg(test)]
 #[test]
 fn test_step_24() {
-    // p_prime_poly: Seq<Fp>,
-    // G: Seq<G1>,
-    // x3: Fp,
-    // z: Fp,
-    // U: G1,
-    // W: G1,
-    // n: u128,
-    // k: usize,
-    // u: Seq<Fp>,
-
     use hacspec_lib::num::traits::Pow;
     let p_prime_poly: Seq<Fp> = Seq::<Fp>::from_vec(vec![
         Fp::from_literal(12398129),
@@ -2748,7 +2789,10 @@ fn test_step_24() {
     let W: G1 = g1mul(Fp::from_literal(42), g1_generator());
     let k: usize = 2;
     let n: usize = 2.exp(2) as usize;
-    let blinding = x3 + z;
+    let L_blinding: Seq<Fp> =
+        Seq::<Fp>::from_vec(vec![Fp::from_literal(298398123), Fp::from_literal(3232323)]);
+    let R_blinding: Seq<Fp> =
+        Seq::<Fp>::from_vec(vec![Fp::from_literal(939), Fp::from_literal(10293)]);
     let mut L: Seq<G1> = Seq::<G1>::create(k);
     let mut R: Seq<G1> = Seq::<G1>::create(k);
 
@@ -2768,7 +2812,8 @@ fn test_step_24() {
         n as u128,
         k,
         u.clone(),
-        blinding,
+        L_blinding.clone(),
+        R_blinding.clone(),
     );
 
     ////////manuel calculation////////////////
@@ -2786,7 +2831,7 @@ fn test_step_24() {
             msm(p_prime_hi.clone(), G_prime_lo.clone()),
             g1mul(z * inner_product(p_prime_hi.clone(), b_lo.clone()), U),
         ),
-        g1mul(blinding, W),
+        g1mul(L_blinding[0], W),
     );
     L[0] = L_0;
 
@@ -2795,7 +2840,7 @@ fn test_step_24() {
             msm(p_prime_lo.clone(), G_prime_hi.clone()),
             g1mul(z * inner_product(p_prime_lo.clone(), b_hi.clone()), U),
         ),
-        g1mul(blinding, W),
+        g1mul(R_blinding[0], W),
     );
     R[0] = R_0;
 
@@ -2823,7 +2868,7 @@ fn test_step_24() {
             msm(p_prime_hi.clone(), G_prime_lo.clone()),
             g1mul(z * inner_product(p_prime_hi.clone(), b_lo.clone()), U),
         ),
-        g1mul(blinding, W),
+        g1mul(L_blinding[1], W),
     );
     L[1] = L_1;
 
@@ -2832,7 +2877,7 @@ fn test_step_24() {
             msm(p_prime_lo.clone(), G_prime_hi.clone()),
             g1mul(z * inner_product(p_prime_lo.clone(), b_hi.clone()), U),
         ),
-        g1mul(blinding, W),
+        g1mul(R_blinding[1], W),
     );
     R[1] = R_1;
 
@@ -2849,6 +2894,62 @@ fn test_step_24() {
     assert_eq!(R[1], real_R[1]);
 }
 
+// u: Seq<Fp>,
+// L: Seq<G1>,
+// P_prime: G1,
+// R: Seq<G1>,
+// c: Fp,
+// G_prime_0: G1,
+// b_0: Fp,
+// z: Fp,
+// U: G1,
+// f: Fp,
+// W: G1,
+
+#[cfg(test)]
+#[test]
+fn test_step_26() {
+    let u: Seq<Fp> = Seq::<Fp>::from_vec(vec![Fp::from_literal(743), Fp::from_literal(9)]);
+    let L: Seq<G1> = Seq::<G1>::from_vec(vec![
+        g1mul(Fp::from_literal(74), g1_generator()),
+        g1mul(Fp::from_literal(749292992), g1_generator()),
+    ]);
+    let R: Seq<G1> = Seq::<G1>::from_vec(vec![
+        g1mul(Fp::from_literal(7), g1_generator()),
+        g1mul(Fp::from_literal(92929929292), g1_generator()),
+    ]);
+
+    let P_prime: G1 = g1mul(Fp::from_literal(1239734), g1_generator());
+    let c: Fp = Fp::from_literal(1919191);
+    let G_prime_0: G1 = g1mul(Fp::from_literal(9191203983123123123123), g1_generator());
+    let b_0: Fp = Fp::from_literal(87410923091283);
+    let z: Fp = Fp::from_literal(699388299374);
+    let U: G1 = g1mul(Fp::from_literal(77777777), g1_generator());
+    let f: Fp = Fp::ONE();
+    let W: G1 = (
+        FpCurve::from_hex("29A35E837F1BC8F4D83DD8E452DAC6691BDEDE5F0916BB02E7EB3BF0D8724746"),
+        FpCurve::from_hex("2E7E5A3C4EFBE72E130E31E28F22E98BF0A3225FCB5E579B61B98F28083A8A05"),
+        false,
+    );
+
+    let mut rhs: G1 = g1add(
+        g1mul(Fp::from_literal(743).inv(), L[0]),
+        g1mul(Fp::from_literal(9).inv(), L[1]),
+    );
+    rhs = g1add(rhs, P_prime);
+    rhs = g1add(
+        rhs,
+        g1add(
+            g1mul(Fp::from_literal(743), R[0]),
+            g1mul(Fp::from_literal(9), R[1]),
+        ),
+    );
+    let mut lhs: G1 = g1mul(c, G_prime_0);
+    lhs = g1add(lhs, g1mul((c * b_0 * z), U));
+    lhs = g1add(lhs, g1mul(f, W));
+    let diff: G1 = g1add(rhs, g1neg(lhs));
+    assert!(step_26(u, L, P_prime, R, c, G_prime_0, b_0, z, U, f, W))
+}
 #[cfg(test)]
 #[test]
 fn testmsm() {
@@ -3239,23 +3340,20 @@ fn test_vanishing_poly(omega_value: u128, n: u128) {
     }
 }
 
-// #[cfg(test)]
-// #[quickcheck]
-// fn test_step_4(omega_value:u128, n: u128, r: u128){
-//     let vanishing_poly_degree = n%50+5;
-//     let g_prime_degree = n%100+55;
-//     let mut r = r;
+#[cfg(test)]
+#[test]
+// fn test_vanishing_poly(omega_value:u128, n: u128){
+fn test_add_poly_x() {
+    let omega: Fp = Fp::from_literal((omega_value % 50) + 1);
+    let n = n % 20 + 2;
+    let vanishing_poly = compute_vanishing_polynomial(omega, n);
+    for i in 0..(n - 1) {
+        let should_be_zero = eval_polyx(vanishing_poly.clone(), omega.pow(i));
+        assert_eq!(should_be_zero, Fp::ZERO())
+    }
+}
 
-//     // r cannot be 0 as it would lead to g_prime being all 0
-//     if r == 0{
-//         r = r+2;
-//     }
-
-//     let  omega: Fp = Fp::from_literal((omega_value%50)+1);
-//     let g_prime = compute_vanishing_polynomial(omega, g_prime_degree);
-//     let g_prime = mul_scalar_polyx(g_prime, Fp::from_literal(r));
-//     let h = step_4(g_prime, omega, vanishing_poly_degree);
-//     let h_degree = poly_degree(h);
-//     let expected_h_degree = g_prime_degree - vanishing_poly_degree;
-//     assert_eq!(h_degree,expected_h_degree);
-// }
+//TESTS MISSING:::::
+// add_poly_x
+// sub_poly_x
+// all other poly functions only have 1 unit test...
