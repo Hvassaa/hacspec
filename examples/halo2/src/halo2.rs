@@ -187,6 +187,17 @@ fn eval_polyx(p: Seq<Fp>, x: Fp) -> Fp {
     res
 }
 
+fn rotate_polyx(p: Seq<Fp>, rotation: Fp) -> Seq<Fp> {
+    let mut res = p;
+    for i in 0..res.len() {
+        let coef = res[i];
+        let rot = rotation.pow(i as u128);
+        res[i] = coef * rot;
+    }
+
+    res
+}
+
 /// Get the degree of a polynomial
 ///
 /// # Arguments
@@ -2493,6 +2504,63 @@ fn test_vanishing_poly(omega_value: u128, n: u128) {
         let should_be_zero = eval_polyx(vanishing_poly.clone(), omega.pow(i));
         assert_eq!(should_be_zero, Fp::ZERO())
     }
+}
+
+#[cfg(test)]
+#[test]
+// fn test_vanishing_poly(omega_value:u128, n: u128){
+fn scratch() {
+    let n = 4;
+    let omega = Fp::from_literal(2);
+
+    let a0_points = Seq::<(Fp, Fp)>::from_vec(vec![
+        (Fp::from_literal(1), Fp::from_literal(2)),
+        (Fp::from_literal(2), Fp::from_literal(10)),
+        (Fp::from_literal(3), Fp::from_literal(5)),
+        (Fp::from_literal(4), Fp::from_literal(26)),
+    ]);
+
+    let a1_points = Seq::<(Fp, Fp)>::from_vec(vec![
+        (Fp::from_literal(1), Fp::from_literal(3)),
+        (Fp::from_literal(3), Fp::from_literal(8)),
+    ]);
+
+    let a2_points = Seq::<(Fp, Fp)>::from_vec(vec![
+        (Fp::from_literal(1), Fp::from_literal(5)),
+        (Fp::from_literal(3), Fp::from_literal(13)),
+    ]);
+
+    let q_add_points = Seq::<(Fp, Fp)>::from_vec(vec![
+        (Fp::from_literal(1), Fp::from_literal(1)),
+        (Fp::from_literal(3), Fp::from_literal(1)),
+    ]);
+
+    let a_0 = legrange_poly(a0_points);
+    let a_1 = legrange_poly(a1_points);
+    let a_2 = legrange_poly(a2_points);
+    let q_add = legrange_poly(q_add_points);
+
+    let mut g_prime = add_polyx(a_0.clone(), a_1);
+    g_prime = add_polyx(g_prime, a_2);
+    let a_0_rotated = rotate_polyx(a_0, omega);
+    g_prime = sub_polyx(g_prime, a_0_rotated);
+    println!("{}", eval_polyx(g_prime, Fp::ZERO()));
+
+    // let points_list = vec![a0_points, a1_points, a2_points, q_add_points];
+    // let mut poly_list: Vec<Seq<Fp>> = vec![];
+    //
+    // for i in points_list {
+    //     let poly = legrange_poly(i);
+    //     for i in 0..poly.len() {
+    //         println!("{:?}", poly[i]);
+    //     }
+    //
+    //     for i in 1..(n + 1) {
+    //         let eval = eval_polyx(poly.clone(), (Fp::from_literal(i)));
+    //         println!("{} -> {:?}", i, eval);
+    //     }
+    //     poly_list.push(poly);
+    // }
 }
 
 // #[cfg(test)]
