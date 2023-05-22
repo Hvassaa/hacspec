@@ -1184,16 +1184,16 @@ fn step_18(
     let n_q = q.len();
     let v = Fp::ZERO();
 
-    let mut P_sum = g1_default();
+    let mut P_sum: G1 = g1_default();
     for i in 0..n_q {
-        let Q_i = Q[i];
-        let term = g1mul(x4.pow(i as u128), Q_i);
+        let Q_i: G1 = Q[i];
+        let term: G1 = g1mul(x4.pow((n_q - i - 1) as u128), Q_i);
         P_sum = g1add(P_sum, term)
     }
-    P_sum = g1mul(x4, P_sum);
-    let P = g1add(Q_prime, P_sum);
+    let first_term: G1 = g1mul(x4.pow(n_q as u128), Q_prime);
+    let P: G1 = g1add(first_term, P_sum);
 
-    let mut v_first_sum = Fp::ZERO();
+    let mut v_first_sum: Fp = Fp::ZERO();
     for i in 0..n_q as usize {
         let q_i: Seq<u128> = q[i].clone();
         let n_e = q_i.len();
@@ -2530,11 +2530,11 @@ fn test_step_18_manuel() {
         ])),
     ]);
 
-    let P_sum_0: (FpCurve, FpCurve, bool) = Q[0];
-    let P_sum_1: (FpCurve, FpCurve, bool) = g1mul(x4, Q[1]);
-    let P_sum_2: (FpCurve, FpCurve, bool) = g1mul(x4.pow(2), Q[2]);
+    let P_sum_0: (FpCurve, FpCurve, bool) = g1mul(x4.pow(2), Q[0]);
+    let P_sum_1: (FpCurve, FpCurve, bool) = g1mul(x4.pow(1), Q[1]);
+    let P_sum_2: (FpCurve, FpCurve, bool) = g1mul(x4.pow(0), Q[2]);
     let P_sum: (FpCurve, FpCurve, bool) = g1add(g1add(P_sum_0, P_sum_1), P_sum_2);
-    let P_test: (FpCurve, FpCurve, bool) = g1add(g1mul(x4, P_sum), Q_prime);
+    let P_test: (FpCurve, FpCurve, bool) = g1add(g1mul(x4.pow(3), Q_prime), P_sum);
     let (P, v) = step_18(
         x,
         x1,
@@ -2674,13 +2674,14 @@ fn test_step_18() {
         );
 
         ///////////TEST IMPLEMENTATION FOR P////////////////////
-        let mut test_P: G1 = Q_prime;
+        let mut test_P: G1 = g1mul(x4.pow(n_q as u128), Q_prime);
         for i in 0..n_q {
-            test_P = g1add(test_P, g1mul(x4.pow(i as u128 + 1), Q[i]));
+            test_P = g1add(test_P, g1mul(x4.pow((n_q - 1 - i) as u128), Q[i]));
         }
-        let mut test_v = Fp::ZERO();
         assert_eq!(P, test_P);
         ////////////TEST IMPLEMENTATION FOR v//////////////////
+        ///
+        let mut test_v = Fp::ZERO();
         // let mut second_sum: Fp = Fp::ZERO();
         let mut first_sum: Fp = Fp::ZERO();
         let mut second_sum: Fp = Fp::ZERO();
