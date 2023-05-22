@@ -118,6 +118,29 @@ fn sub_polyx(p1: Seq<Fp>, p2: Seq<Fp>) -> Seq<Fp> {
     trim_poly(res)
 }
 
+/// Polynomial multiplication using sparse multiplication.
+/// This can be more efficient than operand scanning but also prone to side-channel
+/// attacks.
+/// Mostly copied from hacspec's poly_mul
+///
+/// # Arguments
+///
+/// * `p1` LHS polynomial
+/// * `p2` RHS polynomial
+fn mul_polyx(a: Seq<Fp>, b: Seq<Fp>) -> Seq<Fp> {
+    let mut result = Seq::<Fp>::create(a.len() + b.len());
+    for i in 0..a.len() {
+        if !a[i].equal(Fp::default()) {
+            for j in 0..b.len() {
+                if !b[j].equal(Fp::default()) {
+                    result[i + j] = (result[i + j].add(a[i] * b[j]));
+                }
+            }
+        }
+    }
+    result
+}
+
 /// Multiply a polynomial by a scalar, return resulting polynomial
 ///
 /// # Arguments
@@ -187,11 +210,11 @@ fn eval_polyx(p: Seq<Fp>, x: Fp) -> Fp {
     res
 }
 
-fn rotate_polyx(p: Seq<Fp>, rotation: Fp) -> Seq<Fp> {
+fn rotate_polyx(p: Seq<Fp>, rotation: Fp, n: u128) -> Seq<Fp> {
     let mut res = p;
     for i in 0..res.len() {
         let coef = res[i];
-        let rot = rotation.pow(i as u128);
+        let rot = rotation.pow((i as u128).modulo(n));
         res[i] = coef * rot;
     }
 
@@ -3354,29 +3377,79 @@ fn test_vanishing_poly(omega_value: u128, n: u128) {
 #[cfg(test)]
 #[test]
 fn scratch() {
+    /*
+     * let n = 2^2 = 4
+     * then ω = 2 is 4 prime root of unity over F_5
+     *
+     * (since:
+     * 2^4 mod 5 = 16 mod 5 = 1 and
+     * 2^1 mod 5 = 2 != 1 and
+     * 2^2 mod 5 = 4 != 1 and
+     * 2^3 mod 5 = 3 != 1)
+     *
+     * | i | ω^i | a_0 | a_1 | a_2 | q_add |
+     * |---|-----|-----|-----|-----|-------|
+     * | 0 | 1   | 2   | 3   | 5   | 1     |
+     * | 1 | 2   | 10  |     |     | 0     |
+     * | 2 | 4   | 5   | 8   | 13  | 1     |
+     * | 3 | 8   | 26  |     |     | 0     |
+     *
+     * then, g(X) = q_add(X) * (a_0(X) + a_1(X) + a_2(X) - a_0(ωX))
+     * and g(ω^i) = 0 for all i in [0,n) (should hold)
+     *
+     *
+     * (n_g - 2 = 2 ??? )
+     */
     let n = 4;
+    let n_a = 3;
     let omega = Fp::from_literal(2);
+    let crs: CRS = (
+        Seq::<G1>::from_vec(vec![
+            g1mul(Fp::from_literal(22), g1_generator()),
+            g1mul(Fp::from_literal(7), g1_generator()),
+            g1mul(Fp::from_literal(9), g1_generator()),
+            g1mul(Fp::from_literal(43), g1_generator()),
+        ]),
+        g1mul(Fp::from_literal(123), g1_generator()),
+    );
+
+    let r_poly = Seq::<Fp>::from_vec(vec![
+        Fp::from_literal(987),
+        Fp::from_literal(2),
+        Fp::from_literal(64),
+        Fp::from_literal(355),
+    ]);
+    let R_blind = Fp::from_literal(78);
+    let R = commit_polyx(&crs, r_poly.clone(), R_blind);
+
+    let p = Seq::<Seq<u128>>::from_vec(vec![
+        Seq::<u128>::from_vec(vec![0, 1]),
+        Seq::<u128>::from_vec(vec![0]),
+        Seq::<u128>::from_vec(vec![0]),
+    ]);
 
     let a0_points = Seq::<(Fp, Fp)>::from_vec(vec![
         (Fp::from_literal(1), Fp::from_literal(2)),
         (Fp::from_literal(2), Fp::from_literal(10)),
-        (Fp::from_literal(3), Fp::from_literal(5)),
-        (Fp::from_literal(4), Fp::from_literal(26)),
+        (Fp::from_literal(4), Fp::from_literal(5)),
+        (Fp::from_literal(8), Fp::from_literal(26)),
     ]);
 
     let a1_points = Seq::<(Fp, Fp)>::from_vec(vec![
         (Fp::from_literal(1), Fp::from_literal(3)),
-        (Fp::from_literal(3), Fp::from_literal(8)),
+        (Fp::from_literal(4), Fp::from_literal(8)),
     ]);
 
     let a2_points = Seq::<(Fp, Fp)>::from_vec(vec![
         (Fp::from_literal(1), Fp::from_literal(5)),
-        (Fp::from_literal(3), Fp::from_literal(13)),
+        (Fp::from_literal(4), Fp::from_literal(13)),
     ]);
 
     let q_add_points = Seq::<(Fp, Fp)>::from_vec(vec![
         (Fp::from_literal(1), Fp::from_literal(1)),
-        (Fp::from_literal(3), Fp::from_literal(1)),
+        (Fp::from_literal(2), Fp::from_literal(0)),
+        (Fp::from_literal(4), Fp::from_literal(1)),
+        (Fp::from_literal(8), Fp::from_literal(0)),
     ]);
 
     let a_0 = legrange_poly(a0_points);
@@ -3384,27 +3457,36 @@ fn scratch() {
     let a_2 = legrange_poly(a2_points);
     let q_add = legrange_poly(q_add_points);
 
-    let mut g_prime = add_polyx(a_0.clone(), a_1);
-    g_prime = add_polyx(g_prime, a_2);
-    let a_0_rotated = rotate_polyx(a_0, omega);
-    g_prime = sub_polyx(g_prime, a_0_rotated);
-    println!("{}", eval_polyx(g_prime, Fp::ZERO()));
+    // construct A_i's (commitments)
+    let A_0_blinding = Fp::from_literal(99);
+    let A_0 = commit_polyx(&crs, a_0.clone(), A_0_blinding);
+    let A_1_blinding = Fp::from_literal(123);
+    let A_1 = commit_polyx(&crs, a_1.clone(), A_1_blinding);
+    let A_2_blinding = Fp::from_literal(748);
+    let A_2 = commit_polyx(&crs, a_2.clone(), A_2_blinding);
+    let A_list = Seq::<G1>::from_vec(vec![A_0, A_1, A_2]);
 
-    // let points_list = vec![a0_points, a1_points, a2_points, q_add_points];
-    // let mut poly_list: Vec<Seq<Fp>> = vec![];
-    //
-    // for i in points_list {
-    //     let poly = legrange_poly(i);
-    //     for i in 0..poly.len() {
-    //         println!("{:?}", poly[i]);
-    //     }
-    //
-    //     for i in 1..(n + 1) {
-    //         let eval = eval_polyx(poly.clone(), (Fp::from_literal(i)));
-    //         println!("{} -> {:?}", i, eval);
-    //     }
-    //     poly_list.push(poly);
-    // }
+    // construct g'(X) = q_add(X) * (a_0(X)+a_1(X)+a_2(X)-a_0(omega * X))
+    let mut g_prime = add_polyx(a_0.clone(), a_1.clone());
+    g_prime = add_polyx(g_prime, a_2.clone());
+    let a_0_rotated = rotate_polyx(a_0.clone(), omega, n);
+    g_prime = sub_polyx(g_prime, a_0_rotated);
+    g_prime = mul_polyx(g_prime, q_add);
+    for i in 0..4 {
+        assert_eq!(eval_polyx(g_prime.clone(), omega.pow(i)), Fp::ZERO());
+    }
+
+    let h = step_4(g_prime, omega, n);
+    let h_is = step_5(h, n);
+    let r_seq = Seq::<Fp>::from_vec(vec![Fp::from_literal(5), Fp::from_literal(76)]);
+    let H_is = step_6(h_is.clone(), &crs, r_seq);
+    let x_challenge = Fp::from_literal(345);
+    let H_prime = step_7(H_is, x_challenge, n);
+    let h_prime = step_8(h_is, x_challenge, n);
+    let a_primes = Seq::<Seq<Fp>>::from_vec(vec![a_0, a_1, a_2]);
+    let (r, a_is) = step_9(r_poly, a_primes, n_a, omega, p, x_challenge);
+    let x1_challenge = Fp::from_literal(475);
+    // let Q_is = step_11(n_a, x1_challenge, H_prime, R, A_list);
 }
 
 // fn test_vanishing_poly(omega_value:u128, n: u128){
@@ -3416,13 +3498,13 @@ fn scratch() {
 //     let mut r = r;
 
 fn test_add_poly_x() {
-    let omega: Fp = Fp::from_literal((omega_value % 50) + 1);
-    let n = n % 20 + 2;
-    let vanishing_poly = compute_vanishing_polynomial(omega, n);
-    for i in 0..(n - 1) {
-        let should_be_zero = eval_polyx(vanishing_poly.clone(), omega.pow(i));
-        assert_eq!(should_be_zero, Fp::ZERO())
-    }
+    // let omega: Fp = Fp::from_literal((omega_value % 50) + 1);
+    // let n = n % 20 + 2;
+    // let vanishing_poly = compute_vanishing_polynomial(omega, n);
+    // for i in 0..(n - 1) {
+    //     let should_be_zero = eval_polyx(vanishing_poly.clone(), omega.pow(i));
+    //     assert_eq!(should_be_zero, Fp::ZERO())
+    // }
 }
 
 //TESTS MISSING:::::
