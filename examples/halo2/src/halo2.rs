@@ -1256,21 +1256,22 @@ fn step_18(
 /// * `q_polys` - the q polynomials from step 12
 fn step_19(x4: Fp, q_prime: Seq<Fp>, q_polys: Seq<Seq<Fp>>) -> Seq<Fp> {
     let mut p = Seq::<Fp>::create(1); // initialize p to the constant zero poly
+    let n_q: usize = q_polys.len();
 
-    //  Sum_i^nq-1 {x4^i q_i(X)}
-    for i in 0..q_polys.len() {
-        let x4_powered = x4.pow(i as u128);
+    //  Sum_i^nq-1 {x4^(n_q-1-i) q_i(X)}
+    for i in 0..n_q {
+        let power: u128 = (n_q - 1 - i) as u128;
+        let x4_powered = x4.pow(power as u128);
         let q_i = q_polys[i].clone();
         let multed_poly = mul_scalar_polyx(q_i, x4_powered);
 
         p = add_polyx(p, multed_poly)
     }
 
-    // [x4] Sum_i^nq-1 {x4^i q_i(X)}
-    p = mul_scalar_polyx(p, x4);
-
     // q'(X) + [x4] Sum_i^nq-1 {x4^i q_i(X)}
-    p = add_polyx(p, q_prime);
+    let x4n_q: Fp = x4.pow(n_q as u128);
+    let first_term: Seq<Fp> = mul_scalar_polyx(q_prime, x4n_q);
+    p = add_polyx(p, first_term);
 
     p
 }
@@ -2733,13 +2734,17 @@ fn test_step_18() {
 fn test_step_19() {
     fn a(x4: u8, q_prime: UniPolynomial, q_polys: SeqOfUniPoly) -> bool {
         let q_polys: Seq<Seq<Fp>> = q_polys.0;
+        let n_q: usize = q_polys.len();
         let x4: Fp = Fp::from_literal(x4 as u128);
+        let x4nq: Fp = x4.pow(n_q as u128);
         let mut q_prime: Seq<Fp> = q_prime.0;
         let p: Seq<Fp> = step_19(x4, q_prime.clone(), q_polys.clone());
+        q_prime = mul_scalar_polyx(q_prime, x4nq);
+
         for i in 0..q_polys.len() {
             let mut q_i: Seq<Fp> = q_polys[i].clone();
-            q_i = mul_scalar_polyx(q_i, x4.pow(i as u128));
-            q_i = mul_scalar_polyx(q_i, x4);
+            q_i = mul_scalar_polyx(q_i, x4.pow((n_q - 1 - i) as u128));
+            // q_i = mul_scalar_polyx(q_i, x4);
             q_prime = add_polyx(q_i, q_prime.clone());
         }
         assert_eq!(p.len(), q_prime.len());
@@ -3497,15 +3502,24 @@ fn scratch() {
 //     let g_prime_degree = n%100+55;
 //     let mut r = r;
 
-fn test_add_poly_x() {
-    // let omega: Fp = Fp::from_literal((omega_value % 50) + 1);
-    // let n = n % 20 + 2;
-    // let vanishing_poly = compute_vanishing_polynomial(omega, n);
-    // for i in 0..(n - 1) {
-    //     let should_be_zero = eval_polyx(vanishing_poly.clone(), omega.pow(i));
-    //     assert_eq!(should_be_zero, Fp::ZERO())
-    // }
-}
+// fn test_add_poly_x() {
+// let omega: Fp = Fp::from_literal((omega_value % 50) + 1);
+// let n = n % 20 + 2;
+// let vanishing_poly = compute_vanishing_polynomial(omega, n);
+// for i in 0..(n - 1) {
+//     let should_be_zero = eval_polyx(vanishing_poly.clone(), omega.pow(i));
+//     assert_eq!(should_be_zero, Fp::ZERO())
+// }
+
+// fn test_add_poly_x() {
+//     let omega: Fp = Fp::from_literal((omega_value % 50) + 1);
+//     let n = n % 20 + 2;
+//     let vanishing_poly = compute_vanishing_polynomial(omega, n);
+//     for i in 0..(n - 1) {
+//         let should_be_zero = eval_polyx(vanishing_poly.clone(), omega.pow(i));
+//         assert_eq!(should_be_zero, Fp::ZERO())
+//     }
+// }
 
 //TESTS MISSING:::::
 // add_poly_x
