@@ -955,7 +955,6 @@ fn step_11(
         let a_i = a[i as usize];
         // TODO is this what is meant by Q_sigma(i) ?
         let sigma_i = sigma(i as u128, sigma_list.clone(), q.clone());
-        // let sigma_i = q[i].clone();
         for k in 0..sigma_i.len() {
             let j = sigma_i[k];
             let q_sigma_i = qs[j as usize];
@@ -985,7 +984,8 @@ fn step_11(
 /// * `h_prime` - h', the computed polynomial from [step_8]
 /// * `r` - the "random" polynomial from [step_3]
 /// * `a_prime` - a', the list of univariate polys from [step_1]
-/// * `q` - q, from the protocol represented as Seq<Seq<u128>>, s.t. sigma(i) = q[i]
+/// * `q` - q, from the protocol
+/// * `sigma_list` - s.t. q[sigma_list[i]]=p_i (indexing/mapping into q, for p_i)
 fn step_12(
     n_a: u128,
     x1: Fp,
@@ -993,6 +993,7 @@ fn step_12(
     r: Seq<Fp>,
     a_prime: Seq<Seq<Fp>>,
     q: Seq<Seq<u128>>,
+    sigma_list: Seq<u128>,
 ) -> Seq<Seq<Fp>> {
     let n_q = q.len();
 
@@ -1006,7 +1007,7 @@ fn step_12(
     // bullet 1
     for i in 0..(n_a as usize) {
         let a_i = a_prime[i as usize].clone();
-        let sigma_i = q[i].clone();
+        let sigma_i = sigma(i as u128, sigma_list.clone(), q.clone());
         // TODO is this what is meant by Q_sigma(i) ?
         for j in 0..sigma_i.len() {
             let j = sigma_i[j];
@@ -1039,7 +1040,8 @@ fn step_12(
 /// * `x1` - the challenge from step 11
 /// * `r` - r from step 9
 /// * `s` - s, the computed polynomials from step 10
-/// * `q` - q, from the protocol represented as seqs of (i, set), s.t. q_i = set
+/// * `q` - q, from the protocol
+/// * `sigma_list` - s.t. q[sigma_list[i]]=p_i (indexing/mapping into q, for p_i)
 /// * `a` - a', the list of univariate polys from step 1
 /// * `g_prime` - the polynomial from step 2
 fn step_13(
@@ -1051,6 +1053,7 @@ fn step_13(
     r: Fp,
     s: Seq<Seq<Fp>>,
     q: Seq<Seq<u128>>,
+    sigma_list: Seq<u128>,
     a: Seq<Seq<Fp>>,
     g_prime: Seq<Fp>,
 ) -> Seq<Seq<Fp>> {
@@ -1065,8 +1068,7 @@ fn step_13(
     // bullet 1
     for i in 0..(n_a as usize) {
         let s_i = s[i as usize].clone();
-        let sigma_i = q[i].clone();
-        // TODO is this what is meant by Q_sigma(i) ?
+        let sigma_i = sigma(i as u128, sigma_list.clone(), q.clone());
         for j in 0..sigma_i.len() {
             let j = sigma_i[j];
             let r_sigma_i = rs[j as usize].clone();
@@ -1921,6 +1923,9 @@ fn test_step_11() {
         // create some random values for q, each entry with len n_q/2
         // and entries for sigma_list to be used in sigma
         // (note, here we actually do not guarantee that q's elements are distinct)
+        // add one more entry for sigma_list, since the loop starts at 1
+        let sigma_idx = rand::Rng::gen_range(&mut rand::thread_rng(), 0..q.len());
+        sigma_list.push(sigma_idx as u128);
         q[0] = Seq::<u128>::from_vec(vec![0]); // q[0]={0} by definition
         for i in 1..q.len() {
             let mut v: Vec<u128> = vec![];
@@ -1936,9 +1941,6 @@ fn test_step_11() {
         }
         let n_q: usize = q.len();
 
-        // add one more entry for sigma_list, since the loop above started at 1
-        let sigma_idx = rand::Rng::gen_range(&mut rand::thread_rng(), 0..q.len());
-        sigma_list.push(sigma_idx as u128);
         let sigma_seq = Seq::<u128>::from_vec(sigma_list);
 
         //////////////////////////////////////////////////////////////////////////////////
@@ -2014,8 +2016,14 @@ fn test_step_12() {
         }
         let x1 = Fp::from_literal(x1 as u128);
 
+        let mut sigma_list: Vec<u128> = vec![];
         let mut q = Seq::<Seq<u128>>::create(n_a as usize);
         // create some random values for q, each entry with len n_q/2
+        // and entries for sigma_list to be used in sigma
+        // (note, here we actually do not guarantee that q's elements are distinct)
+        // add one more entry for sigma_list, since the loop starts at 1
+        let sigma_idx = rand::Rng::gen_range(&mut rand::thread_rng(), 0..q.len());
+        sigma_list.push(sigma_idx as u128);
         q[0] = Seq::<u128>::from_vec(vec![0]); // q[0]={0} by definition
         for i in 1..q.len() {
             let mut v: Vec<u128> = vec![];
@@ -2025,7 +2033,12 @@ fn test_step_12() {
             v.shuffle(&mut thread_rng());
             let v = &v[0..((n_q / 2) as usize)];
             q[i] = Seq::from_vec(v.to_vec());
+
+            let sigma_idx = rand::Rng::gen_range(&mut rand::thread_rng(), 0..q.len());
+            sigma_list.push(sigma_idx as u128);
         }
+
+        let sigma_seq = Seq::<u128>::from_vec(sigma_list);
 
         // a_polys is a number of random polys, but there should be n_a of them
         // (SeqOfUniPoly generates a fixed length seq of polys)
@@ -2051,15 +2064,17 @@ fn test_step_12() {
             r.clone(),
             a_polys.clone(),
             q.clone(),
+            sigma_seq.clone(),
         );
         // calculate each Q_i and check that it corresponds with the output of step_12
         for i in 0..n_q {
             let mut q_poly = Seq::<Fp>::create(1);
             // BULLET 1
             // q_i := x1 * q_i + a'_j(X), for every time i is in some sigma(j)
-            for j in 0..q.len() {
-                for k in 0..q[j].len() {
-                    if i == q[j][k] as u8 {
+            for j in 0..n_a {
+                let p_j = sigma(j as u128, sigma_seq.clone(), q.clone());
+                for k in 0..p_j.len() {
+                    if i == p_j[k] as u8 {
                         q_poly = add_polyx(mul_scalar_polyx(q_poly, x1), a_polys[j].clone())
                     }
                 }
@@ -2127,7 +2142,10 @@ fn test_step_13() {
         if n_q > n_a {
             n_q = n_q % n_a
         }
-        let n = n_q * 3; // a bit of reuse, due the above restrictions
+        let mut n = n_q * 3; // a bit of reuse, due the above restrictions
+        if n == 0 {
+            n = 1;
+        }
         let omega = Fp::from_literal(omega as u128);
         let x = Fp::from_literal(x as u128);
         let x1 = x * Fp::TWO(); // a bit of reuse, due the above restrictions
@@ -2137,7 +2155,14 @@ fn test_step_13() {
         let a = a.0;
         let g_prime = g_prime.0;
 
+        let mut sigma_list: Vec<u128> = vec![];
+        let mut q = Seq::<Seq<u128>>::create(n_a as usize);
         // create some random values for q, each entry with len n_q/2
+        // and entries for sigma_list to be used in sigma
+        // (note, here we actually do not guarantee that q's elements are distinct)
+        // add one more entry for sigma_list, since the loop starts at 1
+        let sigma_idx = rand::Rng::gen_range(&mut rand::thread_rng(), 0..q.len());
+        sigma_list.push(sigma_idx as u128);
         q[0] = Seq::<u128>::from_vec(vec![0]); // q[0]={0} by definition
         for i in 1..q.len() {
             let mut v: Vec<u128> = vec![];
@@ -2147,6 +2172,9 @@ fn test_step_13() {
             v.shuffle(&mut thread_rng());
             let v = &v[0..((n_q / 2) as usize)];
             q[i] = Seq::from_vec(v.to_vec());
+
+            let sigma_idx = rand::Rng::gen_range(&mut rand::thread_rng(), 0..q.len());
+            sigma_list.push(sigma_idx as u128);
         }
 
         // s is a number of random polys, but there should be n_a of them
@@ -2162,6 +2190,8 @@ fn test_step_13() {
             }
         }
 
+        let sigma_seq = Seq::<u128>::from_vec(sigma_list);
+
         //////////////////////////////////////////////////////////////////////////////////
         /// SETTING UP VALUES DONE
         //////////////////////////////////////////////////////////////////////////////////
@@ -2174,6 +2204,7 @@ fn test_step_13() {
             r,
             s_polys.clone(),
             q.clone(),
+            sigma_seq.clone(),
             a,
             g_prime.clone(),
         );
@@ -2183,10 +2214,12 @@ fn test_step_13() {
             let mut r_poly = Seq::<Fp>::create(1);
             // BULLET 1
             // r_i := x1 * r_i + s_j(X), for every time i is in some sigma(j)
-            for j in 0..q.len() {
-                for k in 0..q[j].len() {
-                    if i == q[j][k] {
-                        r_poly = add_polyx(mul_scalar_polyx(r_poly, x1), s_polys[j].clone())
+            for j in 0..n_a {
+                let p_j = sigma(j as u128, sigma_seq.clone(), q.clone());
+                for k in 0..p_j.len() {
+                    if i == p_j[k] {
+                        r_poly =
+                            add_polyx(mul_scalar_polyx(r_poly, x1), s_polys[j as usize].clone())
                     }
                 }
             }
