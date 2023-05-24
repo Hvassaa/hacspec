@@ -891,9 +891,9 @@ fn step_9(
 /// # Arguments
 /// * `omega` - omega from the protocol
 /// * `x` - the challenge from step 7
+/// * `p` - the p list from the protocol
 /// * `a` - the sequence of sequences from step 9
 /// * `n_a` - n_a from the protocol
-///
 fn step_10(omega: Fp, p: Seq<Seq<u128>>, x: Fp, a: Seq<Seq<Fp>>, n_a: u128) -> Seq<Seq<Fp>> {
     let mut s = Seq::<Seq<Fp>>::create(n_a as usize);
     let mut i_range: usize = n_a as usize - 1;
@@ -976,7 +976,7 @@ fn step_11(
 }
 
 /// Step 12
-/// Get the list of q's (q_0, ..., q_{n_q - 1})
+/// Get the list of q's (q_0, ..., q_{n_q - 1}) and q_blinds (accumulated blindness)
 ///
 /// # Arguments
 /// * `n_a` - n_a from the protocol
@@ -986,6 +986,7 @@ fn step_11(
 /// * `a_prime` - a', the list of univariate polys from [step_1]
 /// * `q` - q, from the protocol
 /// * `sigma_list` - s.t. q[sigma_list[i]]=p_i (indexing/mapping into q, for p_i)
+/// * `a_blind` - the blindness used in step 1 for the A_i commitments
 fn step_12(
     n_a: u128,
     x1: Fp,
@@ -994,10 +995,14 @@ fn step_12(
     a_prime: Seq<Seq<Fp>>,
     q: Seq<Seq<u128>>,
     sigma_list: Seq<u128>,
-) -> Seq<Seq<Fp>> {
+    a_blinds: Seq<Fp>,
+) -> (Seq<Seq<Fp>>, Seq<Fp>) {
     let n_q = q.len();
 
     let mut qs = Seq::<Seq<Fp>>::create(n_q as usize);
+
+    // used for f later
+    let mut q_blinds = Seq::<Fp>::create(n_q as usize);
 
     // initialize all polys to constant 0
     for i in 0..qs.len() {
@@ -1007,6 +1012,7 @@ fn step_12(
     // bullet 1
     for i in 0..(n_a as usize) {
         let a_i = a_prime[i as usize].clone();
+        let a_blind_i = a_blinds[i as usize];
         let sigma_i = sigma(i as u128, sigma_list.clone(), q.clone());
         // TODO is this what is meant by Q_sigma(i) ?
         for j in 0..sigma_i.len() {
@@ -1014,6 +1020,8 @@ fn step_12(
             let q_sigma_i = qs[j as usize].clone();
             let product = mul_scalar_polyx(q_sigma_i.clone(), x1);
             qs[j as usize] = add_polyx(product, a_i.clone());
+
+            q_blinds[j as usize] = x1 * q_blinds[j as usize] + a_blind_i;
         }
     }
 
@@ -1026,7 +1034,7 @@ fn step_12(
     let final_sum = add_polyx(sum1, r);
     qs[0] = final_sum;
 
-    qs
+    (qs, q_blinds)
 }
 
 /// Step 13
@@ -1094,7 +1102,7 @@ fn step_13(
 }
 
 /// Step 14
-/// Get the commitment Q'
+/// Get the commitment Q', poly q' and the blindness used
 ///
 /// # Arguments
 /// * `crs` - the common reference string
@@ -1103,7 +1111,8 @@ fn step_13(
 /// * `r_polys` - the r polynomials from step 13
 /// * `q` - q, from the protocol
 /// * `sigma_list` - s.t. q[sigma_list[i]]=p_i (indexing/mapping into q, for p_i)
-/// * `r` - randomness for commiting
+/// * `blinding` - randomness for commiting
+/// * `x` - the challenge from step 7
 fn step_14(
     crs: &CRS,
     x2: Fp,
@@ -1114,7 +1123,7 @@ fn step_14(
     blinding: Fp,
     omega: Fp,
     x: Fp,
-) -> G1 {
+) -> (G1, Seq<Fp>, Fp) {
     let mut q_prime = Seq::<Fp>::create(1); // initialize q' to the constant zero poly
     let n_q = q.len();
     for i in 0..(n_q as usize) {
@@ -1140,9 +1149,9 @@ fn step_14(
 
         q_prime = add_polyx(q_prime, multed_poly);
     }
-    let commitment = commit_polyx(crs, q_prime, blinding);
+    let commitment = commit_polyx(crs, q_prime.clone(), blinding);
 
-    commitment
+    (commitment, q_prime, blinding)
 }
 /// This function emulates sending a challenge.
 /// It takes a challenge and returns it again.
@@ -1189,7 +1198,6 @@ fn step_17(x_4: Fp) -> Fp {
 /// * `x2` - challenge from step 11
 /// * `x3` - challenge from step 15
 /// * `x4` - challenge from step 17
-/// * `n_q` -  n_q from the protocol
 /// * `omega` - omega from the protocol
 /// * `Q_prime` - commitment from step 14
 /// * `Q` - list of group-elements from step 11
@@ -1261,9 +1269,20 @@ fn step_18(
 /// * `x4` - the challenge from step 17
 /// * `q_prime` - the q' polynomial computed by the prover in step 14
 /// * `q_polys` - the q polynomials from step 12
-fn step_19(x4: Fp, q_prime: Seq<Fp>, q_polys: Seq<Seq<Fp>>) -> Seq<Fp> {
+/// * `q_blinds` - the blinds from step 12
+/// * `q_prime_blind` - the blinding from step 14
+fn step_19(
+    x4: Fp,
+    q_prime: Seq<Fp>,
+    q_polys: Seq<Seq<Fp>>,
+    q_blinds: Seq<Fp>,
+    q_prime_blind: Fp,
+) -> (Seq<Fp>, Fp) {
     let mut p = Seq::<Fp>::create(1); // initialize p to the constant zero poly
     let n_q: usize = q_polys.len();
+
+    // used for f later on (accumlated blindness)
+    let mut p_blind = Fp::ZERO();
 
     //  Sum_i^nq-1 {x4^(n_q-1-i) q_i(X)}
     for i in 0..n_q {
@@ -1272,7 +1291,9 @@ fn step_19(x4: Fp, q_prime: Seq<Fp>, q_polys: Seq<Seq<Fp>>) -> Seq<Fp> {
         let q_i = q_polys[i].clone();
         let multed_poly = mul_scalar_polyx(q_i, x4_powered);
 
-        p = add_polyx(p, multed_poly)
+        p = add_polyx(p, multed_poly);
+
+        p_blind = p_blind + (x4_powered * q_blinds[i]);
     }
 
     // q'(X) + [x4] Sum_i^nq-1 {x4^i q_i(X)}
@@ -1280,20 +1301,22 @@ fn step_19(x4: Fp, q_prime: Seq<Fp>, q_polys: Seq<Seq<Fp>>) -> Seq<Fp> {
     let first_term: Seq<Fp> = mul_scalar_polyx(q_prime, x4n_q);
     p = add_polyx(p, first_term);
 
-    p
+    p_blind = p_blind + (x4n_q * q_prime_blind);
+
+    (p, p_blind)
 }
 
 /// Step 20
 ///
-/// Get the commitment S
+/// Get the commitment S and the blindness used
 ///
 /// # Arguments
 /// * `s` - a randomly sampled poly (degree n-1) with a root at x3 from [step_15]
 /// * `crs` - the common reference string
 /// * `r` - randomness for commiting
-fn step_20(s: Seq<Fp>, crs: CRS, r: Fp) -> G1 {
+fn step_20(s: Seq<Fp>, crs: CRS, r: Fp) -> (G1, Fp) {
     let S = commit_polyx(&crs, s, r);
-    S
+    (S, r)
 }
 
 /// Step 21
@@ -1326,14 +1349,16 @@ fn step_22(p: G1, g0: G1, s: G1, v: Fp, xi: Fp) -> G1 {
 }
 
 /// Step 23
-/// Get the p'(X) polynomial
+/// Get the p'(X) polynomial and p' blindness
 ///
 /// # Arguments
 /// * `p` - the polynomial p from step 19
 /// * `s` - the polynomial s from step 20
 /// * `x3` - the challenge from step 15
 /// * `xi` - the ξ challenge from step 21
-fn step_23(p: Seq<Fp>, s: Seq<Fp>, x3: Fp, xi: Fp) -> Seq<Fp> {
+/// * `p_blind` - the blindness from step 19
+/// * `s_blind` - the blindness from step 20
+fn step_23(p: Seq<Fp>, s: Seq<Fp>, x3: Fp, xi: Fp, p_blind: Fp, s_blind: Fp) -> (Seq<Fp>, Fp) {
     // TODO what happens if v does not correspond with v?
     let p_eval_x3 = eval_polyx(p.clone(), x3);
     let xi_mul_s = mul_scalar_polyx(s, xi);
@@ -1341,12 +1366,14 @@ fn step_23(p: Seq<Fp>, s: Seq<Fp>, x3: Fp, xi: Fp) -> Seq<Fp> {
     p_prime = sub_scalar_polyx(p_prime, p_eval_x3);
     p_prime = add_polyx(p_prime, xi_mul_s);
 
-    p_prime
+    let p_prime_blind = s_blind * xi + p_blind;
+
+    (p_prime, p_prime_blind)
 }
 
 /// Step 24
 ///
-/// Get **G**' abd **p**'
+/// Get **G**', **p**', **b**, L, R, and {L,R} blinds
 ///
 /// # Arguments
 /// * `p_prime_poly` - the polynomial p'(X) from [step_23]
@@ -1358,10 +1385,13 @@ fn step_23(p: Seq<Fp>, s: Seq<Fp>, x3: Fp, xi: Fp) -> Seq<Fp> {
 /// * `n` - n from the protocol preamble
 /// * `k` - k from the protocol preamble
 /// * `u` - the list of u_j challenges from the verifier // TODO maybe should be interactive
+/// * `L_blinding` - the list of blinding to be used for L_j
+/// * `R_blinding` - the list of blinding to be used for R_j
 ///
 /// # Returns
 /// * `p_prime` - `Seq<Fp>`
 /// * `G_prime` - `Seq<G1>`
+/// * `b` - `Seq<Fp>`
 /// * `L` - `Seq<G1>` the sequence of all `L_j`
 /// * `R` - `Seq<G1>` the sequence of all `R_j`
 fn step_24(
@@ -1376,7 +1406,15 @@ fn step_24(
     u: Seq<Fp>,
     L_blinding: Seq<Fp>,
     R_blinding: Seq<Fp>,
-) -> (Seq<Fp>, Seq<G1>, Seq<G1>, Seq<G1>) {
+) -> (
+    Seq<Fp>,
+    Seq<G1>,
+    Seq<Fp>,
+    Seq<G1>,
+    Seq<G1>,
+    Seq<Fp>,
+    Seq<Fp>,
+) {
     let mut p_prime: Seq<Fp> = p_prime_poly;
     let mut g_prime: Seq<G1> = G;
     let mut b: Seq<Fp> = Seq::<Fp>::create(n as usize);
@@ -1455,7 +1493,7 @@ fn step_24(
         p_prime = new_p_prime;
     }
 
-    (p_prime, g_prime, L, R)
+    (p_prime, g_prime, b, L, R, L_blinding, R_blinding)
 }
 
 /// Step 25
@@ -2060,7 +2098,7 @@ fn test_step_12() {
         //////////////////////////////////////////////////////////////////////////////////
         let h = h.0;
         let r = r.0;
-        let q_s = step_12(
+        let (q_s, _) = step_12(
             n_a as u128,
             x1,
             h.clone(),
@@ -2068,6 +2106,7 @@ fn test_step_12() {
             a_polys.clone(),
             q.clone(),
             sigma_seq.clone(),
+            Seq::create(a_polys.len()), // we dont test blindess
         );
         // calculate each Q_i and check that it corresponds with the output of step_12
         for i in 0..n_q {
@@ -2525,7 +2564,8 @@ fn test_step_14() {
         /// FINISHED CREATHING G
         /////////////////////////////
         let q_prime_test = commit_polyx(&(G.clone(), W), sum_result, r);
-        let q_prime: G1 = step_14(
+        // we ignore the blinding and polynomial
+        let (Q_prime, _, _) = step_14(
             &(G.clone(), W),
             x2,
             q_polys.clone(),
@@ -2537,7 +2577,7 @@ fn test_step_14() {
             x,
         );
 
-        assert_eq!(q_prime, q_prime_test);
+        assert_eq!(Q_prime, q_prime_test);
         true
     }
     // limit the number of tests, since it is SLOW
@@ -2849,7 +2889,14 @@ fn test_step_19() {
         let x4: Fp = Fp::from_literal(x4 as u128);
         let x4nq: Fp = x4.pow(n_q as u128);
         let mut q_prime: Seq<Fp> = q_prime.0;
-        let p: Seq<Fp> = step_19(x4, q_prime.clone(), q_polys.clone());
+        // ignores blindness
+        let (p, _) = step_19(
+            x4,
+            q_prime.clone(),
+            q_polys.clone(),
+            Seq::create(q_prime.len()),
+            Fp::ZERO(),
+        );
         q_prime = mul_scalar_polyx(q_prime, x4nq);
 
         for i in 0..q_polys.len() {
@@ -2905,7 +2952,8 @@ fn test_step_23() {
             add_scalar_polyx(p.clone(), eval_polyx(p.clone(), x3).neg()),
             mul_scalar_polyx(s.clone(), xi),
         );
-        let p_prime: Seq<Fp> = step_23(p, s, x3, xi);
+        // ignore blindess
+        let (p_prime, _) = step_23(p, s, x3, xi, Fp::ZERO(), Fp::ZERO());
         assert_eq!(p_prime.len(), test_result.len());
         for i in 0..p_prime.len() {
             assert_eq!(p_prime[i], test_result[i])
@@ -2952,7 +3000,8 @@ fn test_step_24() {
         Fp::from_literal(3),
         Fp::from_literal(4),
     ]);
-    let (real_p_prime, real_G_prime, real_L, real_R) = step_24(
+    // ignore blindness
+    let (real_p_prime, real_G_prime, real_b, real_L, real_R, _, _) = step_24(
         p_prime_poly.clone(),
         G.clone(),
         x3,
@@ -3492,7 +3541,7 @@ fn test_vanishing_poly(omega_value: u128, n: u128) {
 
 #[cfg(test)]
 #[test]
-fn scratch() {
+fn example_run() {
     /*
      * let n = 2^2 = 4
      * then ω = 2 is 4 prime root of unity over F_5
@@ -3518,16 +3567,17 @@ fn scratch() {
      */
     let n = 4;
     let n_a = 3;
+    let n_q = 2;
     let omega = Fp::from_literal(2);
-    let crs: CRS = (
-        Seq::<G1>::from_vec(vec![
-            g1mul(Fp::from_literal(22), g1_generator()),
-            g1mul(Fp::from_literal(7), g1_generator()),
-            g1mul(Fp::from_literal(9), g1_generator()),
-            g1mul(Fp::from_literal(43), g1_generator()),
-        ]),
-        g1mul(Fp::from_literal(123), g1_generator()),
-    );
+    let G = Seq::<G1>::from_vec(vec![
+        g1mul(Fp::from_literal(22), g1_generator()),
+        g1mul(Fp::from_literal(7), g1_generator()),
+        g1mul(Fp::from_literal(9), g1_generator()),
+        g1mul(Fp::from_literal(43), g1_generator()),
+    ]);
+    let W = g1mul(Fp::from_literal(123), g1_generator());
+    let crs: CRS = (G.clone(), W);
+    let U = g1mul(Fp::from_literal(743), g1_generator());
 
     let r_poly = Seq::<Fp>::from_vec(vec![
         Fp::from_literal(987),
@@ -3571,6 +3621,7 @@ fn scratch() {
     let a_0 = legrange_poly(a0_points);
     let a_1 = legrange_poly(a1_points);
     let a_2 = legrange_poly(a2_points);
+    let a_list = Seq::from_vec(vec![a_0.clone(), a_1.clone(), a_2.clone()]);
     let q_add = legrange_poly(q_add_points);
 
     // construct A_i's (commitments)
@@ -3581,6 +3632,8 @@ fn scratch() {
     let A_2_blinding = Fp::from_literal(748);
     let A_2 = commit_polyx(&crs, a_2.clone(), A_2_blinding);
     let A_list = Seq::<G1>::from_vec(vec![A_0, A_1, A_2]);
+    // save a_blinds
+    let a_blinds = Seq::from_vec(vec![A_0_blinding, A_1_blinding, A_2_blinding]);
 
     // construct g'(X) = q_add(X) * (a_0(X)+a_1(X)+a_2(X)-a_0(omega * X))
     let mut g_prime = add_polyx(a_0.clone(), a_1.clone());
@@ -3592,17 +3645,144 @@ fn scratch() {
         assert_eq!(eval_polyx(g_prime.clone(), omega.pow(i)), Fp::ZERO());
     }
 
-    let h = step_4(g_prime, omega, n);
+    let q = Seq::<Seq<u128>>::from_vec(vec![Seq::from_vec(vec![0]), Seq::from_vec(vec![0, 1])]);
+    let sigma_list = Seq::<u128>::from_vec(vec![1, 0, 0]);
+
+    let h = step_4(g_prime.clone(), omega, n);
+
     let h_is = step_5(h, n);
+
     let r_seq = Seq::<Fp>::from_vec(vec![Fp::from_literal(5), Fp::from_literal(76)]);
     let H_is = step_6(h_is.clone(), &crs, r_seq);
+
     let x_challenge = Fp::from_literal(345);
     let H_prime = step_7(H_is, x_challenge, n);
+
     let h_prime = step_8(h_is, x_challenge, n);
+
     let a_primes = Seq::<Seq<Fp>>::from_vec(vec![a_0, a_1, a_2]);
-    let (r, a_is) = step_9(r_poly, a_primes, n_a, omega, p, x_challenge);
+    let (r, a_is) = step_9(r_poly.clone(), a_primes, n_a, omega, p.clone(), x_challenge);
+
+    let s_is = step_10(omega, p.clone(), x_challenge, a_list.clone(), n_a as u128);
+
     let x1_challenge = Fp::from_literal(475);
-    // let Q_is = step_11(n_a, x1_challenge, H_prime, R, A_list);
+    let Q_is = step_11(
+        n_a as u128,
+        x1_challenge,
+        H_prime,
+        R,
+        A_list,
+        q.clone(),
+        sigma_list.clone(),
+    );
+
+    let (q_is, q_blinds) = step_12(
+        n_a as u128,
+        x1_challenge,
+        h_prime,
+        r_poly,
+        a_list.clone(),
+        q.clone(),
+        sigma_list.clone(),
+        a_blinds,
+    );
+
+    let r_is = step_13(
+        n_a as u128,
+        n,
+        omega,
+        x_challenge,
+        x1_challenge,
+        r,
+        s_is,
+        q.clone(),
+        sigma_list.clone(),
+        a_list,
+        g_prime,
+    );
+
+    let x2_challenge = Fp::from_literal(286);
+    let step14_blinding = Fp::from_literal(32);
+    let (Q_prime, q_prime, Q_prime_blind) = step_14(
+        &crs,
+        x2_challenge,
+        q_is.clone(),
+        r_is.clone(),
+        q.clone(),
+        sigma_list.clone(),
+        step14_blinding,
+        omega,
+        x_challenge,
+    );
+
+    let x3_challenge = step_15(Fp::from_literal(175));
+
+    let u = step_16(n_q, x3_challenge, q_is.clone());
+
+    let x4_challenge = step_17(Fp::from_literal(391));
+
+    let (P, v) = step_18(
+        x_challenge,
+        x1_challenge,
+        x2_challenge,
+        x3_challenge,
+        x4_challenge,
+        omega,
+        Q_prime,
+        Q_is,
+        u.clone(),
+        r_is,
+        q,
+        sigma_list,
+    );
+
+    let (p_poly, p_blind) = step_19(x4_challenge, q_prime, q_is, q_blinds, Q_prime_blind);
+
+    let step20_blinding = Fp::from_literal(532);
+    let s_poly_points = Seq::from_vec(vec![
+        (Fp::from_literal(729), Fp::from_literal(23)),
+        (Fp::from_literal(73), Fp::from_literal(102)),
+        (Fp::from_literal(444), Fp::from_literal(484)),
+        (x3_challenge, Fp::ZERO()),
+    ]);
+    let s_poly = legrange_poly(s_poly_points);
+    let (S, s_blind) = step_20(s_poly.clone(), crs, step20_blinding);
+
+    let (xi, z) = step_21(Fp::from_literal(98), Fp::from_literal(8438));
+
+    let P_prime = step_22(P, G[0], S, v, xi);
+
+    let (p_prime_poly, p_prime_blind) = step_23(p_poly, s_poly, x3_challenge, xi, p_blind, s_blind);
+
+    let L_blinding = Seq::<Fp>::from_vec(vec![Fp::from_literal(549), Fp::from_literal(634)]);
+    let R_blinding = Seq::<Fp>::from_vec(vec![Fp::from_literal(827), Fp::from_literal(826)]);
+    let u_challenges = Seq::from_vec(vec![Fp::from_literal(723), Fp::from_literal(9283)]);
+    let (p_prime, G_prime, b, L, R, L_blinding, R_blinding) = step_24(
+        p_prime_poly,
+        G,
+        x3_challenge,
+        z,
+        U,
+        W,
+        n,
+        2,
+        u_challenges,
+        L_blinding,
+        R_blinding,
+    );
+    let (c, f) = step_25(
+        p_prime,
+        L_blinding,
+        R_blinding,
+        s_blind,
+        Q_prime_blind,
+        xi,
+        u.clone(),
+    );
+
+    let V_accepts = step_26(u, L, P_prime, R, c, G_prime[0], b[0], z, U, f, W);
+
+    assert!(V_accepts);
 }
 
 // fn test_vanishing_poly(omega_value:u128, n: u128){
