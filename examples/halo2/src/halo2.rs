@@ -561,10 +561,10 @@ fn eval_multi_poly(p: Seq<Term>, inputs: Seq<Fp>) -> Fp {
 /// * `blinding` - blinding factor
 fn commit_polyx(crs: &CRS, a: Seq<Fp>, blinding: Fp) -> G1 {
     let (G, W) = crs;
-    // let (f1, f2, b) = h;
+    let (f1, f2, b) = W;
 
     let lhs: G1 = msm(a, G.clone());
-    let rhs: G1 = g1mul(blinding, W.clone());
+    let rhs: G1 = g1mul(blinding, (f1.clone(), f2.clone(), b.clone()));
     let res: G1 = g1add(lhs, rhs);
 
     res
@@ -659,9 +659,6 @@ fn msm(a: Seq<Fp>, g: Seq<G1>) -> G1 {
 /// * `omega` - root of unity for the H
 /// * `n` - the order of the group
 fn compute_vanishing_polynomial(omega: Fp, n: u128) -> Seq<Fp> {
-    println!("compute vanishing");
-    println!("{:?}", n);
-
     let mut vanishing_poly = Seq::<Fp>::create((n - 1 as u128) as usize);
     vanishing_poly[0] = Fp::ONE();
     for i in 0..n as usize - 1 {
