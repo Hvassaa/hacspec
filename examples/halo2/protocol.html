@@ -1,0 +1,1414 @@
+<h1 id="protocol-description">Protocol Description</h1>
+<h2 id="preliminaries">Preliminaries</h2>
+<p>We take <span class="math inline">\sec</span> as our security
+parameter, and unless explicitly noted all algorithms and adversaries
+are probabilistic (interactive) Turing machines that run in polynomial
+time in this security parameter. We use <span
+class="math inline">\negl</span> to denote a function that is negligible
+in <span class="math inline">\sec</span>.</p>
+<h3 id="cryptographic-groups">Cryptographic Groups</h3>
+<p>We let <span class="math inline">\group</span> denote a cyclic group
+of prime order <span class="math inline">p</span>. The identity of a
+group is written as <span class="math inline">\zero</span>. We refer to
+the scalars of elements in <span class="math inline">\group</span> as
+elements in a scalar field <span class="math inline">\field</span> of
+size <span class="math inline">p</span>. Group elements are written in
+capital letters while scalars are written in lowercase or Greek letters.
+Vectors of scalars or group elements are written in boldface, i.e. <span
+class="math inline">\mathbf{a} \in \field^n</span> and <span
+class="math inline">\mathbf{G} \in \group^n</span>. Group operations are
+written additively and the multiplication of a group element <span
+class="math inline">G</span> by a scalar <span
+class="math inline">a</span> is written <span class="math inline">[a]
+G</span>.</p>
+<p>We will often use the notation <span class="math inline">\langle
+\mathbf{a}, \mathbf{b} \rangle</span> to describe the inner product of
+two like-length vectors of scalars <span class="math inline">\mathbf{a},
+\mathbf{b} \in \field^n</span>. We also use this notation to represent
+the linear combination of group elements such as <span
+class="math inline">\langle \mathbf{a}, \mathbf{G} \rangle</span> with
+<span class="math inline">\mathbf{a} \in \field^n, \mathbf{G} \in
+\group^n</span>, computed in practice by a multiscalar
+multiplication.</p>
+<p>We use <span class="math inline">\mathbf{0}^n</span> to describe a
+vector of length <span class="math inline">n</span> that contains only
+zeroes in <span class="math inline">\field</span>.</p>
+<blockquote>
+<p><strong>Discrete Log Relation Problem.</strong> The advantage metric
+<span class="math display">
+\adv^\dlrel_{\group,n}(\a, \sec) = \textnormal{Pr} \left[
+\mathsf{G}^\dlrel_{\group,n}(\a, \sec) \right]
+</span> is defined with respect the following game. <span
+class="math display">
+\begin{array}{ll}
+&amp;\underline{\bold{Game} \, \mathsf{G}^\dlrel_{\group,n}(\a, \sec):}
+\\
+&amp;\mathbf{G} \gets \group^n_\sec \\
+&amp;\mathbf{a} \gets \a(\mathbf{G}) \\
+&amp;\textnormal{Return} \, \left( \langle \mathbf{a}, \mathbf{G}
+\rangle = \zero \land \mathbf{a} \neq \mathbf{0}^n \right)
+\end{array}
+</span></p>
+</blockquote>
+<p>Given an <span class="math inline">n</span>-length vector <span
+class="math inline">\mathbf{G} \in \group^n</span> of group elements,
+the <em>discrete log relation problem</em> asks for <span
+class="math inline">\mathbf{g} \in \field^n</span> such that <span
+class="math inline">\mathbf{g} \neq \mathbf{0}^n</span> and yet <span
+class="math inline">\innerprod{\mathbf{g}}{\mathbf{G}} = \zero</span>,
+which we refer to as a <em>non-trivial</em> discrete log relation. The
+hardness of this problem is tightly implied by the hardness of the
+discrete log problem in the group as shown in Lemma 3 of <a
+href="https://eprint.iacr.org/2020/1213">[JT20]</a>. Formally, we use
+the game <span class="math inline">\dlgame</span> defined above to
+capture this problem.</p>
+<h3 id="interactive-proofs">Interactive Proofs</h3>
+<p><em>Interactive proofs</em> are a triple of algorithms <span
+class="math inline">\ip = (\setup, \prover, \verifier)</span>. The
+algorithm <span class="math inline">\setup(1^\sec)</span> produces as
+its output some <em>public parameters</em> commonly referred to by <span
+class="math inline">\pp</span>. The prover <span
+class="math inline">\prover</span> and verifier <span
+class="math inline">\verifier</span> are interactive machines (with
+access to <span class="math inline">\pp</span>) and we denote by <span
+class="math inline">\langle \prover(x), \verifier(y) \rangle</span> an
+algorithm that executes a two-party protocol between them on inputs
+<span class="math inline">x, y</span>. The output of this protocol, a
+<em>transcript</em> of their interaction, contains all of the messages
+sent between <span class="math inline">\prover</span> and <span
+class="math inline">\verifier</span>. At the end of the protocol, the
+verifier outputs a decision bit.</p>
+<h3 id="zero-knowledge-arguments-of-knowledge">Zero knowledge Arguments
+of Knowledge</h3>
+<p>Proofs of knowledge are interactive proofs where the prover aims to
+convince the verifier that they know a witness <span
+class="math inline">w</span> such that <span class="math inline">(x, w)
+\in \relation</span> for a statement <span class="math inline">x</span>
+and polynomial-time decidable relation <span
+class="math inline">\relation</span>. We will work with
+<em>arguments</em> of knowledge which assume computationally-bounded
+provers.</p>
+<p>We will analyze arguments of knowledge through the lens of four
+security notions.</p>
+<ul>
+<li><strong>Completeness:</strong> If the prover possesses a valid
+witness, can they <em>always</em> convince the verifier? It is useful to
+understand this property as it can have implications for the other
+security notions.</li>
+<li><strong>Soundness:</strong> Can a cheating prover falsely convince
+the verifier of the correctness of a statement that is not actually
+correct? We refer to the probability that a cheating prover can falsely
+convince the verifier as the <em>soundness error</em>.</li>
+<li><strong>Knowledge soundness:</strong> When the verifier is convinced
+the statement is correct, does the prover actually possess (“know”) a
+valid witness? We refer to the probability that a cheating prover
+falsely convinces the verifier of this knowledge as the <em>knowledge
+error</em>.</li>
+<li><strong>Zero knowledge:</strong> Does the verifier learn anything
+besides that which can be inferred from the correctness of the statement
+and the prover’s knowledge of a valid witness?</li>
+</ul>
+<p>First, we will visit the simple definition of completeness.</p>
+<blockquote>
+<p><strong>Perfect Completeness.</strong> An interactive argument <span
+class="math inline">(\setup, \prover, \verifier)</span> has <em>perfect
+completeness</em> if for all polynomial-time decidable relations <span
+class="math inline">\relation</span> and for all non-uniform
+polynomial-time adversaries <span class="math inline">\a</span> <span
+class="math display">
+Pr \left[
+(x, w) \notin \relation \lor
+\langle \prover(\pp, x, w), \verifier(\pp, x) \rangle \,
+\textnormal{accepts}
+\, \middle| \,
+\begin{array}{ll}
+&amp;\pp \gets \setup(1^\sec) \\
+&amp;(x, w) \gets \a(\pp)
+\end{array}
+\right] = 1
+</span></p>
+</blockquote>
+<h4 id="soundness">Soundness</h4>
+<p>Complicating our analysis is that although our protocol is described
+as an interactive argument, it is realized in practice as a
+<em>non-interactive argument</em> through the use of the Fiat-Shamir
+transformation.</p>
+<blockquote>
+<p><strong>Public coin.</strong> We say that an interactive argument is
+<em>public coin</em> when all of the messages sent by the verifier are
+each sampled with fresh randomness.</p>
+</blockquote>
+<blockquote>
+<p><strong>Fiat-Shamir transformation.</strong> In this transformation
+an interactive, public coin argument can be made
+<em>non-interactive</em> in the <em>random oracle model</em> by
+replacing the verifier algorithm with a cryptographically strong hash
+function that produces sufficiently random looking output.</p>
+</blockquote>
+<p>This transformation means that in the concrete protocol a cheating
+prover can easily “rewind” the verifier by forking the transcript and
+sending new messages to the verifier. Studying the concrete security of
+our construction <em>after</em> applying this transformation is
+important. Fortunately, we are able to follow a framework of analysis by
+Ghoshal and Tessaro ([<a
+href="https://eprint.iacr.org/2020/1351">GT20</a>]) that has been
+applied to constructions similar to ours.</p>
+<p>We will study our protocol through the notion of
+<em>state-restoration soundness</em>. In this model the (cheating)
+prover is allowed to rewind the verifier to any previous state it was
+in. The prover wins if they are able to produce an accepting
+transcript.</p>
+<blockquote>
+<p><strong>State-Restoration Soundness.</strong> Let <span
+class="math inline">\ip</span> be an interactive argument with <span
+class="math inline">r = r(\sec)</span> verifier challenges and let the
+<span class="math inline">i</span>th challenge be sampled from <span
+class="math inline">\ch_i</span>. The advantage metric <span
+class="math display">
+\adv^\srs_\ip(\prover, \sec) = \textnormal{Pr} \left[
+\srs^\ip_\prover(\sec) \right]
+</span> of a state restoration prover <span
+class="math inline">\prover</span> is defined with respect to the
+following game. <span class="math display">
+\begin{array}{ll}
+\begin{array}{ll}
+&amp;\underline{\bold{Game} \, \srs_\ip^\prover(\sec):} \\
+&amp;\textnormal{win} \gets \tt{false}; \\
+&amp;\tr \gets \epsilon \\
+&amp;\pp \gets \ip.\setup(1^\sec) \\
+&amp;(x, \textsf{st}_\prover) \gets \prover_\sec(\pp) \\
+&amp;\textnormal{Run} \,
+\prover^{\oracle_\srs}_\sec(\textsf{st}_\prover) \\
+&amp;\textnormal{Return win}
+\end{array} &amp;
+\begin{array}{ll}
+&amp;\underline{\bold{Oracle} \, \oracle_\srs(\tau = (a_1, c_1, ...,
+a_{i - 1}, c_{i - 1}), a_i):} \\
+&amp; \textnormal{If} \, \tau \in \tr \, \textnormal{then} \\
+&amp; \, \, \textnormal{If} \, i \leq r \, \textnormal{then} \\
+&amp; \, \, \, \, c_i \gets \ch_i; \tr \gets \tr || (\tau, a_i, c_i);
+\textnormal{Return} \, c_i \\
+&amp; \, \, \textnormal{Else if} \, i = r + 1 \, \textnormal{then} \\
+&amp; \, \, \, \, d \gets \ip.\verifier (\pp, x, (\tau, a_i)); \tr \gets
+(\tau, a_i) \\
+&amp; \, \, \, \, \textnormal{If} \, d = 1 \, \textnormal{then win}
+\gets \tt{true} \\
+&amp; \, \, \, \, \textnormal{Return} \, d \\
+&amp;\textnormal{Return} \bottom
+\end{array}
+\end{array}
+</span></p>
+</blockquote>
+<p>As shown in [<a href="https://eprint.iacr.org/2020/1351">GT20</a>]
+(Theorem 1) state restoration soundness is tightly related to soundness
+after applying the Fiat-Shamir transformation.</p>
+<h4 id="knowledge-soundness">Knowledge Soundness</h4>
+<p>We will show that our protocol satisfies a strengthened notion of
+knowledge soundness known as <em>witness extended emulation</em>.
+Informally, this notion states that for any successful prover algorithm
+there exists an efficient <em>emulator</em> that can extract a witness
+from it by rewinding it and supplying it with fresh randomness.</p>
+<p>However, we must slightly adjust our definition of witness extended
+emulation to account for the fact that our provers are state restoration
+provers and can rewind the verifier. Further, to avoid the need for
+rewinding the state restoration prover during witness extraction we
+study our protocol in the algebraic group model.</p>
+<blockquote>
+<p><strong>Algebraic Group Model (AGM).</strong> An adversary <span
+class="math inline">\alg{\prover}</span> is said to be
+<em>algebraic</em> if whenever it outputs a group element <span
+class="math inline">X</span> it also outputs a <em>representation</em>
+<span class="math inline">\mathbf{x} \in \field^n</span> such that <span
+class="math inline">\langle \mathbf{x}, \mathbf{G} \rangle = X</span>
+where <span class="math inline">\mathbf{G} \in \group^n</span> is the
+vector of group elements that <span
+class="math inline">\alg{\prover}</span> has seen so far. Notationally,
+we write <span class="math inline">\rep{X}</span> to describe a group
+element <span class="math inline">X</span> enhanced with this
+representation. We also write <span
+class="math inline">\repv{X}{G}{i}</span> to identify the component of
+the representation of <span class="math inline">X</span> that
+corresponds with <span class="math inline">\mathbf{G}_i</span>. In other
+words, <span class="math display">
+X = \sum\limits_{i=0}^{n - 1} \left[ \repv{X}{G}{i} \right] \mathbf{G}_i
+</span></p>
+</blockquote>
+<p>The algebraic group model allows us to perform so-called “online”
+extraction for some protocols: the extractor can obtain the witness from
+the representations themselves for a single (accepting) transcript.</p>
+<blockquote>
+<p><strong>State Restoration Witness Extended Emulation</strong> Let
+<span class="math inline">\ip</span> be an interactive argument for
+relation <span class="math inline">\relation</span> with <span
+class="math inline">r = r(\sec)</span> challenges. We define for all
+non-uniform algebraic provers <span
+class="math inline">\alg{\prover}</span>, extractors <span
+class="math inline">\extractor</span>, and computationally unbounded
+distinguishers <span class="math inline">\distinguisher</span> the
+advantage metric <span class="math display">
+\adv^\srwee_{\ip, \relation}(\alg{\prover}, \distinguisher, \extractor,
+\sec) = \textnormal{Pr} \left[
+\weereal^{\prover,\distinguisher}_{\ip,\relation}(\sec) \right] -
+\textnormal{Pr} \left[
+\weeideal^{\extractor,\prover,\distinguisher}_{\ip,\relation}(\sec)
+\right]
+</span> is defined with the respect to the following games. <span
+class="math display">
+\begin{array}{ll}
+\begin{array}{ll}
+&amp;\underline{\bold{Game} \,
+\weereal_{\ip,\relation}^{\alg{\prover},\distinguisher}(\sec):} \\
+&amp;\tr \gets \epsilon \\
+&amp;\pp \gets \ip.\setup(1^\sec) \\
+&amp;(x, \state{\prover}) \gets \alg{\prover}(\pp) \\
+&amp;\textnormal{Run} \, \alg{\prover}^{\oracle_\real}(\state{\prover})
+\\
+&amp;b \gets \distinguisher(\tr) \\
+&amp;\textnormal{Return} \, b = 1 \\
+&amp;\underline{\bold{Game} \,
+\weeideal_{\ip,\relation}^{\extractor,\alg{\prover},\distinguisher}(\sec):}
+\\
+&amp;\tr \gets \epsilon \\
+&amp;\pp \gets \ip.\setup(1^\sec) \\
+&amp;(x, \state{\prover}) \gets \alg{\prover}(\pp) \\
+&amp;\state{\extractor} \gets (1^\sec, \pp, x) \\
+&amp;\textnormal{Run} \, \alg{\prover}^{\oracle_\ideal}(\state{\prover})
+\\
+&amp;w \gets \extractor(\state{\extractor}, \bottom) \\
+&amp;b \gets \distinguisher(\tr) \\
+&amp;\textnormal{Return} \, (b = 1) \\
+&amp;\, \, \land (\textnormal{Acc}(\tr) \implies (x, w) \in \relation)
+\\
+\end{array} &amp;
+\begin{array}{ll}
+&amp;\underline{\bold{Oracle} \, \oracle_\real(\tau = (a_1, c_1, ...,
+a_{i - 1}, c_{i - 1}), a_i):} \\
+&amp; \textnormal{If} \, \tau \in \tr \, \textnormal{then} \\
+&amp; \, \, \textnormal{If} \, i \leq r \, \textnormal{then} \\
+&amp; \, \, \, \, c_i \gets \ch_i; \tr \gets \tr || (\tau, a_i, c_i);
+\textnormal{Return} \, c_i \\
+&amp; \, \, \textnormal{Else if} \, i = r + 1 \, \textnormal{then} \\
+&amp; \, \, \, \, d \gets \ip.\verifier (\pp, x, (\tau, a_i)); \tr \gets
+(\tau, a_i) \\
+&amp; \, \, \, \, \textnormal{If} \, d = 1 \, \textnormal{then win}
+\gets \tt{true} \\
+&amp; \, \, \, \, \textnormal{Return} \, d \\
+&amp; \, \, \textnormal{Return} \, \bottom \\
+\\
+\\
+&amp;\underline{\bold{Oracle} \, \oracle_\ideal(\tau, a):} \\
+&amp; \textnormal{If} \, \tau \in \tr \, \textnormal{then} \\
+&amp; \, \, (r, \state{\extractor}) \gets \extractor(\state{\extractor},
+\left[(\tau, a)\right]) \\
+&amp; \, \, \tr \gets \tr || (\tau, a, r) \\
+&amp; \, \, \textnormal{Return} \, r \\
+&amp;\textnormal{Return} \, \bottom
+\end{array}
+\end{array}
+</span></p>
+</blockquote>
+<h4 id="zero-knowledge">Zero Knowledge</h4>
+<p>We say that an argument of knowledge is <em>zero knowledge</em> if
+the verifier also does not learn anything from their interaction besides
+that which can be learned from the existence of a valid <span
+class="math inline">w</span>. More formally,</p>
+<blockquote>
+<p><strong>Perfect Special Honest-Verifier Zero Knowledge.</strong> A
+public coin interactive argument <span class="math inline">(\setup,
+\prover, \verifier)</span> has <em>perfect special honest-verifier zero
+knowledge</em> (PSHVZK) if for all polynomial-time decidable relations
+<span class="math inline">\relation</span> and for all <span
+class="math inline">(x, w) \in \relation</span> and for all non-uniform
+polynomial-time adversaries <span class="math inline">\a_1, \a_2</span>
+there exists a probabilistic polynomial-time simulator <span
+class="math inline">\sim</span> such that <span class="math display">
+\begin{array}{rl}
+&amp;Pr \left[ \a_1(\sigma, x, \tr) = 1 \, \middle| \,
+\begin{array}{ll}
+&amp;\pp \gets \setup(1^\lambda); \\
+&amp;(x, w, \rho) \gets \a_2(\pp); \\
+&amp;tr \gets \langle \prover(\pp, x, w), \verifier(\pp, x, \rho)
+\rangle
+\end{array}
+\right] \\
+\\
+=&amp;Pr \left[ \a_1(\sigma, x, \tr) = 1 \, \middle| \,
+\begin{array}{ll}
+&amp;\pp \gets \setup(1^\lambda); \\
+&amp;(x, w, \rho) \gets \a_2(\pp); \\
+&amp;tr \gets \sim(\pp, x, \rho)
+\end{array}
+\right]
+\end{array}
+</span> where <span class="math inline">\rho</span> is the internal
+randomness of the verifier.</p>
+</blockquote>
+<p>In this (common) definition of zero-knowledge the verifier is
+expected to act “honestly” and send challenges that correspond only with
+their internal randomness; they cannot adaptively respond to the prover
+based on the prover’s messages. We use a strengthened form of this
+definition that forces the simulator to output a transcript with the
+same (adversarially provided) challenges that the verifier algorithm
+sends to the prover.</p>
+<h2 id="protocol">Protocol</h2>
+<p>Let <span class="math inline">\omega \in \field</span> be a <span
+class="math inline">n = 2^k</span> primitive root of unity forming the
+domain <span class="math inline">D = (\omega^0, \omega^1, ..., \omega^{n
+- 1})</span> with <span class="math inline">t(X) = X^n - 1</span> the
+vanishing polynomial over this domain. Let <span
+class="math inline">n_g, n_a, n_e</span> be positive integers with <span
+class="math inline">n_a, n_e \lt n</span> and <span
+class="math inline">n_g \geq 4</span>. We present an interactive
+argument <span class="math inline">\halo = (\setup, \prover,
+\verifier)</span> for the relation <span class="math display">
+\relation = \left\{
+\begin{array}{ll}
+&amp;\left(
+\begin{array}{ll}
+\left(
+g(X, C_0, ..., C_{n_a - 1}, a_0(X), ..., a_{n_a - 1}\left(X, C_0, ...,
+C_{n_a - 1}, a_0(X), ..., a_{n_a - 2}(X) \right))
+\right); \\
+\left(
+a_0(X), a_1(X, C_0, a_0(X)), ..., a_{n_a - 1}\left(X, C_0, ..., C_{n_a -
+1}, a_0(X), ..., a_{n_a - 2}(X) \right)
+\right)
+\end{array}
+\right) : \\
+\\
+&amp; g(\omega^i, \cdots) = 0 \, \, \, \, \forall i \in [0, 2^k)
+\end{array}
+\right\}
+</span> where <span class="math inline">a_0, a_1, ..., a_{n_a -
+1}</span> are (multivariate) polynomials with degree <span
+class="math inline">n - 1</span> in <span class="math inline">X</span>
+and <span class="math inline">g</span> has degree <span
+class="math inline">n_g(n - 1)</span> at most in any indeterminates
+<span class="math inline">X, C_0, C_1, ...</span>.</p>
+<p><span class="math inline">\setup(\sec)</span> returns <span
+class="math inline">\pp = (\group, \field, \mathbf{G} \in \group^n, U, W
+\in \group)</span>.</p>
+<p>For all <span class="math inline">i \in [0, n_a)</span>: * Let <span
+class="math inline">\mathbf{p_i}</span> be the exhaustive set of
+integers <span class="math inline">j</span> (modulo <span
+class="math inline">n</span>) such that <span
+class="math inline">a_i(\omega^j X, \cdots)</span> appears as a term in
+<span class="math inline">g(X, \cdots)</span>. * Let <span
+class="math inline">\mathbf{q}</span> be a list of distinct sets of
+integers containing <span class="math inline">\mathbf{p_i}</span> and
+the set <span class="math inline">\mathbf{q_0} = \{0\}</span>. * Let
+<span class="math inline">\sigma(i) = \mathbf{q}_j</span> when <span
+class="math inline">\mathbf{q}_j = \mathbf{p_i}</span>.</p>
+<p>Let <span class="math inline">n_q \leq n_a</span> denote the size of
+<span class="math inline">\mathbf{q}</span>, and let <span
+class="math inline">n_e</span> denote the size of every <span
+class="math inline">\mathbf{p_i}</span> without loss of generality.</p>
+<p>In the following protocol, we take it for granted that each
+polynomial <span class="math inline">a_i(X, \cdots)</span> is defined
+such that <span class="math inline">n_e + 1</span> blinding factors are
+freshly sampled by the prover and are each present as an evaluation of
+<span class="math inline">a_i(X, \cdots)</span> over the domain <span
+class="math inline">D</span>. In all of the following, the verifier’s
+challenges cannot be zero or an element in <span
+class="math inline">D</span>, and some additional limitations are placed
+on specific challenges as well.</p>
+<ol type="1">
+<li><span class="math inline">\prover</span> and <span
+class="math inline">\verifier</span> proceed in the following <span
+class="math inline">n_a</span> rounds of interaction, where in round
+<span class="math inline">j</span> (starting at <span
+class="math inline">0</span>)</li>
+</ol>
+<ul>
+<li><span class="math inline">\prover</span> sets <span
+class="math inline">a&#39;_j(X) = a_j(X, c_0, c_1, ..., c_{j - 1},
+a_0(X, \cdots), ..., a_{j - 1}(X, \cdots, c_{j - 1}))</span></li>
+<li><span class="math inline">\prover</span> sends a hiding commitment
+<span class="math inline">A_j = \innerprod{\mathbf{a&#39;}}{\mathbf{G}}
++ [a^* _j] W</span> where <span
+class="math inline">\mathbf{a&#39;}</span> are the coefficients of the
+univariate polynomial <span class="math inline">a&#39;_j(X)</span> and
+<span class="math inline">a^* _j</span> is some random, independently
+sampled blinding factor. (Similar elision notation is used throughout
+this protocol description, if the value is not reused we will use <span
+class="math inline">\cdot</span> to simplify exposition.)</li>
+<li><span class="math inline">\verifier</span> responds with a challenge
+<span class="math inline">c_j</span>.</li>
+</ul>
+<ol start="2" type="1">
+<li><span class="math inline">\prover</span> sets <span
+class="math inline">g&#39;(X) = g(X, c_0, c_1, ..., c_{n_a - 1},
+\cdots)</span>.</li>
+<li><span class="math inline">\prover</span> sends a commitment <span
+class="math inline">R = \innerprod{\mathbf{r}}{\mathbf{G}} + [\cdot]
+W</span> where <span class="math inline">\mathbf{r} \in \field^n</span>
+are the coefficients of a randomly sampled univariate polynomial <span
+class="math inline">r(X)</span> of degree <span class="math inline">n -
+1</span>.</li>
+<li><span class="math inline">\prover</span> computes univariate
+polynomial <span class="math inline">h(X) =
+\frac{g&#39;(X)}{t(X)}</span> of degree <span class="math inline">n_g(n
+- 1) - n</span>.</li>
+<li><span class="math inline">\prover</span> computes at most <span
+class="math inline">n - 1</span> degree polynomials <span
+class="math inline">h_0(X), h_1(X), ..., h_{n_g - 2}(X)</span> such that
+<span class="math inline">h(X) = \sum\limits_{i=0}^{n_g - 2} X^{ni}
+h_i(X)</span>.</li>
+<li><span class="math inline">\prover</span> sends commitments <span
+class="math inline">H_i = \innerprod{\mathbf{h_i}}{\mathbf{G}} + [\cdot]
+W</span> for all <span class="math inline">i</span> where <span
+class="math inline">\mathbf{h_i}</span> denotes the vector of
+coefficients for <span class="math inline">h_i(X)</span>.</li>
+<li><span class="math inline">\verifier</span> responds with challenge
+<span class="math inline">x</span> and computes <span
+class="math inline">H&#39; = \sum\limits_{i=0}^{n_g - 2} [x^{ni}]
+H_i</span>.</li>
+<li><span class="math inline">\prover</span> sets <span
+class="math inline">h&#39;(X) = \sum\limits_{i=0}^{n_g - 2} x^{ni}
+h_i(X)</span>.</li>
+<li><span class="math inline">\prover</span> sends <span
+class="math inline">r = r(x)</span> and for all <span
+class="math inline">i \in [0, n_a)</span> sends <span
+class="math inline">\mathbf{a_i}</span> such that <span
+class="math inline">(\mathbf{a_i})_j =
+a&#39;_i(\omega^{(\mathbf{p_i})_j} x)</span> for all <span
+class="math inline">j \in [0, n_e - 1]</span>.</li>
+<li>For all <span class="math inline">i \in [0, n_a)</span> <span
+class="math inline">\prover</span> and <span
+class="math inline">\verifier</span> set <span
+class="math inline">s_i(X)</span> to be the lowest degree univariate
+polynomial defined such that <span
+class="math inline">s_i(\omega^{(\mathbf{p_i})_j} x) =
+(\mathbf{a_i})_j</span> for all <span class="math inline">j \in [0, n_e
+- 1)</span>.</li>
+<li><span class="math inline">\verifier</span> responds with challenges
+<span class="math inline">x_1, x_2</span> and initializes <span
+class="math inline">Q_0, Q_1, ..., Q_{n_q - 1} = \zero</span>.</li>
+</ol>
+<ul>
+<li>Starting at <span class="math inline">i=0</span> and ending at <span
+class="math inline">n_a - 1</span> <span
+class="math inline">\verifier</span> sets <span
+class="math inline">Q_{\sigma(i)} := [x_1] Q_{\sigma(i)} +
+A_i</span>.</li>
+<li><span class="math inline">\verifier</span> finally sets <span
+class="math inline">Q_0 := [x_1^2] Q_0 + [x_1] H&#39; + R</span>.</li>
+</ul>
+<ol start="12" type="1">
+<li><span class="math inline">\prover</span> initializes <span
+class="math inline">q_0(X), q_1(X), ..., q_{n_q - 1}(X) = 0</span> and
+<span class="math inline">q^\*_0, q^\*_1, ..., q^\* _{n_q-1} =
+0</span>.</li>
+</ol>
+<ul>
+<li>Starting at <span class="math inline">i=0</span> and ending at <span
+class="math inline">n_a - 1</span> <span
+class="math inline">\prover</span> sets <span
+class="math inline">q_{\sigma(i)} := x_1 q_{\sigma(i)} +
+a&#39;(X)</span> and <span class="math inline">q^* _{\sigma(i)} := x_1
+q^* _{\sigma(i)} + a^*_i</span>.</li>
+<li><span class="math inline">\prover</span> finally sets <span
+class="math inline">q_0(X) := x_1^2 q_0(X) + x_1 h&#39;(X) +
+r(X)</span>.</li>
+</ul>
+<ol start="13" type="1">
+<li><span class="math inline">\prover</span> and <span
+class="math inline">\verifier</span> initialize <span
+class="math inline">r_0(X), r_1(X), ..., r_{n_q - 1}(X) = 0</span>.</li>
+</ol>
+<ul>
+<li>Starting at <span class="math inline">i = 0</span> and ending at
+<span class="math inline">n_a - 1</span> <span
+class="math inline">\prover</span> and <span
+class="math inline">\verifier</span> set <span
+class="math inline">r_{\sigma(i)}(X) := x_1 r_{\sigma(i)}(X) +
+s_i(X)</span>.</li>
+<li>Finally <span class="math inline">\prover</span> and <span
+class="math inline">\verifier</span> set <span class="math inline">r_0
+:= x_1^2 r_0 + x_1 h + r</span> and where <span
+class="math inline">h</span> is computed by <span
+class="math inline">\verifier</span> as <span
+class="math inline">\frac{g&#39;(x)}{t(x)}</span> using the values <span
+class="math inline">r, \mathbf{a}</span> provided by <span
+class="math inline">\prover</span>.</li>
+</ul>
+<ol start="14" type="1">
+<li><span class="math inline">\prover</span> sends <span
+class="math inline">Q&#39; = \innerprod{\mathbf{q&#39;}}{\mathbf{G}} +
+[q^{\prime *}] W</span> where <span class="math inline">q^{\prime
+*}</span> is blinding factor and <span
+class="math inline">\mathbf{q&#39;}</span> defines the coefficients of
+the polynomial $$q’(X) = _{i=0}^{n_q - 1}</li>
+</ol>
+<p>x_2^{n_q - 1 - i} ( {q_i(X) - r_i(X)} {_{j=0}^{n_e - 1} ( X - ^{(
+)<em>j} x ) } ) <span class="math display">
+15. $\verifier$ responds with challenge $x_3$.
+16. $\prover$ sends $\mathbf{u} \in \field^{n_q}$ such that
+$\mathbf{u}_i = q_i(x_3)$ for all $i \in [0, n_q)$.
+17. $\verifier$ responds with challenge $x_4$.
+18. $\verifier$ sets $P = [x_4^{n_q}]Q&#39; + \sum\limits_{i=0}^{n_q -
+1} [x_4^{n_q - 1 - i}] Q_i$ and $v = $
+</span> x_4^{n_q} </em>{i=0}^{n_q - 1} ( x_2^{n_q - 1 - i} ( { <em>i -
+r_i(x_3) } {</em>{j=0}^{n_e - 1} ( x_3 - ^{( )<em>j} x ) } ) ) +
+</em>{i=0}^{n_q - 1} x_4^{n_q - 1 - i} _i $$ 19. <span
+class="math inline">\prover</span> sets <span class="math inline">p(X) =
+x_4^{n_q} \cdot q&#39;(x) + \sum\limits_{i=0}^{n_q - 1} x_4^{n_q - 1 -
+i} \cdot q_i(X)</span> and <span class="math inline">p^* = x_4^{n_q}
+\cdot q&#39;^* + \sum\limits_{i=0}^{n_q - 1} x_4^{n_q - 1 - i} \cdot
+q^*_i</span>. 20. <span class="math inline">\prover</span> samples a
+random polynomial <span class="math inline">s(X)</span> of degree <span
+class="math inline">n - 1</span> with a root at <span
+class="math inline">x_3</span> and sends a commitment <span
+class="math inline">S = \innerprod{\mathbf{s}}{\mathbf{G}} + [s^{*}]
+W</span> where <span class="math inline">\mathbf{s}</span> defines the
+coefficients of <span class="math inline">s(X)</span> and <span
+class="math inline">s^{*}</span> is blinding. 21. <span
+class="math inline">\verifier</span> responds with challenges <span
+class="math inline">\xi, z</span>. 22. <span
+class="math inline">\verifier</span> sets <span
+class="math inline">P&#39; = P - [v] \mathbf{G}_0 + [\xi] S</span>. 23.
+<span class="math inline">\prover</span> sets <span
+class="math inline">p&#39;(X) = p(X) - p(x_3) + \xi s(X)</span> and
+<span class="math inline">p^{\prime *} = s^\* \cdot \xi + p^\*</span>
+(where <span class="math inline">p(x_3)</span> should correspond with
+the verifier’s computed value <span class="math inline">v</span>). 24.
+Initialize <span class="math inline">\mathbf{p&#39;}</span> as the
+coefficients of <span class="math inline">p&#39;(X)</span> and <span
+class="math inline">\mathbf{G&#39;} = \mathbf{G}</span> and <span
+class="math inline">\mathbf{b} = (x_3^0, x_3^1, ..., x_3^{n -
+1})</span>. <span class="math inline">\prover</span> and <span
+class="math inline">\verifier</span> will interact in the following
+<span class="math inline">k</span> rounds, where in the <span
+class="math inline">j</span>th round starting in round <span
+class="math inline">j=0</span> and ending in round <span
+class="math inline">j=k-1</span>: * <span
+class="math inline">\prover</span> sends <span class="math inline">L_j =
+\innerprod{\mathbf{p&#39;}_\hi}{\mathbf{G&#39;}_\lo} + [z
+\innerprod{\mathbf{p&#39;}_\hi}{\mathbf{b}_\lo}] U + [L_j^\*] W</span>
+and <span class="math inline">R_j =
+\innerprod{\mathbf{p&#39;}_\lo}{\mathbf{G&#39;}_\hi} + [z
+\innerprod{\mathbf{p&#39;}_\lo}{\mathbf{b}_\hi}] U + [R_j^\*] W</span>
+where <span class="math inline">L_j^\*</span> and <span
+class="math inline">R_j^\*</span> are blinding. * <span
+class="math inline">\verifier</span> responds with challenge <span
+class="math inline">u_j</span> chosen such that <span
+class="math inline">1 + u_{k-1-j} x_3^{2^j}</span> is nonzero. * <span
+class="math inline">\prover</span> and <span
+class="math inline">\verifier</span> set <span
+class="math inline">\mathbf{G&#39;} := \mathbf{G&#39;}_\lo + u_j
+\mathbf{G&#39;}_\hi</span> and <span class="math inline">\mathbf{b} :=
+\mathbf{b}_\lo + u_j \mathbf{b}_\hi</span>. * <span
+class="math inline">\prover</span> sets <span
+class="math inline">\mathbf{p&#39;} := \mathbf{p&#39;}_\lo + u_j^{-1}
+\mathbf{p&#39;}_\hi</span>. 25. <span class="math inline">\prover</span>
+sends <span class="math inline">c = \mathbf{p&#39;}_0</span> and
+synthetic blinding factor <span class="math inline">f = p^{\prime *} +
+\sum_{j=0}^{k - 1}L_j^\* \cdot u_j^{-1}+r_j^\* \cdot u_j</span>. 26.
+<span class="math inline">\verifier</span> accepts only if <span
+class="math inline">\sum_{j=0}^{k - 1} [u_j^{-1}] L_j + P&#39; +
+\sum_{j=0}^{k - 1} [u_j] R_j = [c] \mathbf{G&#39;}_0 + [c \mathbf{b}_0
+z] U + [f] W</span>.</p>
+<h3 id="zero-knowledge-and-completeness">Zero-knowledge and
+Completeness</h3>
+<p>We claim that this protocol is <em>perfectly complete</em>. This can
+be verified by inspection of the protocol; given a valid witness <span
+class="math inline">a_i(X, \cdots) \forall i</span> the prover succeeds
+in convincing the verifier with probability <span
+class="math inline">1</span>.</p>
+<p>We claim that this protocol is <em>perfect special honest-verifier
+zero knowledge</em>. We do this by showing that a simulator <span
+class="math inline">\sim</span> exists which can produce an accepting
+transcript that is equally distributed with a valid prover’s interaction
+with a verifier with the same public coins. The simulator will act as an
+honest prover would, with the following exceptions:</p>
+<ol type="1">
+<li>In step <span class="math inline">1</span> of the protocol <span
+class="math inline">\sim</span> chooses random degree <span
+class="math inline">n - 1</span> polynomials (in <span
+class="math inline">X</span>) <span class="math inline">a_i(X, \cdots)
+\forall i</span>.</li>
+<li>In step <span class="math inline">5</span> of the protocol <span
+class="math inline">\sim</span> chooses a random <span
+class="math inline">n - 1</span> degree polynomials <span
+class="math inline">h_0(X), h_1(X), ..., h_{n_g - 2}(X)</span>.</li>
+<li>In step <span class="math inline">14</span> of the protocol <span
+class="math inline">\sim</span> chooses a random <span
+class="math inline">n - 1</span> degree polynomial <span
+class="math inline">q&#39;(X)</span>.</li>
+<li>In step <span class="math inline">20</span> of the protocol <span
+class="math inline">\sim</span> uses its foreknowledge of the verifier’s
+choice of <span class="math inline">\xi</span> to produce a degree <span
+class="math inline">n - 1</span> polynomial <span
+class="math inline">s(X)</span> conditioned only such that <span
+class="math inline">p(X) - v + \xi s(X)</span> has a root at <span
+class="math inline">x_3</span>.</li>
+</ol>
+<p>First, let us consider why this simulator always succeeds in
+producing an <em>accepting</em> transcript. <span
+class="math inline">\sim</span> lacks a valid witness and simply commits
+to random polynomials whenever knowledge of a valid witness would be
+required by the honest prover. The verifier places no conditions on the
+scalar values in the transcript. <span class="math inline">\sim</span>
+must only guarantee that the check in step <span
+class="math inline">26</span> of the protocol succeeds. It does so by
+using its knowledge of the challenge <span
+class="math inline">\xi</span> to produce a polynomial which interferes
+with <span class="math inline">p&#39;(X)</span> to ensure it has a root
+at <span class="math inline">x_3</span>. The transcript will thus always
+be accepting due to perfect completeness.</p>
+<p>In order to see why <span class="math inline">\sim</span> produces
+transcripts distributed identically to the honest prover, we will look
+at each piece of the transcript and compare the distributions. First,
+note that <span class="math inline">\sim</span> (just as the honest
+prover) uses a freshly random blinding factor for every group element in
+the transcript, and so we need only consider the <em>scalars</em> in the
+transcript. <span class="math inline">\sim</span> acts just as the
+prover does except in the mentioned cases so we will analyze each
+case:</p>
+<ol type="1">
+<li><span class="math inline">\sim</span> and an honest prover reveal
+<span class="math inline">n_e</span> openings of each polynomial <span
+class="math inline">a_i(X, \cdots)</span>, and at most one additional
+opening of each <span class="math inline">a_i(X, \cdots)</span> in step
+<span class="math inline">16</span>. However, the honest prover blinds
+their polynomials <span class="math inline">a_i(X, \cdots)</span> (in
+<span class="math inline">X</span>) with <span class="math inline">n_e +
+1</span> random evaluations over the domain <span
+class="math inline">D</span>. Thus, the openings of <span
+class="math inline">a_i(X, \cdots)</span> at the challenge <span
+class="math inline">x</span> (which is prohibited from being <span
+class="math inline">0</span> or in the domain <span
+class="math inline">D</span> by the protocol) are distributed
+identically between <span class="math inline">\sim</span> and an honest
+prover.</li>
+<li>Neither <span class="math inline">\sim</span> nor the honest prover
+reveal <span class="math inline">h(x)</span> as it is computed by the
+verifier. However, the honest prover may reveal <span
+class="math inline">h&#39;(x_3)</span> — which has a non-trivial
+relationship with <span class="math inline">h(X)</span> — were it not
+for the fact that the honest prover also commits to a random degree
+<span class="math inline">n - 1</span> polynomial <span
+class="math inline">r(X)</span> in step <span
+class="math inline">3</span>, producing a commitment <span
+class="math inline">R</span> and ensuring that in step <span
+class="math inline">12</span> when the prover sets <span
+class="math inline">q_0(X) := x_1^2 q_0(X) + x_1 h&#39;(X) + r(X)</span>
+the distribution of <span class="math inline">q_0(x_3)</span> is
+uniformly random. Thus, <span class="math inline">h&#39;(x_3)</span> is
+never revealed by the honest prover nor by <span
+class="math inline">\sim</span>.</li>
+<li>The expected value of <span class="math inline">q&#39;(x_3)</span>
+is computed by the verifier (in step <span
+class="math inline">18</span>) and so the simulator’s actual choice of
+<span class="math inline">q&#39;(X)</span> is irrelevant.</li>
+<li><span class="math inline">p(X) - v + \xi s(X)</span> is conditioned
+on having a root at <span class="math inline">x_3</span>, but otherwise
+no conditions are placed on <span class="math inline">s(X)</span> and so
+the distribution of the degree <span class="math inline">n - 1</span>
+polynomial <span class="math inline">p(X) - v + \xi s(X)</span> is
+uniformly random whether or not <span class="math inline">s(X)</span>
+has a root at <span class="math inline">x_3</span>. Thus, the
+distribution of <span class="math inline">c</span> produced in step
+<span class="math inline">25</span> is identical between <span
+class="math inline">\sim</span> and an honest prover. The synthetic
+blinding factor <span class="math inline">f</span> also revealed in step
+<span class="math inline">25</span> is a trivial function of the
+prover’s other blinding factors and so is distributed identically
+between <span class="math inline">\sim</span> and an honest prover.</li>
+</ol>
+<p>Notes:</p>
+<ol type="1">
+<li>In an earlier version of our protocol, the prover would open each
+individual commitment <span class="math inline">H_0, H_1, ...</span> at
+<span class="math inline">x</span> as part of the multipoint opening
+argument, and the verifier would confirm that a linear combination of
+these openings (with powers of <span class="math inline">x^n</span>)
+agreed to the expected value of <span class="math inline">h(x)</span>.
+This was done because it’s more efficient in recursive proofs. However,
+it was unclear to us what the expected distribution of the openings of
+these commitments <span class="math inline">H_0, H_1, ...</span> was and
+so proving that the argument was zero-knowledge is difficult. Instead,
+we changed the argument so that the <em>verifier</em> computes a linear
+combination of the commitments and that linear combination is opened at
+<span class="math inline">x</span>. This avoided leaking <span
+class="math inline">h_i(x)</span>.</li>
+<li>As mentioned, in step <span class="math inline">3</span> the prover
+commits to a random polynomial as a way of ensuring that <span
+class="math inline">h&#39;(x_3)</span> is not revealed in the multiopen
+argument. This is done because it’s unclear what the distribution of
+<span class="math inline">h&#39;(x_3)</span> would be.</li>
+<li>Technically it’s also possible for us to prove zero-knowledge with a
+simulator that uses its foreknowledge of the challenge <span
+class="math inline">x</span> to commit to an <span
+class="math inline">h(X)</span> which agrees at <span
+class="math inline">x</span> to the value it will be expected to. This
+would obviate the need for the random polynomial <span
+class="math inline">s(X)</span> in the protocol. This may make the
+analysis of zero-knowledge for the remainder of the protocol a little
+bit tricky though, so we didn’t go this route.</li>
+<li>Group element blinding factors are <em>technically</em> not
+necessary after step <span class="math inline">23</span> in which the
+polynomial is completely randomized. However, it’s simpler in practice
+for us to ensure that every group element in the protocol is randomly
+blinded to make edge cases involving the point at infinity harder.</li>
+<li>It is crucial that the verifier cannot challenge the prover to open
+polynomials at points in <span class="math inline">D</span> as otherwise
+the transcript of an honest prover will be forced to contain what could
+be portions of the prover’s witness. We therefore restrict the space of
+challenges to include all elements of the field except <span
+class="math inline">D</span> and, for simplicity, we also prohibit the
+challenge of <span class="math inline">0</span>.</li>
+</ol>
+<h2 id="witness-extended-emulation">Witness-extended Emulation</h2>
+<p>Let <span class="math inline">\protocol = \protocol[\group]</span> be
+the interactive argument described above for relation <span
+class="math inline">\relation</span> and some group <span
+class="math inline">\group</span> with scalar field <span
+class="math inline">\field</span>. We can always construct an extractor
+<span class="math inline">\extractor</span> such that for any
+non-uniform algebraic prover <span
+class="math inline">\alg{\prover}</span> making at most <span
+class="math inline">q</span> queries to its oracle, there exists a
+non-uniform adversary <span class="math inline">\dlreladv</span> with
+the property that for any computationally unbounded distinguisher <span
+class="math inline">\distinguisher</span></p>
+<p><span class="math display">
+\adv^\srwee_{\protocol, \relation}(\alg{\prover}, \distinguisher,
+\extractor, \sec) \leq q\epsilon + \adv^\dlrel_{\group,n+2}(\dlreladv,
+\sec)
+</span></p>
+<p>where <span class="math inline">\epsilon \leq \frac{n_g \cdot (n -
+1)}{|\ch|}</span>.</p>
+<p><em>Proof.</em> We will prove this by invoking Theorem 1 of <a
+href="https://eprint.iacr.org/2020/1351">[GT20]</a>. First, we note that
+the challenge space for all rounds is the same, i.e. <span
+class="math inline">\forall i \ \ch = \ch_i</span>. Theorem 1 requires
+us to define:</p>
+<ul>
+<li><span class="math inline">\badch(\tr&#39;) \in \ch</span> for all
+partial transcripts <span class="math inline">\tr&#39; = (\pp, x, [a_0],
+c_0, \ldots, [a_i])</span> such that <span
+class="math inline">|\badch(\tr&#39;)| / |\ch| \leq
+\epsilon</span>.</li>
+<li>an extractor function <span class="math inline">e</span> that takes
+as input an accepting extended transcript <span
+class="math inline">\tr</span> and either returns a valid witness or
+fails.</li>
+<li>a function <span class="math inline">\pfail(\protocol,
+\alg{\prover}, e, \relation)</span> returning a probability.</li>
+</ul>
+<p>We say that an accepting extended transcript <span
+class="math inline">\tr</span> contains “bad challenges” if and only if
+there exists a partial extended transcript <span
+class="math inline">\tr&#39;</span>, a challenge <span
+class="math inline">c_i \in \badch(\tr&#39;)</span>, and some sequence
+of prover messages and challenges <span class="math inline">([a_{i+1}],
+c_{i+1}, \ldots [a_j])</span> such that <span class="math inline">\tr =
+\tr&#39; \,||\, (c_i, [a_{i+1}], c_{i+1}, \ldots [a_j])</span>.</p>
+<p>Theorem 1 requires that <span class="math inline">e</span>, when
+given an accepting extended transcript <span
+class="math inline">\tr</span> that does not contain “bad challenges”,
+returns a valid witness for that transcript except with probability
+bounded above by <span class="math inline">\pfail(\protocol,
+\alg{\prover}, e, \relation)</span>.</p>
+<p>Our strategy is as follows: we will define <span
+class="math inline">e</span>, establish an upper bound on <span
+class="math inline">\pfail</span> with respect to an adversary <span
+class="math inline">\dlreladv</span> that plays the <span
+class="math inline">\dlrel_{\group,n+2}</span> game, substitute these
+into Theorem 1, and then walk through the protocol to determine the
+upper bound of the size of <span
+class="math inline">\badch(\tr&#39;)</span>. The adversary <span
+class="math inline">\dlreladv</span> plays the <span
+class="math inline">\dlrel_{\group,n+2}</span> game as follows: given
+the inputs <span class="math inline">U, W \in \mathbb{G}, \mathbf{G} \in
+\mathbb{G}^n</span>, the adversary <span
+class="math inline">\dlreladv</span> simulates the game <span
+class="math inline">\srwee_{\protocol, \relation}</span> to <span
+class="math inline">\alg{\prover}</span> using the inputs from the <span
+class="math inline">\dlrel_{\group,n+2}</span> game as public
+parameters. If <span class="math inline">\alg{\prover}</span> manages to
+produce an accepting extended transcript <span
+class="math inline">\tr</span>, <span
+class="math inline">\dlreladv</span> invokes a function <span
+class="math inline">h</span> on <span class="math inline">\tr</span> and
+returns its output. We shall define <span class="math inline">h</span>
+in such a way that for an accepting extended transcript <span
+class="math inline">\tr</span> that does not contain “bad challenges”,
+<span class="math inline">e(\tr)</span> <em>always</em> returns a valid
+witness whenever <span class="math inline">h(\tr)</span> does
+<em>not</em> return a non-trivial discrete log relation. This means that
+the probability <span class="math inline">\pfail(\protocol,
+\alg{\prover}, e, \relation)</span> is no greater than <span
+class="math inline">\adv^\dlrel_{\group,n+2}(\dlreladv, \sec)</span>,
+establishing our claim.</p>
+<h4 id="helpful-substitutions">Helpful substitutions</h4>
+<p>We will perform some substitutions to aid in exposition. First, let
+us define the polynomial</p>
+<p><span class="math display">
+\kappa(X) = \prod_{j=0}^{k - 1} (1 + u_{k - 1 - j} X^{2^j})
+</span></p>
+<p>so that we can write <span class="math inline">\mathbf{b}_0 =
+\kappa(x_3)</span>. The coefficient vector <span
+class="math inline">\mathbf{s}</span> of <span
+class="math inline">\kappa(X)</span> is defined such that</p>
+<p><span class="math display">\mathbf{s}_i = \prod\limits_{j=0}^{k-1}
+u_{k - 1 - j}^{f(i, j)}</span></p>
+<p>where <span class="math inline">f(i, j)</span> returns <span
+class="math inline">1</span> when the <span
+class="math inline">j</span>th bit of <span class="math inline">i</span>
+is set, and <span class="math inline">0</span> otherwise. We can also
+write <span class="math inline">\mathbf{G&#39;}_0 =
+\innerprod{\mathbf{s}}{\mathbf{G}}</span>.</p>
+<h3 id="description-of-function-h">Description of function <span
+class="math inline">h</span></h3>
+<p>Recall that an accepting transcript <span
+class="math inline">\tr</span> is such that</p>
+<p><span class="math display">
+\sum_{i=0}^{k - 1} [u_j^{-1}] \rep{L_j} + \rep{P&#39;} + \sum_{i=0}^{k -
+1} [u_j] \rep{R_j} = [c] \mathbf{G&#39;}_0 + [c z \mathbf{b}_0] U + [f]
+W
+</span></p>
+<p>By inspection of the representations of group elements with respect
+to <span class="math inline">\mathbf{G}, U, W</span> (recall that <span
+class="math inline">\alg{\prover}</span> is algebraic and so <span
+class="math inline">\dlreladv</span> has them), we obtain the <span
+class="math inline">n</span> equalities</p>
+<p><span class="math display">
+\sum_{i=0}^{k - 1} u_j^{-1} \repv{L_j}{G}{i} + \repv{P&#39;}{G}{i} +
+\sum_{i=0}^{k - 1} u_j \repv{R_j}{G}{i} = c \mathbf{s}_i \forall i \in
+[0, n)
+</span></p>
+<p>and the equalities</p>
+<p><span class="math display">
+\sum_{i=0}^{k - 1} u_j^{-1} \repr{L_j}{U} + \repr{P&#39;}{U} +
+\sum_{i=0}^{k - 1} u_j \repr{R_j}{U} = c z \kappa(x_3)
+</span></p>
+<p><span class="math display">
+\sum_{i=0}^{k - 1} u_j^{-1} \repr{L_j}{W} + \repr{P&#39;}{W} +
+\sum_{i=0}^{k - 1} u_j \repr{R_j}{W} = f
+</span></p>
+<p>We define the linear-time function <span class="math inline">h</span>
+that returns the representation of</p>
+<p><span class="math display">
+\begin{array}{rll}
+\sum\limits_{i=0}^{n - 1} &amp;\left[ \sum_{i=0}^{k - 1} u_j^{-1}
+\repv{L_j}{G}{i} + \repv{P&#39;}{G}{i} + \sum_{i=0}^{k - 1} u_j
+\repv{R_j}{G}{i} - c \mathbf{s}_i \right] &amp; \mathbf{G}_i \\[1ex]
++ &amp;\left[ \sum_{i=0}^{k - 1} u_j^{-1} \repr{L_j}{U} +
+\repr{P&#39;}{U} + \sum_{i=0}^{k - 1} u_j \repr{R_j}{U} - c z
+\kappa(x_3) \right] &amp; U \\[1ex]
++ &amp;\left[ \sum_{i=0}^{k - 1} u_j^{-1} \repr{L_j}{W} +
+\repr{P&#39;}{W} + \sum_{i=0}^{k - 1} u_j \repr{R_j}{W} - f \right]
+&amp; W
+\end{array}
+</span></p>
+<p>which is always a discrete log relation. If any of the equalities
+above are not satisfied, then this discrete log relation is non-trivial.
+This is the function invoked by <span
+class="math inline">\dlreladv</span>.</p>
+<h4 id="the-extractor-function-e">The extractor function <span
+class="math inline">e</span></h4>
+<p>The extractor function <span class="math inline">e</span> simply
+returns <span class="math inline">a_i(X)</span> from the representation
+<span class="math inline">\rep{A_i}</span> for <span
+class="math inline">i \in [0, n_a)</span>. Due to the restrictions we
+will place on the space of bad challenges in each round, we are
+guaranteed to obtain polynomials such that <span
+class="math inline">g(X, C_0, C_1, \cdots, a_0(X), a_1(X),
+\cdots)</span> vanishes over <span class="math inline">D</span> whenever
+the discrete log relation returned by the adversary’s function <span
+class="math inline">h</span> is trivial. This trivially gives us that
+the extractor function <span class="math inline">e</span> succeeds with
+probability bounded above by <span class="math inline">\pfail</span> as
+required.</p>
+<h4 id="defining-badchtr">Defining <span
+class="math inline">\badch(\tr&#39;)</span></h4>
+<p>Recall from before that the following <span
+class="math inline">n</span> equalities hold:</p>
+<p><span class="math display">
+\sum_{i=0}^{k - 1} u_j^{-1} \repv{L_j}{G}{i} + \repv{P&#39;}{G}{i} +
+\sum_{i=0}^{k - 1} u_j \repv{R_j}{G}{i} = c \mathbf{s}_i \forall i \in
+[0, n)
+</span></p>
+<p>as well as the equality</p>
+<p><span class="math display">
+\sum_{i=0}^{k - 1} u_j^{-1} \repr{L_j}{U} + \repr{P&#39;}{U} +
+\sum_{i=0}^{k - 1} u_j \repr{R_j}{U} = c z \kappa(x_3)
+</span></p>
+<p>For convenience let us introduce the following notation</p>
+<p><span class="math display">
+\begin{array}{ll}
+\mv{G}{i}{m} &amp;= \sum_{i=0}^{m - 1} u_j^{-1} \repv{L_j}{G}{i} +
+\repv{P&#39;}{G}{i} + \sum_{i=0}^{m - 1} u_j \repv{R_j}{G}{i} \\[1ex]
+\m{U}{m} &amp;= \sum_{i=0}^{m - 1} u_j^{-1} \repr{L_j}{U} +
+\repr{P&#39;}{U} + \sum_{i=0}^{m - 1} u_j \repr{R_j}{U}
+\end{array}
+</span></p>
+<p>so that we can rewrite the above (after expanding for <span
+class="math inline">\kappa(x_3)</span>) as</p>
+<p><span class="math display">
+\mv{G}{i}{k} = c \mathbf{s}_i \forall i \in [0, n)
+</span></p>
+<p><span class="math display">
+\m{U}{k} = c z \prod_{j=0}^{k - 1} (1 + u_{k - 1 - j} x_3^{2^j})
+</span></p>
+<p>We can combine these equations by multiplying both sides of each
+instance of the first equation by <span
+class="math inline">\mathbf{s}_i^{-1}</span> (because <span
+class="math inline">\mathbf{s}_i</span> is never zero) and substituting
+for <span class="math inline">c</span> in the second equation, yielding
+the following <span class="math inline">n</span> equalities:</p>
+<p><span class="math display">
+\m{U}{k} = \mv{G}{i}{k} \cdot \mathbf{s}_i^{-1} z \prod_{j=0}^{k - 1} (1
++ u_{k - 1 - j} x_3^{2^j}) \forall i \in [0, n)
+</span></p>
+<blockquote>
+<p><strong>Lemma 1.</strong> If <span class="math inline">\m{U}{k} =
+\mv{G}{i}{k} \cdot \mathbf{s}_i^{-1} z \prod_{j=0}^{k - 1} (1 + u_{k - 1
+- j} x_3^{2^j}) \forall i \in [0, n)</span> then it follows that <span
+class="math inline">\repr{P&#39;}{U} = z \sum\limits_{i=0}^{2^k - 1}
+x_3^i \repv{P&#39;}{G}{i}</span> for all transcripts that do not contain
+bad challenges.</p>
+<p><em>Proof.</em> It will be useful to introduce yet another
+abstraction defined starting with <span class="math display">
+\z{k}{m}{i} = \mv{G}{i}{m}
+</span> and then recursively defined for all integers <span
+class="math inline">r</span> such that <span class="math inline">0 \lt r
+\leq k</span> <span class="math display">
+\z{k - r}{m}{i} = \z{k - r + 1}{m}{i} + x_3^{2^{k - r}} \z{k - r +
+1}{m}{i + 2^{k - r}}
+</span> This allows us to rewrite our above equalities as <span
+class="math display">
+\m{U}{k} = \z{k}{k}{i} \cdot \mathbf{s}_i^{-1} z \prod_{j=0}^{k - 1} (1
++ u_{k - 1 - j} x_3^{2^j}) \forall i \in [0, n)
+</span></p>
+<p>We will now show that for all integers <span
+class="math inline">r</span> such that <span class="math inline">0 \lt r
+\leq k</span> that whenever the following holds for <span
+class="math inline">r</span> <span class="math display">
+\m{U}{r} = \z{r}{r}{i} \cdot \mathbf{s}_i^{-1} z \prod_{j=0}^{r - 1} (1
++ u_{k - 1 - j} x_3^{2^j}) \forall i \in [0, 2^r)
+</span> that the same <em>also</em> holds for <span
+class="math display">
+\m{U}{r - 1} = \z{r - 1}{r - 1}{i} \cdot \mathbf{s}_i^{-1} z
+\prod_{j=0}^{r - 2} (1 + u_{k - 2 - j} x_3^{2^j}) \forall i \in [0,
+2^{r-1})
+</span></p>
+<p>For all integers <span class="math inline">r</span> such that <span
+class="math inline">0 \lt r \leq k</span> we have that <span
+class="math inline">\mathbf{s}_{i + 2^{r - 1}} = u_{r - 1} \mathbf{s}_i
+\forall i \in [0, 2^{r - 1})</span> by the definition of <span
+class="math inline">\mathbf{s}</span>. This gives us <span
+class="math inline">\mathbf{s}_{i+2^{r - 1}}^{-1} = \mathbf{s}_i^{-1}
+u_{r - 1}^{-1} \forall i \in [0, 2^{r - 1})</span> as no value in <span
+class="math inline">\mathbf{s}</span> nor any challenge <span
+class="math inline">u_r</span> are zeroes. We can use this to relate one
+half of the equalities with the other half as so: <span
+class="math display">
+\begin{array}{rl}
+\m{U}{r} &amp;= \z{r}{r}{i} \cdot \mathbf{s}_i^{-1} z \prod_{j=0}^{r -
+1} (1 + u_{k - 1 - j} x_3^{2^j}) \\
+&amp;= \z{r}{r}{i + 2^{r - 1}} \cdot \mathbf{s}_i^{-1} u_{r - 1}^{-1} z
+\prod_{j=0}^{r - 1} (1 + u_{k - 1 - j} x_3^{2^j}) \\
+&amp;\forall i \in [0, 2^{r - 1})
+\end{array}
+</span></p>
+<p>Notice that <span class="math inline">\z{r}{r}{i}</span> can be
+rewritten as <span class="math inline">u_{r - 1}^{-1} \repv{L_{r -
+1}}{G}{i} + \z{r}{r - 1}{i} + u_{r - 1} \repv{R_{r - 1}}{G}{i}</span>
+for all <span class="math inline">i \in [0, 2^{r})</span>. Thus we can
+rewrite the above as</p>
+<p><span class="math display">
+\begin{array}{rl}
+\m{U}{r} &amp;= \left( u_{r - 1}^{-1} \repv{L_{r - 1}}{G}{i} + \z{r}{r -
+1}{i} + u_{r - 1} \repv{R_{r - 1}}{G}{i} \right) \\
+&amp;\cdot \; \mathbf{s}_i^{-1} z \prod_{j=0}^{r - 1} (1 + u_{k - 1 - j}
+x_3^{2^j}) \\
+&amp;= \left( u_{r - 1}^{-1} \repv{L_{r - 1}}{G}{i + 2^{r - 1}} +
+\z{r}{r - 1}{i + 2^{r - 1}} + u_{r - 1} \repv{R_{r - 1}}{G}{i + 2^{r -
+1}} \right) \\
+&amp;\cdot \; \mathbf{s}_i^{-1} u_{r - 1}^{-1} z \prod_{j=0}^{r - 1} (1
++ u_{k - 1 - j} x_3^{2^j}) \\
+&amp;\forall i \in [0, 2^{r - 1})
+\end{array}
+</span></p>
+<p>Now let us rewrite these equalities substituting <span
+class="math inline">u_{r - 1}</span> with formal indeterminate <span
+class="math inline">X</span>.</p>
+<p><span class="math display">
+\begin{array}{rl}
+&amp; X^{-1} \repr{L_{r - 1}}{U} + \m{U}{r - 1} + X \repr{R_{r - 1}}{U}
+\\
+&amp;= \left( X^{-1} \repv{L_{r - 1}}{G}{i} + \z{r}{r - 1}{i} + X
+\repv{R_{r - 1}}{G}{i} \right) \\
+&amp;\cdot \; \mathbf{s}_i^{-1} z \prod_{j=0}^{r - 2} (1 + u_{k - 1 - j}
+x_3^{2^j}) (1 + x_3^{2^{r - 1}} X) \\
+&amp;= \left( X^{-1} \repv{L_{r - 1}}{G}{i + 2^{r - 1}} + \z{r}{r - 1}{i
++ 2^{r - 1}} + X \repv{R_{r - 1}}{G}{i + 2^{r - 1}} \right) \\
+&amp;\cdot \; \mathbf{s}_i^{-1} z \prod_{j=0}^{r - 2} (1 + u_{k - 1 - j}
+x_3^{2^j}) (X^{-1} + x_3^{2^{r - 1}}) \\
+&amp;\forall i \in [0, 2^{r - 1})
+\end{array}
+</span></p>
+<p>Now let us rescale everything by <span class="math inline">X^2</span>
+to remove negative exponents.</p>
+<p><span class="math display">
+\begin{array}{rl}
+&amp; X \repr{L_{r - 1}}{U} + X^2 \m{U}{r - 1} + X^3 \repr{R_{r - 1}}{U}
+\\
+&amp;= \left( X^{-1} \repv{L_{r - 1}}{G}{i} + \z{r}{r - 1}{i} + X
+\repv{R_{r - 1}}{G}{i} \right) \\
+&amp;\cdot \; \mathbf{s}_i^{-1} z \prod_{j=0}^{r - 2} (1 + u_{k - 1 - j}
+x_3^{2^j}) (X^2 + x_3^{2^{r - 1}} X^3) \\
+&amp;= \left( X^{-1} \repv{L_{r - 1}}{G}{i + 2^{r - 1}} + \z{r}{r - 1}{i
++ 2^{r - 1}} + X \repv{R_{r - 1}}{G}{i + 2^{r - 1}} \right) \\
+&amp;\cdot \; \mathbf{s}_i^{-1} z \prod_{j=0}^{r - 2} (1 + u_{k - 1 - j}
+x_3^{2^j}) (X + x_3^{2^{r - 1}} X^2) \\
+&amp;\forall i \in [0, 2^{r - 1})
+\end{array}
+</span></p>
+<p>This gives us <span class="math inline">2^{r - 1}</span> triples of
+maximal degree-<span class="math inline">4</span> polynomials in <span
+class="math inline">X</span> that agree at <span
+class="math inline">u_{r - 1}</span> despite having coefficients
+determined prior to the choice of <span class="math inline">u_{r -
+1}</span>. The probability that two of these polynomials would agree at
+<span class="math inline">u_{r - 1}</span> and yet be distinct would be
+<span class="math inline">\frac{4}{|\ch|}</span> by the Schwartz-Zippel
+lemma and so by the union bound the probability that the three of these
+polynomials agree and yet any of them is distinct from another is <span
+class="math inline">\frac{8}{|\ch|}</span>. By the union bound again the
+probability that any of the <span class="math inline">2^{r - 1}</span>
+triples have multiple distinct polynomials is <span
+class="math inline">\frac{2^{r - 1}\cdot8}{|\ch|}</span>. By restricting
+the challenge space for <span class="math inline">u_{r - 1}</span>
+accordingly we obtain <span
+class="math inline">|\badch(\trprefix{\tr&#39;}{u_r})|/|\ch| \leq
+\frac{2^{r - 1}\cdot8}{|\ch|}</span> for integers <span
+class="math inline">0 \lt r \leq k</span> and thus <span
+class="math inline">|\badch(\trprefix{\tr&#39;}{u_k})|/|\ch| \leq
+\frac{4n}{|\ch|} \leq \epsilon</span>.</p>
+<p>We can now conclude an equality of polynomials, and thus of
+coefficients. Consider the coefficients of the constant terms first,
+which gives us the <span class="math inline">2^{r - 1}</span> equalities
+<span class="math display">
+0 = 0 = \mathbf{s}_i^{-1} z \left( \prod_{j=0}^{r - 2} (1 + u_{k - 1 -
+j} x_3^{2^j}) \right) \cdot \repv{L_{r - 1}}{G}{i + 2^{r - 1}} \forall i
+\in [0, 2^{r - 1})
+</span></p>
+<p>No value of <span class="math inline">\mathbf{s}</span> is zero,
+<span class="math inline">z</span> is never chosen to be <span
+class="math inline">0</span> and each <span
+class="math inline">u_j</span> is chosen so that <span
+class="math inline">1 + u_{k - 1 - j} x_3^{2^j}</span> is nonzero, so we
+can then conclude <span class="math display">
+0 = \repv{L_{r - 1}}{G}{i + 2^{r - 1}} \forall i \in [0, 2^{r - 1})
+</span></p>
+<p>An identical process can be followed with respect to the coefficients
+of the <span class="math inline">X^4</span> term in the equalities to
+establish <span class="math inline">0 = \repv{R_{r - 1}}{G}{i} \forall i
+\in [0, 2^{r - 1})</span> contingent on <span
+class="math inline">x_3</span> being nonzero, which it always is.
+Substituting these in our equalities yields us something simpler</p>
+<p><span class="math display">
+\begin{array}{rl}
+&amp; X \repr{L_{r - 1}}{U} + X^2 \m{U}{r - 1} + X^3 \repr{R_{r - 1}}{U}
+\\
+&amp;= \left( X^{-1} \repv{L_{r - 1}}{G}{i} + \z{r}{r - 1}{i} \right) \\
+&amp;\cdot \; \mathbf{s}_i^{-1} z \prod_{j=0}^{r - 2} (1 + u_{k - 1 - j}
+x_3^{2^j}) (X^2 + x_3^{2^{r - 1}} X^3) \\
+&amp;= \left( \z{r}{r - 1}{i + 2^{r - 1}} + X \repv{R_{r - 1}}{G}{i +
+2^{r - 1}} \right) \\
+&amp;\cdot \; \mathbf{s}_i^{-1} z \prod_{j=0}^{r - 2} (1 + u_{k - 1 - j}
+x_3^{2^j}) (X + x_3^{2^{r - 1}} X^2) \\
+&amp;\forall i \in [0, 2^{r - 1})
+\end{array}
+</span></p>
+<p>Now we will consider the coefficients in <span
+class="math inline">X</span>, which yield the equalities</p>
+<p><span class="math display">
+\begin{array}{rl}
+\repr{L_{r - 1}}{U} &amp;= \mathbf{s}_i^{-1} z \prod_{j=0}^{r - 2} (1 +
+u_{k - 1 - j} x_3^{2^j}) \cdot \repv{L_{r - 1}}{G}{i} \\
+&amp;= \mathbf{s}_i^{-1} z \prod_{j=0}^{r - 2} (1 + u_{k - 1 - j}
+x_3^{2^j}) \cdot \z{r}{r - 1}{i + 2^{r - 1}} \\
+&amp;\forall i \in [0, 2^{r - 1})
+\end{array}
+</span></p>
+<p>which for similar reasoning as before yields the equalities <span
+class="math display">
+\repv{L_{r - 1}}{G}{i} = \z{r}{r - 1}{i + 2^{r - 1}} \forall i \in [0,
+2^{r - 1})
+</span></p>
+<p>Finally we will consider the coefficients in <span
+class="math inline">X^2</span> which yield the equalities</p>
+<p><span class="math display">
+\begin{array}{rl}
+\m{U}{r - 1} &amp;= \mathbf{s}_i^{-1} z \prod_{j=0}^{r - 2} (1 + u_{k -
+1 - j} x_3^{2^j}) \cdot \left( \z{r}{r - 1}{i} + \repv{L_{r - 1}}{G}{i}
+x_3^{2^{r - 1}} \right) \\
+&amp;\forall i \in [0, 2^{r - 1})
+\end{array}
+</span></p>
+<p>which by substitution gives us <span class="math inline">\forall i
+\in [0, 2^{r - 1})</span> <span class="math display">
+\m{U}{r - 1} = \mathbf{s}_i^{-1} z \prod_{j=0}^{r - 2} (1 + u_{k - 1 -
+j} x_3^{2^j}) \cdot \left( \z{r}{r - 1}{i} + \z{r}{r - 1}{i + 2^{r - 1}}
+x_3^{2^{r - 1}} \right)
+</span></p>
+<p>Notice that by the definition of <span class="math inline">\z{r -
+1}{m}{i}</span> we can rewrite this as</p>
+<p><span class="math display">
+\m{U}{r - 1} = \z{r - 1}{r - 1}{i} \cdot \mathbf{s}_i^{-1} z
+\prod_{j=0}^{r - 2} (1 + u_{k - 1 - j} x_3^{2^j}) \forall i \in [0, 2^{r
+- 1})
+</span></p>
+<p>which is precisely in the form we set out to demonstrate.</p>
+<p>We now proceed by induction from the case <span class="math inline">r
+= k</span> (which we know holds) to reach <span class="math inline">r =
+0</span>, which gives us <span class="math display">
+\m{U}{0} = \z{0}{0}{0} \cdot \mathbf{s}_0^{-1} z
+</span></p>
+<p>and because <span class="math inline">\m{U}{0} =
+\repr{P&#39;}{U}</span> and <span class="math inline">\z{0}{0}{0} =
+\sum_{i=0}^{2^k - 1} x_3^i \repv{P&#39;}{G}{i}</span>, we obtain <span
+class="math inline">\repr{P&#39;}{U} = z \sum_{i=0}^{2^k - 1} x_3^i
+\repv{P&#39;}{G}{i}</span>, which completes the proof.</p>
+</blockquote>
+<p>Having established that <span class="math inline">\repr{P&#39;}{U} =
+z \sum_{i=0}^{2^k - 1} x_3^i \repv{P&#39;}{G}{i}</span>, and given that
+<span class="math inline">x_3</span> and <span
+class="math inline">\repv{P&#39;}{G}{i}</span> are fixed in advance of
+the choice of <span class="math inline">z</span>, we have that at most
+one value of <span class="math inline">z \in \ch</span> (which is
+nonzero) exists such that <span class="math inline">\repr{P&#39;}{U} = z
+\sum_{i=0}^{2^k - 1} x_3^i \repv{P&#39;}{G}{i}</span> and yet <span
+class="math inline">\repr{P&#39;}{U} \neq 0</span>. By restricting <span
+class="math inline">|\badch(\trprefix{\tr&#39;}{z})|/|\ch| \leq
+\frac{1}{|\ch|} \leq \epsilon</span> accordingly we obtain <span
+class="math inline">\repr{P&#39;}{U} = 0</span> and therefore that the
+polynomial defined by <span
+class="math inline">\repr{P&#39;}{\mathbf{G}}</span> has a root at <span
+class="math inline">x_3</span>.</p>
+<p>By construction <span class="math inline">P&#39; = P - [v]
+\mathbf{G}_0 + [\xi] S</span>, giving us that the polynomial defined by
+<span class="math inline">\repr{P + [\xi] S}{\mathbf{G}}</span>
+evaluates to <span class="math inline">v</span> at the point <span
+class="math inline">x_3</span>. We have that <span
+class="math inline">v, P, S</span> are fixed prior to the choice of
+<span class="math inline">\xi</span>, and so either the polynomial
+defined by <span class="math inline">\repr{S}{\mathbf{G}}</span> has a
+root at <span class="math inline">x_3</span> (which implies the
+polynomial defined by <span
+class="math inline">\repr{P}{\mathbf{G}}</span> evaluates to <span
+class="math inline">v</span> at the point <span
+class="math inline">x_3</span>) or else <span
+class="math inline">\xi</span> is the single solution in <span
+class="math inline">\ch</span> for which <span
+class="math inline">\repr{P + [\xi] S}{\mathbf{G}}</span> evaluates to
+<span class="math inline">v</span> at the point <span
+class="math inline">x_3</span> while <span
+class="math inline">\repr{P}{\mathbf{G}}</span> itself does not. We
+avoid the latter case by restricting <span
+class="math inline">|\badch(\trprefix{\tr&#39;}{\xi})|/|\ch| \leq
+\frac{1}{|\ch|} \leq \epsilon</span> accordingly and can thus conclude
+that the polynomial defined by <span
+class="math inline">\repr{P}{\mathbf{G}}</span> evaluates to <span
+class="math inline">v</span> at <span
+class="math inline">x_3</span>.</p>
+<p>The remaining work deals strictly with the representations of group
+elements sent previously by the prover and their relationship with <span
+class="math inline">P</span> as well as the challenges chosen in each
+round of the protocol. We will simplify things first by using <span
+class="math inline">p(X)</span> to represent the polynomial defined by
+<span class="math inline">\repr{P}{\mathbf{G}}</span>, as it is the case
+that this <span class="math inline">p(X)</span> corresponds exactly with
+the like-named polynomial in the protocol itself. We will make similar
+substitutions for the other group elements (and their corresponding
+polynomials) to aid in exposition, as the remainder of this proof is
+mainly tedious application of the Schwartz-Zippel lemma to upper bound
+the bad challenge space size for each of the remaining challenges in the
+protocol.</p>
+<p>Recall that <span class="math inline">P = Q&#39; + x_4
+\sum\limits_{i=0}^{n_q - 1} [x_4^i] Q_i</span>, and so by substitution
+we have <span class="math inline">p(X) = q&#39;(X) + x_4
+\sum\limits_{i=0}^{n_q - 1} x_4^i q_i(X)</span>. Recall also that</p>
+<p><span class="math display">
+v = \sum\limits_{i=0}^{n_q - 1}
+\left(
+x_2^i
+  \left(
+  \frac
+  { \mathbf{u}_i - r_i(x_3) }
+  {\prod\limits_{j=0}^{n_e - 1}
+    \left(
+      x_3 - \omega^{\left(
+        \mathbf{q_i}
+      \right)_j} x
+    \right)
+  }
+  \right)
+\right)
++
+x_4 \sum\limits_{i=0}^{n_q - 1} x_4 \mathbf{u}_i
+</span></p>
+<p>We have already established that <span class="math inline">p(x_3) =
+v</span>. Notice that the coefficients in the above expressions for
+<span class="math inline">v</span> and <span
+class="math inline">P</span> are fixed prior to the choice of <span
+class="math inline">x_4 \in \ch</span>. By the Schwartz-Zippel lemma we
+have that only at most <span class="math inline">n_q + 1</span> possible
+choices of <span class="math inline">x_4</span> exist such that these
+expressions are satisfied and yet <span class="math inline">q_i(x_3)
+\neq \mathbf{u}_i</span> for any <span class="math inline">i</span>
+or</p>
+<p><span class="math display">
+q&#39;(x_3) \neq \sum\limits_{i=0}^{n_q - 1}
+\left(
+x_2^i
+  \left(
+  \frac
+  { \mathbf{u}_i - r_i(x_3) }
+  {\prod\limits_{j=0}^{n_e - 1}
+    \left(
+      x_3 - \omega^{\left(
+        \mathbf{q_i}
+      \right)_j} x
+    \right)
+  }
+  \right)
+\right)
+</span></p>
+<p>By restricting <span
+class="math inline">|\badch(\trprefix{\tr&#39;}{x_4})|/|\ch| \leq
+\frac{n_q + 1}{|\ch|} \leq \epsilon</span> we can conclude that all of
+the aforementioned inequalities are untrue. Now we can substitute <span
+class="math inline">\mathbf{u}_i</span> with <span
+class="math inline">q_i(x_3)</span> for all <span
+class="math inline">i</span> to obtain</p>
+<p><span class="math display">
+q&#39;(x_3) = \sum\limits_{i=0}^{n_q - 1}
+\left(
+x_2^i
+  \left(
+  \frac
+  { q_i(x_3) - r_i(x_3) }
+  {\prod\limits_{j=0}^{n_e - 1}
+    \left(
+      x_3 - \omega^{\left(
+        \mathbf{q_i}
+      \right)_j} x
+    \right)
+  }
+  \right)
+\right)
+</span></p>
+<p>Suppose that <span class="math inline">q&#39;(X)</span> (which is the
+polynomial defined by <span
+class="math inline">\repr{Q&#39;}{\mathbf{G}}</span>, and is of degree
+at most <span class="math inline">n - 1</span>) does <em>not</em> take
+the form</p>
+<p>$$_{i=0}^{n_q - 1}</p>
+<p>x_2^i ( {q_i(X) - r_i(X)} {_{j=0}^{n_e - 1} ( X - ^{( )_j} x ) } )
+$$</p>
+<p>and yet <span class="math inline">q&#39;(X)</span> agrees with this
+expression at <span class="math inline">x_3</span> as we’ve established
+above. By the Schwartz-Zippel lemma this can only happen for at most
+<span class="math inline">n - 1</span> choices of <span
+class="math inline">x_3 \in \ch</span> and so by restricting <span
+class="math inline">|\badch(\trprefix{\tr&#39;}{x_3})|/|\ch| \leq
+\frac{n - 1}{|\ch|} \leq \epsilon</span> we obtain that</p>
+<p>$$q’(X) = _{i=0}^{n_q - 1}</p>
+<p>x_2^i ( {q_i(X) - r_i(X)} {_{j=0}^{n_e - 1} ( X - ^{( )_j} x ) } )
+$$</p>
+<p>Next we will extract the coefficients of this polynomial in <span
+class="math inline">x_2</span> (which are themselves polynomials in
+formal indeterminate <span class="math inline">X</span>) by again
+applying the Schwartz-Zippel lemma with respect to <span
+class="math inline">x_2</span>; again, this leads to the restriction
+<span class="math inline">|\badch(\trprefix{\tr&#39;}{x_2})|/|\ch| \leq
+\frac{n_q}{|\ch|} \leq \epsilon</span> and we obtain the following
+polynomials of degree at most <span class="math inline">n - 1</span> for
+all <span class="math inline">i \in [0, n_q - 1)</span></p>
+<p><span class="math display">
+\frac
+  {q_i(X) - r_i(X)}
+  {\prod\limits_{j=0}^{n_e - 1}
+    \left(
+      X - \omega^{\left(
+        \mathbf{q_i}
+      \right)_j} x
+    \right)
+  }
+</span></p>
+<p>Having established that these are each non-rational polynomials of
+degree at most <span class="math inline">n - 1</span> we can then say
+(by the factor theorem) that for each <span class="math inline">i \in
+[0, n_q - 1]</span> and <span class="math inline">j \in [0, n_e -
+1]</span> we have that <span class="math inline">q_i(X) - r_i(X)</span>
+has a root at <span
+class="math inline">\omega^{\left(\mathbf{q_i}\right)_j} x</span>. Note
+that we can interpret each <span class="math inline">q_i(X)</span> as
+the restriction of a <em>bivariate</em> polynomial at the point <span
+class="math inline">x_1</span> whose degree with respect to <span
+class="math inline">x_1</span> is at most <span class="math inline">n_a
++ 1</span> and whose coefficients consist of various polynomials <span
+class="math inline">a&#39;_i(X)</span> (from the representation <span
+class="math inline">\repr{A&#39;_i}{\mathbf{G}}</span>) as well as <span
+class="math inline">h&#39;(X)</span> (from the representation <span
+class="math inline">\repr{H&#39;_i}{\mathbf{G}}</span>) and <span
+class="math inline">r(X)</span> (from the representation <span
+class="math inline">\repr{R}{\mathbf{G}}</span>). By similarly applying
+the Schwartz-Zippel lemma and restricting the challenge space with <span
+class="math inline">|\badch(\trprefix{\tr&#39;}{x_1})|/|\ch| \leq
+\frac{n_a + 1}{|\ch|} \leq \epsilon</span> we obtain (by construction of
+each <span class="math inline">q&#39;_i(X)</span> and <span
+class="math inline">r_i(X)</span> in steps 12 and 13 of the protocol)
+that the prover’s claimed value of <span class="math inline">r</span> in
+step 9 is equal to <span class="math inline">r(x)</span>; that the value
+<span class="math inline">h</span> computed by the verifier in step 13
+is equal to <span class="math inline">h&#39;(x)</span>; and that for all
+<span class="math inline">i \in [0, n_q - 1]</span> the prover’s claimed
+values <span class="math inline">(\mathbf{a_i})_j =
+a&#39;_i(\omega^{(\mathbf{p_i})_j} x)</span> for all <span
+class="math inline">j \in [0, n_e - 1]</span>.</p>
+<p>By construction of <span class="math inline">h&#39;(X)</span> (from
+the representation <span
+class="math inline">\repr{H&#39;}{\mathbf{G}}</span>) in step 7 we know
+that <span class="math inline">h&#39;(x) = h(x)</span> where by <span
+class="math inline">h(X)</span> we refer to the polynomial of degree at
+most <span class="math inline">(n_g - 1) \cdot (n - 1)</span> whose
+coefficients correspond to the concatenated representations of each
+<span class="math inline">\repr{H_i}{\mathbf{G}}</span>. As before,
+suppose that <span class="math inline">h(X)</span> does <em>not</em>
+take the form <span class="math inline">g&#39;(X) / t(X)</span>. Then
+because <span class="math inline">h(X)</span> is determined prior to the
+choice of <span class="math inline">x</span> then by the Schwartz-Zippel
+lemma we know that it would only agree with <span
+class="math inline">g&#39;(X) / t(X)</span> at <span
+class="math inline">(n_g - 1) \cdot (n - 1)</span> points at most if the
+polynomials were not equal. By restricting again <span
+class="math inline">|\badch(\trprefix{\tr&#39;}{x})|/|\ch| \leq
+\frac{(n_g - 1) \cdot (n - 1)}{|\ch|} \leq \epsilon</span> we obtain
+<span class="math inline">h(X) = g&#39;(X) / t(X)</span> and because
+<span class="math inline">h(X)</span> is a non-rational polynomial by
+the factor theorem we obtain that <span
+class="math inline">g&#39;(X)</span> vanishes over the domain <span
+class="math inline">D</span>.</p>
+<p>We now have that <span class="math inline">g&#39;(X)</span> vanishes
+over <span class="math inline">D</span> but wish to show that <span
+class="math inline">g(X, C_0, C_1, \cdots)</span> vanishes over <span
+class="math inline">D</span> at all points to complete the proof. This
+just involves a sequence of applying the same technique to each of the
+challenges; since the polynomial <span
+class="math inline">g(\cdots)</span> has degree at most <span
+class="math inline">n_g \cdot (n - 1)</span> in any indeterminate by
+definition, and because each polynomial <span class="math inline">a_i(X,
+C_0, C_1, ..., C_{i - 1}, \cdots)</span> is determined prior to the
+choice of concrete challenge <span class="math inline">c_i</span> by
+similarly bounding <span
+class="math inline">|\badch(\trprefix{\tr&#39;}{c_i})|/|\ch| \leq
+\frac{n_g \cdot (n - 1)}{|\ch|} \leq \epsilon</span> we ensure that
+<span class="math inline">g(X, C_0, C_1, \cdots)</span> vanishes over
+<span class="math inline">D</span>, completing the proof.</p>

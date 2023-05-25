@@ -1127,7 +1127,7 @@ fn step_14(
     let mut q_prime = Seq::<Fp>::create(1); // initialize q' to the constant zero poly
     let n_q = q.len();
     for i in 0..(n_q as usize) {
-        let x2_powered = x2.pow(i as u128);
+        let x2_powered = x2.pow((n_q - 1 - i) as u128);
         let q_i = q_polys[i].clone();
         let r_i = r_polys[i].clone();
         let q_i_sub_r_i = sub_polyx(q_i, r_i);
@@ -2527,9 +2527,11 @@ fn test_step_14() {
         //////////////////////////////////////////////////////////////////////////////////
         let mut sum_result = Seq::from_vec(vec![Fp::from_literal(0)]);
 
-        for i in 0..(n_q as usize) as usize {
-            let dividend_lhs: Seq<Fp> = mul_scalar_polyx(q_polys[i].clone(), x2.pow(i as u128));
-            let dividend_rhs: Seq<Fp> = mul_scalar_polyx(r_polys[i].clone(), x2.pow(i as u128));
+        for i in 0..n_q as usize {
+            let dividend_lhs: Seq<Fp> =
+                mul_scalar_polyx(q_polys[i].clone(), x2.pow((n_q as usize - i - 1) as u128));
+            let dividend_rhs: Seq<Fp> =
+                mul_scalar_polyx(r_polys[i].clone(), x2.pow((n_q as usize - i - 1) as u128));
             let dividend: Seq<Fp> = sub_polyx(dividend_lhs, dividend_rhs);
 
             let q_i = sigma(i as u128, sigma_seq.clone(), q.clone());
