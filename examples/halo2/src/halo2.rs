@@ -1235,7 +1235,6 @@ fn step_18(
     for i in 0..n_q as usize {
         let q_i: Seq<u128> = sigma(i as u128, sigma_list.clone(), q.clone());
         let n_e = q_i.len();
-        let x2_i: Fp = x2.pow(i as u128);
         let u_i: Fp = u[i];
         let r_i: Seq<Fp> = r[i].clone();
         let r_i_x3: Fp = eval_polyx(r_i, x3);
@@ -1247,18 +1246,19 @@ fn step_18(
             let term = x3 - rhs;
             product = product * term;
         }
-        let sum_term: Fp = x2.pow(i as u128) * (numerator / product);
+        let sum_term: Fp = x2.pow((n_q - i - 1) as u128) * (numerator / product);
 
         v_first_sum = v_first_sum + sum_term;
     }
+    v_first_sum = v_first_sum * x4.pow(n_q as u128);
 
     let mut v_second_sum: Fp = Fp::ZERO();
     for i in 0..n_q {
         let u_i: Fp = u[i];
-        let term: Fp = x4 * u_i;
+        let term: Fp = x4.pow((n_q - 1 - i) as u128) * u_i;
         v_second_sum = v_second_sum + term;
     }
-    let v = v_first_sum + x4 * v_second_sum;
+    let v = v_first_sum + v_second_sum;
     (P, v)
 }
 
@@ -2312,8 +2312,8 @@ fn test_step_13() {
     );
 }
 
-// #[cfg(test)]
-// #[test]
+#[cfg(test)]
+#[test]
 // fn test_step_14_manuel() {
 //     ////////////////////////////////////////////////////////////////////////////////////
 //     /// SETTING UP THE REQUIRED VALUES (n_a, n_q, x1, H', R, the q list, the A commitemtns), NOT INTERESTING
@@ -2463,7 +2463,6 @@ fn test_step_13() {
 //     let commitment: (FpCurve, FpCurve, bool) = commit_polyx(&(G.clone(), W), result, r);
 //     assert_eq!(commitment, q_prime);
 // }
-
 #[cfg(test)]
 #[test]
 fn test_step_14() {
@@ -2862,15 +2861,17 @@ fn test_step_18() {
         let mut first_sum: Fp = Fp::ZERO();
         let mut second_sum: Fp = Fp::ZERO();
         for i in 0..n_q {
-            let first_sum_dividend: Fp = x2.pow(i as u128) * (u[i] - eval_polyx(r[i].clone(), x3));
+            let first_sum_dividend: Fp =
+                x2.pow((n_q - 1 - i) as u128) * (u[i] - eval_polyx(r[i].clone(), x3));
             let q_i = sigma(i as u128, sigma_seq.clone(), q.clone());
             let mut first_sum_divisor = Fp::ONE();
             for j in 0..q_i.len() {
                 first_sum_divisor = first_sum_divisor * (x3 - omega.pow(q_i[j]) * x);
             }
-            second_sum = second_sum + x4 * x4 * u[i];
+            second_sum = second_sum + x4.pow((n_q - 1 - i) as u128) * u[i];
             first_sum = first_sum + (first_sum_dividend / first_sum_divisor);
         }
+        first_sum = first_sum * x4.pow(n_q as u128);
         let test_v: Fp = first_sum + second_sum;
 
         assert_eq!(v, test_v);
