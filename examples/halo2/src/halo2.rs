@@ -762,7 +762,7 @@ fn step_4(g_prime: Seq<Fp>, omega: Fp, n: u128) -> Seq<Fp> {
 /// * `n` - defines length of new polynomials (global variable for prooving system)
 fn step_5(h: Seq<Fp>, n: u128) -> Seq<Seq<Fp>> {
     let h = trim_poly(h);
-    let no_of_parts = (h.len() + (n - (2 as u128)) as usize) / ((n - (1 as u128)) as usize);
+    let no_of_parts = ((h.len() + n as usize - 1) / n as usize);
     let n = n as usize;
 
     let mut original_index = 0;
@@ -1704,9 +1704,6 @@ fn test_step_4() {
         if r == 0 {
             r = r + 2;
         }
-        println!("{:?}", vanishing_poly_degree);
-        println!("{:?}", g_prime_degree);
-        println!("{:?}", r);
 
         let omega: Fp = Fp::from_literal((omega_value as u128) + 1);
         let g_prime = compute_vanishing_polynomial(omega, g_prime_degree as u128);
@@ -3604,12 +3601,16 @@ fn example_run() {
 
     let a1_points = Seq::<(Fp, Fp)>::from_vec(vec![
         (Fp::from_literal(1), Fp::from_literal(3)),
+        (Fp::from_literal(2), Fp::from_literal(0)),
         (Fp::from_literal(4), Fp::from_literal(8)),
+        (Fp::from_literal(8), Fp::from_literal(0)),
     ]);
 
     let a2_points = Seq::<(Fp, Fp)>::from_vec(vec![
         (Fp::from_literal(1), Fp::from_literal(5)),
+        (Fp::from_literal(2), Fp::from_literal(0)),
         (Fp::from_literal(4), Fp::from_literal(13)),
+        (Fp::from_literal(8), Fp::from_literal(0)),
     ]);
 
     let q_add_points = Seq::<(Fp, Fp)>::from_vec(vec![
@@ -3651,7 +3652,7 @@ fn example_run() {
 
     let h = step_4(g_prime.clone(), omega, n);
 
-    let h_is = step_5(h, n);
+    let h_is: Seq<Seq<Fp>> = step_5(h, n);
 
     let r_seq = Seq::<Fp>::from_vec(vec![Fp::from_literal(5), Fp::from_literal(76)]);
     let H_is = step_6(h_is.clone(), &crs, r_seq);
