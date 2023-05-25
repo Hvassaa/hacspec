@@ -1502,18 +1502,19 @@ fn step_24(
 ///
 /// # Arguments
 /// * `p_prime` - **p**' from [step_24]
-/// * `blinding_factors` - the list of all the elided blinding factors
+/// * `L_blinding` - the blinding used for L in step 24
+/// * `R_blinding` - the blinding used for R in step 24
+/// * `p_prime_blind` - the the accumulated blinding from step 23
+/// * `u` - u from step 16
 fn step_25(
     p_prime: Seq<Fp>,
     L_blinding: Seq<Fp>,
     R_blinding: Seq<Fp>,
-    s_blind: Fp,
-    q_prime_blind: Fp,
-    xi: Fp,
+    p_prime_blind: Fp,
     u: Seq<Fp>,
 ) -> (Fp, Fp) {
     let p_prime_0 = p_prime[0];
-    let mut f: Fp = q_prime_blind + (s_blind * xi);
+    let mut f: Fp = p_prime_blind;
     for j in 0..L_blinding.len() {
         let u_j: Fp = u[j];
         let u_j_inv: Fp = u_j.inv();
@@ -3770,15 +3771,7 @@ fn example_run() {
         L_blinding,
         R_blinding,
     );
-    let (c, f) = step_25(
-        p_prime,
-        L_blinding,
-        R_blinding,
-        s_blind,
-        Q_prime_blind,
-        xi,
-        u.clone(),
-    );
+    let (c, f) = step_25(p_prime, L_blinding, R_blinding, p_prime_blind, u.clone());
 
     let V_accepts = step_26(u, L, P_prime, R, c, G_prime[0], b[0], z, U, f, W);
 
