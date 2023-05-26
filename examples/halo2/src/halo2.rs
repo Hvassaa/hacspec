@@ -345,7 +345,7 @@ fn multi_poly_with_x(p: Seq<Fp>) -> Seq<Fp> {
 
 // TODO document
 fn multi_poly_with_x_pow(p: Seq<Fp>, power: usize) -> Seq<Fp> {
-    let p = trim_poly(p);
+    let p: Seq<Fp> = trim_poly(p);
     let mut res: Seq<Fp> = Seq::<Fp>::create(p.len() + power);
 
     for i in 0..p.len() {
