@@ -3761,12 +3761,28 @@ fn example_run() {
         (x3_challenge, Fp::ZERO()),
     ]);
     let s_poly: Seq<Fp> = legrange_poly(s_poly_points);
+    assert_eq!(
+        eval_polyx(s_poly.clone(), x3_challenge),
+        Fp::ZERO(),
+        "s(X) should have root at x3"
+    );
+    assert_eq!(
+        poly_degree(s_poly.clone()),
+        n - 1,
+        "s(X) should have degree n-1: {}",
+        n - 1
+    );
     let (S, s_blind) = step_20(s_poly.clone(), crs, step20_blinding);
 
     let (xi, z) = step_21(Fp::from_literal(98), Fp::from_literal(8438));
 
     let P_prime: G1 = step_22(P, G[0], S, v, xi);
 
+    assert_eq!(
+        eval_polyx(p_poly.clone(), x3_challenge),
+        v,
+        "p(x3) should correspond with v"
+    );
     let (p_prime_poly, p_prime_blind) = step_23(p_poly, s_poly, x3_challenge, xi, p_blind, s_blind);
 
     let L_blinding: Seq<Fp> =
