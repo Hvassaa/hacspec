@@ -3187,6 +3187,28 @@ fn testmsm() {
 }
 
 #[cfg(test)]
+#[quickcheck]
+fn test_step_9(r_poly: UniPolynomial, a_prime_seq: SeqOfUniPoly, x: u128, omega: u128) {
+    let r_poly = r_poly.0;
+    let x = Fp::from_literal(x);
+    let omega = Fp::from_literal(omega);
+    let a_prime_seq = a_prime_seq.0;
+    let p = gen_p(a_prime_seq.len(), 20);
+    let (r, a) = step_9(r_poly.clone(), a_prime_seq.clone(), omega, p.clone(), x);
+    for i in 0..a.len() {
+        let a_i = a[i].clone();
+        let a_prime_i = a_prime_seq[i].clone();
+        let p_i = p[i].clone();
+        for j in 0..a_i.len() {
+            let a_i_j = a_i[j];
+            let p_i_j = p_i[j];
+            let eval = eval_polyx(a_prime_i.clone(), omega.pow(p_i_j) * x);
+            assert_eq!(a_i_j, eval);
+        }
+    }
+    assert_eq!(r, eval_polyx(r_poly, x));
+}
+#[cfg(test)]
 #[test]
 fn test_step_9_10() {
     fn a(a_prime_seq: SeqOfUniPoly, omega_value: u128, x_value: u128) -> TestResult {
@@ -3803,3 +3825,27 @@ fn example_run() {
 // add_poly_x
 // sub_poly_x
 // all other poly functions only have 1 unit test...
+
+#[cfg(test)]
+#[test]
+fn test_primitive_root_of_unity() {
+    // https://crypto.stackexchange.com/questions/63614/finding-the-n-th-root-of-unity-in-a-finite-field
+    let n = 4;
+    let mut x = Fp::TWO();
+    loop {
+        let g = x.pow_self(Fp::max_val() / Fp::from_literal(n));
+        if g.pow(n / 2) != Fp::ONE() {
+            println!("{}", g);
+            break;
+        }
+        let r: u128 = rand::Rng::gen(&mut rand::thread_rng());
+        x = x * Fp::from_literal(r);
+    }
+    // n = 8, k = 3
+    // ABBF0854924172DE43AC8291F4C7BFE65008B10372D434FA931DF4CE2230320
+    // 4855188899445002300170730717563617051094175372704778513906105166874447905568
+
+    // n = 4, k = 2
+    // 96E31EEA5205EE7829A559CEC3CAB14D83233F67234D59A2F17C7C5B54146EA
+    // 4265513433803163958251475299683560813532603332905934989976535652412227143402
+}
