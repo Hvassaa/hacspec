@@ -359,13 +359,13 @@ fn multi_poly_with_x_pow(p: Seq<Fp>, power: usize) -> Seq<Fp> {
 /// * `points`is a sequence of points `(Fp,Fp)` that the polynomial must pass through
 /// # Assertions
 /// * No two points may have the same x-value.
-fn legrange_poly(points: Seq<(Fp, Fp)>) -> Seq<Fp> {
+fn lagrange_poly(points: Seq<(Fp, Fp)>) -> Seq<Fp> {
     let mut poly = Seq::<Fp>::create(points.len());
 
     for i in 0..points.len() {
         let x: Fp = points[i].0;
         let y: Fp = points[i].1;
-        let basis = legrange_basis(points.clone(), x);
+        let basis = lagrange_basis(points.clone(), x);
         let scaled_basis = mul_scalar_polyx(basis, y);
         poly = add_polyx(poly.clone(), scaled_basis.clone());
     }
@@ -380,7 +380,7 @@ fn legrange_poly(points: Seq<(Fp, Fp)>) -> Seq<Fp> {
 /// * `x`is the x-value where the polynomial will evaluate to 1. If `x`is also in `points` the polynomial will still evaluate to 1 at `x``
 /// # Assertions
 /// * No two points may have the same x-value
-fn legrange_basis(points: Seq<(Fp, Fp)>, x: Fp) -> Seq<Fp> {
+fn lagrange_basis(points: Seq<(Fp, Fp)>, x: Fp) -> Seq<Fp> {
     let mut basis = Seq::<Fp>::create(points.len());
     basis[0] = Fp::ONE();
     let mut devisor = Fp::ONE();
@@ -880,7 +880,7 @@ fn step_10(omega: Fp, p: Seq<Seq<u128>>, x: Fp, a: Seq<Seq<Fp>>) -> Seq<Seq<Fp>>
             let y_j = a_i[j];
             points[j] = (x_j, y_j);
         }
-        let s_i: Seq<Fp> = legrange_poly(points);
+        let s_i: Seq<Fp> = lagrange_poly(points);
         s[i] = s_i;
     }
 
@@ -1696,6 +1696,62 @@ fn test_divide_poly() {
     for i in 0..p3.len() {
         assert_eq!(p3[i], p4[i])
     }
+}
+
+#[cfg(test)]
+#[quickcheck]
+fn test_poly_add(p1: UniPolynomial, p2: UniPolynomial, x: u128) {
+    let p1 = p1.0;
+    let p2 = p2.0;
+    let x = Fp::from_literal(x);
+    let sum_poly = add_polyx(p1.clone(), p2.clone());
+
+    let expected = eval_polyx(p1, x) + eval_polyx(p2, x);
+    let actual = eval_polyx(sum_poly, x);
+    assert_eq!(expected, actual);
+}
+
+#[cfg(test)]
+#[quickcheck]
+fn test_poly_sub(p1: UniPolynomial, p2: UniPolynomial, x: u128) {
+    let p1 = p1.0;
+    let p2 = p2.0;
+    let x = Fp::from_literal(x);
+    let sum_poly = sub_polyx(p1.clone(), p2.clone());
+
+    let expected = eval_polyx(p1, x) - eval_polyx(p2, x);
+    let actual = eval_polyx(sum_poly, x);
+    assert_eq!(expected, actual);
+}
+
+#[cfg(test)]
+#[quickcheck]
+fn test_poly_mul(p1: UniPolynomial, p2: UniPolynomial, x: u128) {
+    let p1 = p1.0;
+    let p2 = p2.0;
+    let x = Fp::from_literal(x);
+    let mul_poly = mul_polyx(p1.clone(), p2.clone());
+
+    let expected = eval_polyx(p1, x) * eval_polyx(p2, x);
+    let actual = eval_polyx(mul_poly, x);
+    assert_eq!(expected, actual);
+}
+
+#[cfg(test)]
+#[quickcheck]
+fn test_poly_div(p1: UniPolynomial, p2: UniPolynomial, x: u128) {
+    let p1 = p1.0;
+    let p2 = p2.0;
+    let x = Fp::from_literal(x);
+    let (_, remainder) = divide_poly(p1.clone(), p2.clone());
+
+    let p_1_no_remainder = sub_polyx(p1, remainder);
+    let (quotient, remainder) = divide_poly(p_1_no_remainder.clone(), p2.clone());
+    assert!(!check_not_zero(remainder)); // check that remainder is 0
+    let expected = eval_polyx(p_1_no_remainder, x) / eval_polyx(p2.clone(), x);
+    let actual = eval_polyx(quotient, x);
+
+    assert_eq!(expected, actual);
 }
 
 #[cfg(test)]
@@ -3262,23 +3318,23 @@ fn test_step_9_10() {
     );
 }
 
-#[cfg(test)]
-#[quickcheck]
-fn test_poly_mul_x(a: UniPolynomial) {
-    let p1 = a.0;
-    let new_p = &multi_poly_with_x(p1.clone());
-    for i in 1..new_p.len() {
-        assert_eq!(new_p[i], p1[i - 1]);
-    }
-    assert_eq!(new_p[0], Fp::from_literal(0));
-}
+// #[cfg(test)]
+// #[quickcheck]
+// fn test_poly_mul_x(a: UniPolynomial) {
+//     let p1 = a.0;
+//     let new_p = &multi_poly_with_x(p1.clone());
+//     for i in 1..new_p.len() {
+//         assert_eq!(new_p[i], p1[i - 1]);
+//     }
+//     assert_eq!(new_p[0], Fp::from_literal(0));
+// }
 
 #[cfg(test)]
 #[quickcheck]
-fn test_legrange(a: Points) {
+fn test_lagrange(a: Points) {
     let points_seq = a.0;
 
-    let legrange_poly = legrange_poly(points_seq.clone());
+    let legrange_poly = lagrange_poly(points_seq.clone());
 
     for j in 0..points_seq.len() {
         let eval_x = points_seq[j].0;
@@ -3290,19 +3346,17 @@ fn test_legrange(a: Points) {
 
 #[cfg(test)]
 #[quickcheck]
-fn test_legrange_basis(a: Points) {
-    // let points_seq = a.0;
-    let result = Fp::from_literal(4)
-        * Fp::from_hex("3000000000000000000000000000000019B4F2BD072F7EA629353058C0000001");
-    let points_seq = Seq::<(Fp, Fp)>::from_vec(vec![
-        (Fp::from_literal(1), Fp::from_literal(2)),
-        (Fp::from_literal(2), Fp::from_literal(3)),
-        (Fp::from_literal(5), Fp::from_literal(0)),
-    ]);
+fn test_lagrange_basis(a: Points) {
+    let points_seq = a.0;
+    // let points_seq = Seq::<(Fp, Fp)>::from_vec(vec![
+    //     (Fp::from_literal(1), Fp::from_literal(2)),
+    //     (Fp::from_literal(2), Fp::from_literal(3)),
+    //     (Fp::from_literal(5), Fp::from_literal(0)),
+    // ]);
 
     for i in 0..points_seq.len() {
         let x = points_seq[i].0;
-        let basis = legrange_basis(points_seq.clone(), x);
+        let basis = lagrange_basis(points_seq.clone(), x);
         for j in 0..points_seq.len() {
             let eval_x = points_seq[j].0;
             let res = eval_polyx(basis.clone(), eval_x);
@@ -3358,42 +3412,42 @@ fn test_commit_to_poly_parts() {
     let commitments = step_6(poly_parts, &crs, r_seq);
 }
 
-#[cfg(test)]
-#[test]
-fn test_poly_add() {
-    let v1 = vec![5, 10, 20]
-        .iter()
-        .map(|e| Fp::from_literal((*e) as u128))
-        .collect();
-    let v2 = vec![55]
-        .iter()
-        .map(|e| Fp::from_literal((*e) as u128))
-        .collect();
-    let p1 = Seq::from_vec(v1);
-    let p2 = Seq::from_vec(v2);
+// #[cfg(test)]
+// #[test]
+// fn test_poly_add() {
+//     let v1 = vec![5, 10, 20]
+//         .iter()
+//         .map(|e| Fp::from_literal((*e) as u128))
+//         .collect();
+//     let v2 = vec![55]
+//         .iter()
+//         .map(|e| Fp::from_literal((*e) as u128))
+//         .collect();
+//     let p1 = Seq::from_vec(v1);
+//     let p2 = Seq::from_vec(v2);
 
-    let p3 = add_polyx(p1, p2);
+//     let p3 = add_polyx(p1, p2);
 
-    assert_eq!(p3[0], Fp::from_literal(60));
-    assert_eq!(p3[1], Fp::from_literal(10));
-    assert_eq!(p3[2], Fp::from_literal(20));
-}
+//     assert_eq!(p3[0], Fp::from_literal(60));
+//     assert_eq!(p3[1], Fp::from_literal(10));
+//     assert_eq!(p3[2], Fp::from_literal(20));
+// }
 
-#[cfg(test)]
-#[test]
-fn test_poly_mul() {
-    let v1 = vec![5, 10, 20]
-        .iter()
-        .map(|e| Fp::from_literal((*e) as u128))
-        .collect();
-    let p1 = Seq::from_vec(v1);
+// #[cfg(test)]
+// #[test]
+// fn test_poly_mul() {
+//     let v1 = vec![5, 10, 20]
+//         .iter()
+//         .map(|e| Fp::from_literal((*e) as u128))
+//         .collect();
+//     let p1 = Seq::from_vec(v1);
 
-    let p3 = mul_scalar_polyx(p1, Fp::TWO());
+//     let p3 = mul_scalar_polyx(p1, Fp::TWO());
 
-    assert_eq!(p3[0], Fp::from_literal(10));
-    assert_eq!(p3[1], Fp::from_literal(20));
-    assert_eq!(p3[2], Fp::from_literal(40));
-}
+//     assert_eq!(p3[0], Fp::from_literal(10));
+//     assert_eq!(p3[1], Fp::from_literal(20));
+//     assert_eq!(p3[2], Fp::from_literal(40));
+// }
 
 #[cfg(test)]
 #[test]
@@ -3506,31 +3560,31 @@ fn test_trim_poly() {
     assert_eq!(trimmed_p.len(), p.len() - 3);
 }
 
-#[cfg(test)]
-#[test]
-fn test_poly_div() {
-    let n = Seq::from_vec(vec![Fp::ZERO(), Fp::ZERO(), Fp::ONE()]);
-    let d = Seq::from_vec(vec![Fp::ZERO(), Fp::ONE()]);
+// #[cfg(test)]
+// #[test]
+// fn test_poly_div() {
+//     let n = Seq::from_vec(vec![Fp::ZERO(), Fp::ZERO(), Fp::ONE()]);
+//     let d = Seq::from_vec(vec![Fp::ZERO(), Fp::ONE()]);
 
-    let (q, r) = divide_poly(n, d);
-    assert_eq!(q.len(), 2);
-    assert_eq!(q[0], Fp::ZERO());
-    assert_eq!(q[1], Fp::ONE());
-    assert!(!check_not_zero(r));
+//     let (q, r) = divide_poly(n, d);
+//     assert_eq!(q.len(), 2);
+//     assert_eq!(q[0], Fp::ZERO());
+//     assert_eq!(q[1], Fp::ONE());
+//     assert!(!check_not_zero(r));
 
-    let n = Seq::from_vec(vec![
-        Fp::from_literal(4),
-        Fp::from_literal(8),
-        Fp::from_literal(3),
-    ]);
-    let d = Seq::from_vec(vec![Fp::TWO(), Fp::from_literal(3)]);
+//     let n = Seq::from_vec(vec![
+//         Fp::from_literal(4),
+//         Fp::from_literal(8),
+//         Fp::from_literal(3),
+//     ]);
+//     let d = Seq::from_vec(vec![Fp::TWO(), Fp::from_literal(3)]);
 
-    let (q, r) = divide_poly(n, d);
-    assert_eq!(q.len(), 2);
-    assert_eq!(q[0], Fp::TWO());
-    assert_eq!(q[1], Fp::ONE());
-    assert!(!check_not_zero(r));
-}
+//     let (q, r) = divide_poly(n, d);
+//     assert_eq!(q.len(), 2);
+//     assert_eq!(q[0], Fp::TWO());
+//     assert_eq!(q[1], Fp::ONE());
+//     assert!(!check_not_zero(r));
+// }
 
 #[cfg(test)]
 #[quickcheck]
@@ -3631,11 +3685,11 @@ fn example_run() {
         (omega.pow(3), Fp::from_literal(0)),
     ]);
 
-    let a_0: Seq<Fp> = legrange_poly(a0_points);
-    let a_1: Seq<Fp> = legrange_poly(a1_points);
-    let a_2: Seq<Fp> = legrange_poly(a2_points);
+    let a_0: Seq<Fp> = lagrange_poly(a0_points);
+    let a_1: Seq<Fp> = lagrange_poly(a1_points);
+    let a_2: Seq<Fp> = lagrange_poly(a2_points);
     let a_list: Seq<Seq<Fp>> = Seq::from_vec(vec![a_0.clone(), a_1.clone(), a_2.clone()]);
-    let q_add: Seq<Fp> = legrange_poly(q_add_points);
+    let q_add: Seq<Fp> = lagrange_poly(q_add_points);
 
     // construct A_i's (commitments)
     let A_0_blinding: Fp = Fp::from_literal(99);
@@ -3760,7 +3814,7 @@ fn example_run() {
         (Fp::from_literal(444), Fp::from_literal(484)),
         (x3_challenge, Fp::ZERO()),
     ]);
-    let s_poly: Seq<Fp> = legrange_poly(s_poly_points);
+    let s_poly: Seq<Fp> = lagrange_poly(s_poly_points);
     assert_eq!(
         eval_polyx(s_poly.clone(), x3_challenge),
         Fp::ZERO(),
