@@ -227,7 +227,7 @@ fn rotate_polyx(p: Seq<Fp>, rotation: Fp) -> Seq<Fp> {
 ///
 /// * `p` - the polynomial
 fn poly_degree(p: Seq<Fp>) -> u128 {
-    let len = p.len();
+    let len = trim_poly(p).len();
     if len == 0 {
         0
     } else {
@@ -328,11 +328,13 @@ fn divide_poly(n: Seq<Fp>, d: Seq<Fp>) -> (Seq<Fp>, Seq<Fp>) {
     for _ in 0..loop_upper_bound {
         if check_not_zero(r.clone()) && poly_degree(r.clone()) >= poly_degree(d.clone()) {
             let t: Seq<Fp> = divide_leading_terms(r.clone(), d.clone());
+
             q = add_polyx(q, t.clone());
             let aux_prod: Seq<Fp> = mul_polyx(d.clone(), t.clone());
             r = sub_polyx(r, aux_prod);
         }
     }
+
     (trim_poly(q), trim_poly(r))
 }
 
@@ -396,8 +398,13 @@ fn legrange_basis(points: Seq<(Fp, Fp)>, x: Fp) -> Seq<Fp> {
     let mut division_poly = Seq::<Fp>::create(points.len());
     division_poly[0] = devisor;
 
-    let output = divide_poly(basis, division_poly);
+    let output = divide_poly(basis.clone(), division_poly.clone());
+
     let (final_basis, _) = output;
+    println!("{:?}", basis);
+    println!("{:?}", division_poly);
+    println!("{:?}", final_basis);
+
     final_basis
 }
 
@@ -1672,26 +1679,17 @@ impl Arbitrary for G1Container {
 #[test]
 fn test_divide_poly() {
     let p1: Seq<Fp> = Seq::<Fp>::from_vec(vec![
-        Fp::from_literal(0),
-        Fp::from_literal(0),
-        Fp::from_literal(0),
-        Fp::from_literal(0),
-        Fp::from_literal(0),
-        Fp::from_literal(0),
-        Fp::from_literal(0),
-        Fp::from_literal(10),
+        Fp::from_literal(12),
+        Fp::from_literal(4000),
+        Fp::from_literal(20),
     ]);
-    let p2: Seq<Fp> = Seq::<Fp>::from_vec(vec![Fp::from_literal(0), Fp::from_literal(2)]);
+    let p2: Seq<Fp> = Seq::<Fp>::from_vec(vec![Fp::from_literal(4), Fp::from_literal(0)]);
 
     let p3: Seq<Fp> = divide_poly(p1, p2).0;
 
     let p4: Seq<Fp> = Seq::<Fp>::from_vec(vec![
-        Fp::from_literal(0),
-        Fp::from_literal(0),
-        Fp::from_literal(0),
-        Fp::from_literal(0),
-        Fp::from_literal(0),
-        Fp::from_literal(0),
+        Fp::from_literal(3),
+        Fp::from_literal(1000),
         Fp::from_literal(5),
     ]);
     assert_eq!(p3.len(), p4.len());
@@ -3192,41 +3190,40 @@ fn testmsm() {
 #[test]
 fn test_step_9_10() {
     fn a(a_prime_seq: SeqOfUniPoly, omega_value: u128, x_value: u128) -> TestResult {
+        let mut x_value: u128 = x_value;
+        let mut omega_value: u128 = omega_value;
+        if x_value < 2 {
+            x_value = x_value + 2;
+        }
+        if omega_value < 3 {
+            omega_value = omega_value + 3;
+        }
         let a_prime_seq = a_prime_seq.0;
-        let p = gen_p(a_prime_seq.len(), 100);
+        let p = gen_p(a_prime_seq.len(), 50);
 
         let r = Seq::<Fp>::from_vec(vec![Fp::ZERO()]);
-        if p.len() == 0 {
-            return TestResult::discard();
-        }
-        let omega: Fp = Fp::from_literal(omega_value % 55);
-        let x: Fp = Fp::from_literal(x_value % 55);
+
+        let omega: Fp = Fp::from_literal(omega_value);
+        let x: Fp = Fp::from_literal(x_value);
 
         let p: Seq<Seq<u128>> = p;
-        let a: &Seq<u128> = &p[0];
-        let n_e: usize = a.len();
         let n_a: usize = a_prime_seq.len();
-        if n_e == 0 {
-            return TestResult::discard();
+        if x_value < 2 {
+            x_value = x_value + 2;
         }
-        if n_a == 0 {
-            return TestResult::discard();
-        }
-        if x_value % 55 < 2 {
-            return TestResult::discard();
-        }
-        if omega_value % 55 < 3 {
-            return TestResult::discard();
+        if omega_value < 3 {
+            omega_value = omega_value + 3;
         }
         let (_, a) = step_9(r, a_prime_seq, omega, p.clone(), x);
         let s = step_10(omega, p.clone(), x, a.clone());
 
         for i in 0..n_a {
             println!("{:?}", i);
+
             let p_i: Seq<u128> = p[i].clone();
             let s_i: Seq<Fp> = s[i].clone();
             let a_i: Seq<Fp> = a[i].clone();
-
+            let n_e = p_i.len();
             for j in 0..n_e {
                 let p_i_j = p_i[j];
                 let function_arg: Fp = omega.pow(p_i_j) * x;
@@ -3272,8 +3269,15 @@ fn test_legrange(a: Points) {
 #[cfg(test)]
 #[quickcheck]
 fn test_legrange_basis(a: Points) {
-    let points_seq = a.0;
-    // let points_seq  = Seq::<(Fp,Fp)>::from_vec(vec![(Fp::from_literal(1),Fp::from_literal(2)), (Fp::from_literal(2),Fp::from_literal(3)), (Fp::from_literal(5),Fp::from_literal(0))]);
+    // let points_seq = a.0;
+    let result = Fp::from_literal(4)
+        * Fp::from_hex("3000000000000000000000000000000019B4F2BD072F7EA629353058C0000001");
+    println!("{:?}", result);
+    let points_seq = Seq::<(Fp, Fp)>::from_vec(vec![
+        (Fp::from_literal(1), Fp::from_literal(2)),
+        (Fp::from_literal(2), Fp::from_literal(3)),
+        (Fp::from_literal(5), Fp::from_literal(0)),
+    ]);
 
     for i in 0..points_seq.len() {
         let x = points_seq[i].0;
