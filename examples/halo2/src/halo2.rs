@@ -405,22 +405,6 @@ fn lagrange_basis(points: Seq<(Fp, Fp)>, x: Fp) -> Seq<Fp> {
     final_basis
 }
 
-// fn legrange_basis(points: Seq<(Fp, Fp)>, x: Fp) -> Seq<Fp> {
-//         let mut basis = Seq::<Fp>::create(points.len());
-//         basis[0] = Fp::ONE();
-//         let mut devisor = Fp::ONE();
-//         for i in 0..points.len() {
-//                     let point = points[i];
-//                     let p_x = point.0;
-//                     if p_x != x {
-//                         let poly_mul_x = multi_poly_with_x(basis.clone());
-//                         let poly_mul_scalar: Seq<Fp> = mul_scalar_polyx(basis.clone(), p_x.neg());
-//                         basis = mul_scalar_polyx(basis.clone(), Fp::ONE());
-//                     }
-//                 }
-//         basis
-//     }
-
 /// Evaluate a term with specified variable inputs
 /// Helper function for reduce_multi_poly
 ///
@@ -636,6 +620,7 @@ fn msm(a: Seq<Fp>, g: Seq<G1>) -> G1 {
 
     res
 }
+
 /// Compute vanishing polynomial over n-order multiplicative subgroup H with root of unity omega
 ///
 /// # Arguments
@@ -653,21 +638,6 @@ fn compute_vanishing_polynomial(omega: Fp, n: u128) -> Seq<Fp> {
     }
 
     vanishing_poly
-}
-
-/// Compute the h(x) polynomial, used in step 4 and 13
-///
-/// # Arguments
-///
-/// * `g_prime` the univariate polynomial calculated in step 2 and 13
-fn compute_h(g_prime: Seq<Fp>) -> Seq<Fp> {
-    // TODO create the real vanishing polynomial
-    let t = Seq::<Fp>::create(0);
-
-    let (h, remainder) = divide_poly(g_prime, t);
-    // TODO what to do with remainder?
-
-    h
 }
 
 /// Implementation of the σ mapping from the protocol
