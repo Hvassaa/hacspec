@@ -11,11 +11,11 @@ use hacspec_pasta::*;
 /// Since the group and field is currently fixed, only G, U, W is represented
 struct PublicParams(
     /// **G** in G^n
-    Seq<G1>,
+    Seq<G1_vesta>,
     /// U in G
-    G1,
+    G1_vesta,
     /// W in G
-    G1,
+    G1_vesta,
 );
 
 /// Common Reference Struct
@@ -23,9 +23,9 @@ struct PublicParams(
 /// This struct is a global variable for the proving system and holds values used in the commitment schemes
 ///
 /// # Tuple entries
-/// * `0`: Seq<G1> ∈ Gᵈ (vector of random elems.)
-/// * `1`: G1 in G (random group element)
-type CRS = (Seq<G1>, G1);
+/// * `0`: Seq<G1_vesta> ∈ Gᵈ (vector of random elems.)
+/// * `1`: G1_vesta in G (random group element)
+type CRS = (Seq<G1_vesta>, G1_vesta);
 
 /// A term in a multivariate polynomial
 ///
@@ -34,7 +34,7 @@ type CRS = (Seq<G1>, G1);
 /// * `1`: - The second entry, a sequence of `u32`s, represent the powers
 ///        for each variable, s.t. the i'th variabe is raised to the power
 ///        of the i'th entry in the sequence.
-type Term = (Fp, Seq<u32>);
+type Term = (FpPallas, Seq<u32>);
 
 /// A representation of input variable in multivariate polynomial
 ///
@@ -42,14 +42,14 @@ type Term = (Fp, Seq<u32>);
 /// * `0`: - The first entry determines whether this variable should be evaluated or not.
 ///        This is useful for only evaluating some variables in a multivariate polynomial.
 /// * `1`: - The second entry is the actual (inputted) value for the variable
-type InputVar = (bool, Fp);
+type InputVar = (bool, FpPallas);
 
 fn halo2() {
     // step 1
     // dummy values
     let a: Seq<Seq<Term>> = Seq::<Seq<Term>>::create(0);
-    let crs: CRS = (Seq::<G1>::create(0), g1_default());
-    let r = Fp::default();
+    let crs: CRS = (Seq::<G1_vesta>::create(0), g1_default_vesta());
+    let r = FpPallas::default();
 
     for j in 0..a.len() {
         let aj = a[j].clone();
@@ -75,8 +75,8 @@ fn halo2() {
 ///
 /// * `p1` - the LHS polynomial
 /// * `p2` - the RHS polynomial
-fn add_polyx(p1: Seq<Fp>, p2: Seq<Fp>) -> Seq<Fp> {
-    let mut res = Seq::<Fp>::create(0);
+fn add_polyx(p1: Seq<FpPallas>, p2: Seq<FpPallas>) -> Seq<FpPallas> {
+    let mut res = Seq::<FpPallas>::create(0);
     let mut short_len = 0;
 
     if p1.len() > p2.len() {
@@ -100,13 +100,13 @@ fn add_polyx(p1: Seq<Fp>, p2: Seq<Fp>) -> Seq<Fp> {
 ///
 /// * `p1` - the LHS polynomial
 /// * `p2` - the RHS polynomial
-fn sub_polyx(p1: Seq<Fp>, p2: Seq<Fp>) -> Seq<Fp> {
+fn sub_polyx(p1: Seq<FpPallas>, p2: Seq<FpPallas>) -> Seq<FpPallas> {
     let mut largest = p1.len();
     if p2.len() > p1.len() {
         largest = p2.len();
     }
 
-    let mut res = Seq::<Fp>::create(largest);
+    let mut res = Seq::<FpPallas>::create(largest);
     for i in 0..p1.len() {
         res[i] = p1[i];
     }
@@ -127,12 +127,12 @@ fn sub_polyx(p1: Seq<Fp>, p2: Seq<Fp>) -> Seq<Fp> {
 ///
 /// * `p1` LHS polynomial
 /// * `p2` RHS polynomial
-fn mul_polyx(a: Seq<Fp>, b: Seq<Fp>) -> Seq<Fp> {
-    let mut result = Seq::<Fp>::create(a.len() + b.len());
+fn mul_polyx(a: Seq<FpPallas>, b: Seq<FpPallas>) -> Seq<FpPallas> {
+    let mut result = Seq::<FpPallas>::create(a.len() + b.len());
     for i in 0..a.len() {
-        if !a[i].equal(Fp::default()) {
+        if !a[i].equal(FpPallas::default()) {
             for j in 0..b.len() {
-                if !b[j].equal(Fp::default()) {
+                if !b[j].equal(FpPallas::default()) {
                     result[i + j] = (result[i + j].add(a[i] * b[j]));
                 }
             }
@@ -147,7 +147,7 @@ fn mul_polyx(a: Seq<Fp>, b: Seq<Fp>) -> Seq<Fp> {
 ///
 /// * `p` - the polynomial
 /// * `s` - the scalar
-fn mul_scalar_polyx(p: Seq<Fp>, s: Fp) -> Seq<Fp> {
+fn mul_scalar_polyx(p: Seq<FpPallas>, s: FpPallas) -> Seq<FpPallas> {
     let mut res = p.clone();
 
     for i in 0..res.len() {
@@ -162,11 +162,11 @@ fn mul_scalar_polyx(p: Seq<Fp>, s: Fp) -> Seq<Fp> {
 ///
 /// * `p` - the polynomial
 /// * `s` - the scalar
-fn add_scalar_polyx(p: Seq<Fp>, s: Fp) -> Seq<Fp> {
+fn add_scalar_polyx(p: Seq<FpPallas>, s: FpPallas) -> Seq<FpPallas> {
     let mut res = p.clone();
     if res.len() == 0 {
         // if poly empty, initialize res to zero constant term
-        res = Seq::<Fp>::create(1);
+        res = Seq::<FpPallas>::create(1);
     }
 
     // do the addition on constant term
@@ -181,11 +181,11 @@ fn add_scalar_polyx(p: Seq<Fp>, s: Fp) -> Seq<Fp> {
 ///
 /// * `p` - the polynomial
 /// * `s` - the scalar
-fn sub_scalar_polyx(p: Seq<Fp>, s: Fp) -> Seq<Fp> {
+fn sub_scalar_polyx(p: Seq<FpPallas>, s: FpPallas) -> Seq<FpPallas> {
     let mut res = p.clone();
     if res.len() == 0 {
         // if poly empty, initialize res to zero constant term
-        res = Seq::<Fp>::create(1);
+        res = Seq::<FpPallas>::create(1);
     }
 
     // do the subtraction on constant term
@@ -200,8 +200,8 @@ fn sub_scalar_polyx(p: Seq<Fp>, s: Fp) -> Seq<Fp> {
 ///
 /// * `p` - the polynomial
 /// * `x` - the point
-fn eval_polyx(p: Seq<Fp>, x: Fp) -> Fp {
-    let mut res = Fp::ZERO();
+fn eval_polyx(p: Seq<FpPallas>, x: FpPallas) -> FpPallas {
+    let mut res = FpPallas::ZERO();
 
     for i in 0..p.len() {
         res = res + p[i] * x.exp(i as u32);
@@ -210,7 +210,7 @@ fn eval_polyx(p: Seq<Fp>, x: Fp) -> Fp {
     res
 }
 
-fn rotate_polyx(p: Seq<Fp>, rotation: Fp) -> Seq<Fp> {
+fn rotate_polyx(p: Seq<FpPallas>, rotation: FpPallas) -> Seq<FpPallas> {
     let mut res = p;
     for i in 0..res.len() {
         let coef = res[i];
@@ -226,7 +226,7 @@ fn rotate_polyx(p: Seq<Fp>, rotation: Fp) -> Seq<Fp> {
 /// # Arguments
 ///
 /// * `p` - the polynomial
-fn poly_degree(p: Seq<Fp>) -> u128 {
+fn poly_degree(p: Seq<FpPallas>) -> u128 {
     let len = trim_poly(p).len();
     if len == 0 {
         0
@@ -241,11 +241,11 @@ fn poly_degree(p: Seq<Fp>) -> u128 {
 /// # Returns
 /// * `true` if polynomial is NOT all 0
 /// * `false`if polynomial IS all 0
-fn check_not_zero(p: Seq<Fp>) -> bool {
-    let mut sum = Fp::ZERO();
+fn check_not_zero(p: Seq<FpPallas>) -> bool {
+    let mut sum = FpPallas::ZERO();
     let mut all_zero = false;
     for i in 0..p.len() {
-        if p[i] > Fp::ZERO() {
+        if p[i] > FpPallas::ZERO() {
             all_zero = true;
         }
     }
@@ -257,14 +257,14 @@ fn check_not_zero(p: Seq<Fp>) -> bool {
 /// # Arguments
 ///
 /// * `p` - the polynomial
-fn trim_poly(p: Seq<Fp>) -> Seq<Fp> {
+fn trim_poly(p: Seq<FpPallas>) -> Seq<FpPallas> {
     let mut last_val_idx = 0;
     for i in 0..p.len() {
-        if p[i] != Fp::ZERO() {
+        if p[i] != FpPallas::ZERO() {
             last_val_idx = i;
         }
     }
-    let mut res = Seq::<Fp>::create(last_val_idx + 1);
+    let mut res = Seq::<FpPallas>::create(last_val_idx + 1);
     if p.len() != 0 {
         for i in 0..res.len() {
             res[i] = p[i];
@@ -281,14 +281,14 @@ fn trim_poly(p: Seq<Fp>) -> Seq<Fp> {
 ///
 /// * `n` - the dividend/enumerator polynomial
 /// * `d` - the divisor/denominator polynomial
-fn divide_leading_terms(n: Seq<Fp>, d: Seq<Fp>) -> Seq<Fp> {
-    let n: Seq<Fp> = trim_poly(n);
-    let d: Seq<Fp> = trim_poly(d);
+fn divide_leading_terms(n: Seq<FpPallas>, d: Seq<FpPallas>) -> Seq<FpPallas> {
+    let n: Seq<FpPallas> = trim_poly(n);
+    let d: Seq<FpPallas> = trim_poly(d);
     let x_pow: usize = n.len() - d.len();
-    let n_coeff: Fp = n[n.len() - 1];
-    let d_coeff: Fp = d[d.len() - 1];
-    let coeff: Fp = n_coeff / d_coeff;
-    let mut res: Seq<Fp> = Seq::<Fp>::create(x_pow + 1);
+    let n_coeff: FpPallas = n[n.len() - 1];
+    let d_coeff: FpPallas = d[d.len() - 1];
+    let coeff: FpPallas = n_coeff / d_coeff;
+    let mut res: Seq<FpPallas> = Seq::<FpPallas>::create(x_pow + 1);
     res[x_pow] = coeff;
 
     res
@@ -317,9 +317,9 @@ fn divide_leading_terms(n: Seq<Fp>, d: Seq<Fp>) -> Seq<Fp> {
 ///
 /// * `n` - the dividend/enumerator polynomial
 /// * `d` - the divisor/denominator polynomial
-fn divide_poly(n: Seq<Fp>, d: Seq<Fp>) -> (Seq<Fp>, Seq<Fp>) {
-    let mut q: Seq<Fp> = Seq::<Fp>::create(n.len());
-    let mut r: Seq<Fp> = n.clone();
+fn divide_poly(n: Seq<FpPallas>, d: Seq<FpPallas>) -> (Seq<FpPallas>, Seq<FpPallas>) {
+    let mut q: Seq<FpPallas> = Seq::<FpPallas>::create(n.len());
+    let mut r: Seq<FpPallas> = n.clone();
 
     let mut loop_upper_bound = d.len();
     if q.len() > d.len() {
@@ -327,10 +327,10 @@ fn divide_poly(n: Seq<Fp>, d: Seq<Fp>) -> (Seq<Fp>, Seq<Fp>) {
     }
     for _ in 0..loop_upper_bound {
         if check_not_zero(r.clone()) && poly_degree(r.clone()) >= poly_degree(d.clone()) {
-            let t: Seq<Fp> = divide_leading_terms(r.clone(), d.clone());
+            let t: Seq<FpPallas> = divide_leading_terms(r.clone(), d.clone());
 
             q = add_polyx(q, t.clone());
-            let aux_prod: Seq<Fp> = mul_polyx(d.clone(), t.clone());
+            let aux_prod: Seq<FpPallas> = mul_polyx(d.clone(), t.clone());
             r = sub_polyx(r, aux_prod);
         }
     }
@@ -339,14 +339,14 @@ fn divide_poly(n: Seq<Fp>, d: Seq<Fp>) -> (Seq<Fp>, Seq<Fp>) {
 }
 
 // TODO document
-fn multi_poly_with_x(p: Seq<Fp>) -> Seq<Fp> {
+fn multi_poly_with_x(p: Seq<FpPallas>) -> Seq<FpPallas> {
     multi_poly_with_x_pow(p, 1 as usize)
 }
 
 // TODO document
-fn multi_poly_with_x_pow(p: Seq<Fp>, power: usize) -> Seq<Fp> {
-    let p: Seq<Fp> = trim_poly(p);
-    let mut res: Seq<Fp> = Seq::<Fp>::create(p.len() + power);
+fn multi_poly_with_x_pow(p: Seq<FpPallas>, power: usize) -> Seq<FpPallas> {
+    let p: Seq<FpPallas> = trim_poly(p);
+    let mut res: Seq<FpPallas> = Seq::<FpPallas>::create(p.len() + power);
 
     for i in 0..p.len() {
         res[i + power] = p[i];
@@ -359,12 +359,12 @@ fn multi_poly_with_x_pow(p: Seq<Fp>, power: usize) -> Seq<Fp> {
 /// * `points`is a sequence of points `(Fp,Fp)` that the polynomial must pass through
 /// # Assertions
 /// * No two points may have the same x-value.
-fn lagrange_poly(points: Seq<(Fp, Fp)>) -> Seq<Fp> {
-    let mut poly = Seq::<Fp>::create(points.len());
+fn lagrange_poly(points: Seq<(FpPallas, FpPallas)>) -> Seq<FpPallas> {
+    let mut poly = Seq::<FpPallas>::create(points.len());
 
     for i in 0..points.len() {
-        let x: Fp = points[i].0;
-        let y: Fp = points[i].1;
+        let x: FpPallas = points[i].0;
+        let y: FpPallas = points[i].1;
         let basis = lagrange_basis(points.clone(), x);
         let scaled_basis = mul_scalar_polyx(basis, y);
         poly = add_polyx(poly.clone(), scaled_basis.clone());
@@ -380,22 +380,22 @@ fn lagrange_poly(points: Seq<(Fp, Fp)>) -> Seq<Fp> {
 /// * `x`is the x-value where the polynomial will evaluate to 1. If `x`is also in `points` the polynomial will still evaluate to 1 at `x``
 /// # Assertions
 /// * No two points may have the same x-value
-fn lagrange_basis(points: Seq<(Fp, Fp)>, x: Fp) -> Seq<Fp> {
-    let mut basis = Seq::<Fp>::create(points.len());
-    basis[0] = Fp::ONE();
-    let mut devisor = Fp::ONE();
+fn lagrange_basis(points: Seq<(FpPallas, FpPallas)>, x: FpPallas) -> Seq<FpPallas> {
+    let mut basis = Seq::<FpPallas>::create(points.len());
+    basis[0] = FpPallas::ONE();
+    let mut devisor = FpPallas::ONE();
     for i in 0..points.len() {
         let point = points[i];
         let p_x = point.0;
         if p_x != x {
             devisor = devisor.mul(x.sub(p_x));
             let poly_mul_x = multi_poly_with_x(basis.clone());
-            let poly_mul_scalar: Seq<Fp> = mul_scalar_polyx(basis.clone(), p_x.neg());
+            let poly_mul_scalar: Seq<FpPallas> = mul_scalar_polyx(basis.clone(), p_x.neg());
             basis = add_polyx(poly_mul_x, poly_mul_scalar);
         }
     }
-    let test = eval_polyx(basis.clone(), Fp::ONE());
-    let mut division_poly = Seq::<Fp>::create(points.len());
+    let test = eval_polyx(basis.clone(), FpPallas::ONE());
+    let mut division_poly = Seq::<FpPallas>::create(points.len());
     division_poly[0] = devisor;
 
     let output = divide_poly(basis.clone(), division_poly.clone());
@@ -453,7 +453,7 @@ fn reduce_multi_term(term: &Term, inputs: Seq<InputVar>, new_size: usize) -> Ter
 ///
 /// * The length of inputs and all sequences of powers in p1 should be equal
 fn reduce_multi_poly(p: Seq<Term>, inputs: Seq<InputVar>) -> Seq<Term> {
-    let mut constant = Fp::ZERO();
+    let mut constant = FpPallas::ZERO();
     let mut unevaluated_variables = 0;
     for i in 0..inputs.len() {
         let (b, _) = inputs[i];
@@ -508,7 +508,7 @@ fn reduce_multi_poly(p: Seq<Term>, inputs: Seq<InputVar>) -> Seq<Term> {
 /// # Constraints
 ///
 /// * The length of inputs and all sequences of powers in p1 should be equal
-fn eval_multi_poly(p: Seq<Term>, inputs: Seq<Fp>) -> Fp {
+fn eval_multi_poly(p: Seq<Term>, inputs: Seq<FpPallas>) -> FpPallas {
     let mut inputvars = Seq::<InputVar>::create(inputs.len());
     for i in 0..inputs.len() {
         inputvars[i] = (true, inputs[i]);
@@ -526,13 +526,13 @@ fn eval_multi_poly(p: Seq<Term>, inputs: Seq<Fp>) -> Fp {
 /// * `crs` - the common reference string
 /// * `a` - the "vector"
 /// * `blinding` - blinding factor
-fn commit_polyx(crs: &CRS, a: Seq<Fp>, blinding: Fp) -> G1 {
+fn commit_polyx(crs: &CRS, a: Seq<FpPallas>, blinding: FpPallas) -> G1_vesta {
     let (G, W) = crs;
     let (f1, f2, b) = W;
 
-    let lhs: G1 = msm(a, G.clone());
-    let rhs: G1 = g1mul(blinding, (f1.clone(), f2.clone(), b.clone()));
-    let res: G1 = g1add(lhs, rhs);
+    let lhs: G1_vesta = msm(a, G.clone());
+    let rhs: G1_vesta = g1mul_vesta(blinding, (f1.clone(), f2.clone(), b.clone()));
+    let res: G1_vesta = g1add_vesta(lhs, rhs);
 
     res
 }
@@ -552,7 +552,7 @@ fn commit_polyx(crs: &CRS, a: Seq<Fp>, blinding: Fp) -> G1 {
 ///
 /// * The length of inputs and all sequences of powers in p1 should be equal
 /// * Exactly one variable should remain unevaluated_variables
-fn multi_to_uni_poly(p: Seq<Term>, inputs: Seq<InputVar>) -> Seq<Fp> {
+fn multi_to_uni_poly(p: Seq<Term>, inputs: Seq<InputVar>) -> Seq<FpPallas> {
     // the univariate polynomial, in mutlivariate representation
     let reduced_poly = reduce_multi_poly(p.clone(), inputs);
 
@@ -567,13 +567,13 @@ fn multi_to_uni_poly(p: Seq<Term>, inputs: Seq<InputVar>) -> Seq<Fp> {
         }
     }
 
-    let mut s = Seq::<Fp>::create(max_deg + 1);
+    let mut s = Seq::<FpPallas>::create(max_deg + 1);
 
     for i in 0..max_deg + 1 {
         // sum the coefficients of terms with same degree (in "x")
-        let mut coeff_sum = Fp::ZERO();
+        let mut coeff_sum = FpPallas::ZERO();
         for j in 0..reduced_poly.len() {
-            let mut coeff = Fp::ZERO();
+            let mut coeff = FpPallas::ZERO();
             let poly_clone = reduced_poly.clone();
             let powers = poly_clone[j].1.clone();
             let f = poly_clone[j].0.clone();
@@ -597,8 +597,8 @@ fn multi_to_uni_poly(p: Seq<Term>, inputs: Seq<InputVar>) -> Seq<Fp> {
 ///
 /// * `u` - LHS vector
 /// * `v` - RHS vector
-fn inner_product(u: Seq<Fp>, v: Seq<Fp>) -> Fp {
-    let mut res = Fp::ZERO();
+fn inner_product(u: Seq<FpPallas>, v: Seq<FpPallas>) -> FpPallas {
+    let mut res = FpPallas::ZERO();
     for i in 0..u.len() {
         res = res + u[i] * v[i];
     }
@@ -612,10 +612,10 @@ fn inner_product(u: Seq<Fp>, v: Seq<Fp>) -> Fp {
 ///
 /// * `a` - sequence of scalars (LHS)
 /// * `g` - sequence of group (curve) elements (RHS)
-fn msm(a: Seq<Fp>, g: Seq<G1>) -> G1 {
-    let mut res: G1 = g1mul(a[0], g[0]);
+fn msm(a: Seq<FpPallas>, g: Seq<G1_vesta>) -> G1_vesta {
+    let mut res: G1_vesta = g1mul_vesta(a[0], g[0]);
     for i in 1..a.len() {
-        res = g1add(res, g1mul(a[i], g[i]));
+        res = g1add_vesta(res, g1mul_vesta(a[i], g[i]));
     }
 
     res
@@ -626,14 +626,15 @@ fn msm(a: Seq<Fp>, g: Seq<G1>) -> G1 {
 /// # Arguments
 /// * `omega` - root of unity for the H
 /// * `n` - the order of the group
-fn compute_vanishing_polynomial(omega: Fp, n: u128) -> Seq<Fp> {
-    let mut vanishing_poly: Seq<Fp> = Seq::<Fp>::create(1);
+fn compute_vanishing_polynomial(omega: FpPallas, n: u128) -> Seq<FpPallas> {
+    let mut vanishing_poly: Seq<FpPallas> = Seq::<FpPallas>::create(1);
 
-    vanishing_poly[0] = Fp::ONE();
+    vanishing_poly[0] = FpPallas::ONE();
     for i in 0..(n) as usize {
         let eval_point = omega.pow(i as u128);
         let poly_mul_x = multi_poly_with_x(vanishing_poly.clone());
-        let poly_mul_scalar: Seq<Fp> = mul_scalar_polyx(vanishing_poly.clone(), eval_point.neg());
+        let poly_mul_scalar: Seq<FpPallas> =
+            mul_scalar_polyx(vanishing_poly.clone(), eval_point.neg());
         vanishing_poly = add_polyx(poly_mul_x, poly_mul_scalar);
     }
 
@@ -661,28 +662,27 @@ fn sigma(i: u128, sigma_list: Seq<u128>, q: Seq<Seq<u128>>) -> Seq<u128> {
 /// * `U` - group element U from pp
 /// * `W` - group element W from pp
 fn calculate_L_or_R(
-    p_part: Seq<Fp>,
-    b_part: Seq<Fp>,
-    g_part: Seq<G1>,
-    z: Fp,
-    U: G1,
-    W: G1,
-    blinding: Fp,
-) -> G1 {
+    p_part: Seq<FpPallas>,
+    b_part: Seq<FpPallas>,
+    g_part: Seq<G1_vesta>,
+    z: FpPallas,
+    U: G1_vesta,
+    W: G1_vesta,
+    blinding: FpPallas,
+) -> G1_vesta {
     // <p'_part, G'_part>
-    let p_g_msm: G1 = msm(p_part.clone(), g_part);
-
-    let p_b_ip: Fp = inner_product(p_part, b_part);
-    let z_ip: Fp = z * p_b_ip;
+    let p_g_msm: G1_vesta = msm(p_part.clone(), g_part);
+    let p_b_ip: FpPallas = inner_product(p_part, b_part);
+    let z_ip: FpPallas = z * p_b_ip;
     // [z<p'_part, b_part>]U
-    let z_ip_U: G1 = g1mul(z_ip, U);
+    let z_ip_U: G1_vesta = g1mul_vesta(z_ip, U);
 
     // [*]W
-    let multed_W: G1 = g1mul(blinding, W);
+    let multed_W: G1_vesta = g1mul_vesta(blinding, W);
 
     // calculate part j (L_j or R_j)
-    let mut part_j: G1 = g1add(p_g_msm, z_ip_U);
-    part_j = g1add(part_j, multed_W);
+    let mut part_j: G1_vesta = g1add_vesta(p_g_msm, z_ip_U);
+    part_j = g1add_vesta(part_j, multed_W);
 
     part_j
 }
@@ -696,7 +696,7 @@ fn step_3() {}
 /// * `g_prime` - polynomial from step 2
 /// * `omega` - a n=2ˆk root of unity (global variable)
 /// * `n` - n=2ˆk (global variable)
-fn step_4(g_prime: Seq<Fp>, omega: Fp, n: u128) -> Seq<Fp> {
+fn step_4(g_prime: Seq<FpPallas>, omega: FpPallas, n: u128) -> Seq<FpPallas> {
     let vanishing = compute_vanishing_polynomial(omega, n);
 
     let (h, remainder) = divide_poly(g_prime, vanishing);
@@ -716,15 +716,15 @@ fn step_4(g_prime: Seq<Fp>, omega: Fp, n: u128) -> Seq<Fp> {
 /// * `h` - Polynomial to be split
 /// * `n` - defines length of new polynomials (global variable for prooving system)
 /// * `n_g` - splits into n_g-2 new polynomials
-fn step_5(h: Seq<Fp>, n: u128, n_g: u128) -> Seq<Seq<Fp>> {
-    let h: Seq<Fp> = trim_poly(h);
+fn step_5(h: Seq<FpPallas>, n: u128, n_g: u128) -> Seq<Seq<FpPallas>> {
+    let h: Seq<FpPallas> = trim_poly(h);
     let no_of_parts: usize = (n_g - 2) as usize;
     let n: usize = n as usize;
 
     let mut original_index: usize = 0;
-    let mut poly_parts: Seq<Seq<Fp>> = Seq::<Seq<Fp>>::create(no_of_parts);
+    let mut poly_parts: Seq<Seq<FpPallas>> = Seq::<Seq<FpPallas>>::create(no_of_parts);
     for i in 0..poly_parts.len() {
-        let mut current_poly_part: Seq<Fp> = Seq::<Fp>::create(n);
+        let mut current_poly_part: Seq<FpPallas> = Seq::<FpPallas>::create(n);
         for j in 0..n {
             if original_index < h.len() {
                 current_poly_part[j] = h[original_index];
@@ -766,10 +766,10 @@ fn step_5(h: Seq<Fp>, n: u128, n_g: u128) -> Seq<Seq<Fp>> {
 ///
 /// # Constraints
 /// * `blindings` should be at least as long as the `poly_parts`
-fn step_6(poly_parts: Seq<Seq<Fp>>, crs: &CRS, blindings: Seq<Fp>) -> Seq<G1> {
-    let mut commitment_seq: Seq<G1> = Seq::<G1>::create(poly_parts.len());
+fn step_6(poly_parts: Seq<Seq<FpPallas>>, crs: &CRS, blindings: Seq<FpPallas>) -> Seq<G1_vesta> {
+    let mut commitment_seq: Seq<G1_vesta> = Seq::<G1_vesta>::create(poly_parts.len());
     for i in 0..poly_parts.len() {
-        let commitment: G1 = commit_polyx(crs, poly_parts[i].clone(), blindings[i]);
+        let commitment: G1_vesta = commit_polyx(crs, poly_parts[i].clone(), blindings[i]);
         commitment_seq[i] = commitment;
     }
     commitment_seq
@@ -781,13 +781,13 @@ fn step_6(poly_parts: Seq<Seq<Fp>>, crs: &CRS, blindings: Seq<Fp>) -> Seq<G1> {
 /// * `commitment_seq` - is a sequence of commitments
 /// * `x` - is the challenge each commitment should be multiplied with
 /// * `n` - Global parameter for the prooving system
-fn step_7(commitment_seq: Seq<G1>, x: Fp, n: u128) -> G1 {
-    let mut result: G1 = g1_default();
+fn step_7(commitment_seq: Seq<G1_vesta>, x: FpPallas, n: u128) -> G1_vesta {
+    let mut result: G1_vesta = g1_default_vesta();
     for i in 0..commitment_seq.len() {
         let power: u128 = n * i as u128;
         let x_raised = x.pow(power);
-        let intemidiate: G1 = g1mul(x_raised, commitment_seq[i]);
-        result = g1add(result, intemidiate);
+        let intemidiate: G1_vesta = g1mul_vesta(x_raised, commitment_seq[i]);
+        result = g1add_vesta(result, intemidiate);
     }
     result
 }
@@ -799,13 +799,13 @@ fn step_7(commitment_seq: Seq<G1>, x: Fp, n: u128) -> G1 {
 /// * `h_parts` - Sequence of the h_i parts from step 5
 /// * `x` - the challenge from step 5
 /// * `n` - n from the protocol
-fn step_8(h_parts: Seq<Seq<Fp>>, x: Fp, n: u128) -> Seq<Fp> {
-    let mut res: Seq<Fp> = Seq::<Fp>::create((1));
+fn step_8(h_parts: Seq<Seq<FpPallas>>, x: FpPallas, n: u128) -> Seq<FpPallas> {
+    let mut res: Seq<FpPallas> = Seq::<FpPallas>::create((1));
     for i in 0..h_parts.len() {
         let power: u128 = n * i as u128;
-        let x_raised: Fp = x.pow(power);
-        let h_i: Seq<Fp> = h_parts[i].clone();
-        let aux_prod: Seq<Fp> = mul_scalar_polyx(h_i, x_raised);
+        let x_raised: FpPallas = x.pow(power);
+        let h_i: Seq<FpPallas> = h_parts[i].clone();
+        let aux_prod: Seq<FpPallas> = mul_scalar_polyx(h_i, x_raised);
         res = add_polyx(res, aux_prod)
     }
 
@@ -822,23 +822,23 @@ fn step_8(h_parts: Seq<Seq<Fp>>, x: Fp, n: u128) -> Seq<Fp> {
 /// * `p` - a list of sets p_i which contains integers from the protocol
 /// * `x` - The challenge from step 7
 fn step_9(
-    r: Seq<Fp>,
-    a_prime_seq: Seq<Seq<Fp>>,
-    omega: Fp,
+    r: Seq<FpPallas>,
+    a_prime_seq: Seq<Seq<FpPallas>>,
+    omega: FpPallas,
     p: Seq<Seq<u128>>,
-    x: Fp,
-) -> (Fp, Seq<Seq<Fp>>) {
+    x: FpPallas,
+) -> (FpPallas, Seq<Seq<FpPallas>>) {
     let n_a: usize = a_prime_seq.len();
-    let mut a_seq: Seq<Seq<Fp>> = Seq::<Seq<Fp>>::create(n_a);
+    let mut a_seq: Seq<Seq<FpPallas>> = Seq::<Seq<FpPallas>>::create(n_a);
     for i in 0..n_a {
         let p_i: Seq<u128> = p[i].clone();
         let n_e: usize = p_i.len();
-        let a_prime_i: Seq<Fp> = a_prime_seq[i].clone();
-        let mut a_i_seq: Seq<Fp> = Seq::<Fp>::create(n_e);
+        let a_prime_i: Seq<FpPallas> = a_prime_seq[i].clone();
+        let mut a_i_seq: Seq<FpPallas> = Seq::<FpPallas>::create(n_e);
         for j in 0..n_e {
             let p_i_j: u128 = p_i[j];
-            let argument: Fp = omega.pow(p_i_j).mul(x);
-            let a_i_j: Fp = eval_polyx(a_prime_i.clone(), argument);
+            let argument: FpPallas = omega.pow(p_i_j).mul(x);
+            let a_i_j: FpPallas = eval_polyx(a_prime_i.clone(), argument);
             a_i_seq[j] = a_i_j;
         }
         a_seq[i] = a_i_seq;
@@ -854,23 +854,28 @@ fn step_9(
 /// * `p` - the p list from the protocol
 /// * `x` - the challenge from step 7
 /// * `a` - the sequence of sequences from step 9
-fn step_10(omega: Fp, p: Seq<Seq<u128>>, x: Fp, a: Seq<Seq<Fp>>) -> Seq<Seq<Fp>> {
+fn step_10(
+    omega: FpPallas,
+    p: Seq<Seq<u128>>,
+    x: FpPallas,
+    a: Seq<Seq<FpPallas>>,
+) -> Seq<Seq<FpPallas>> {
     let n_a = a.len();
-    let mut s = Seq::<Seq<Fp>>::create(n_a);
+    let mut s = Seq::<Seq<FpPallas>>::create(n_a);
     for i in 0..n_a {
         let a_i = a[i].clone();
 
         let p_i = p[i].clone();
         let n_e = p_i.len();
 
-        let mut points: Seq<(Fp, Fp)> = Seq::<(Fp, Fp)>::create((n_e));
+        let mut points: Seq<(FpPallas, FpPallas)> = Seq::<(FpPallas, FpPallas)>::create((n_e));
         for j in 0..n_e {
             let p_i_j: u128 = p_i[j];
             let x_j = omega.pow(p_i_j) * x;
             let y_j = a_i[j];
             points[j] = (x_j, y_j);
         }
-        let s_i: Seq<Fp> = lagrange_poly(points);
+        let s_i: Seq<FpPallas> = lagrange_poly(points);
         s[i] = s_i;
     }
 
@@ -891,40 +896,40 @@ fn step_10(omega: Fp, p: Seq<Seq<u128>>, x: Fp, a: Seq<Seq<Fp>>) -> Seq<Seq<Fp>>
 /// * `sigma_list` - s.t. q[sigma_list[i]]=p_i (indexing/mapping into q, for p_i)
 fn step_11(
     n_a: u128,
-    x1: Fp,
-    x2: Fp,
-    H_prime: G1,
-    R: G1,
-    a: Seq<G1>,
+    x1: FpPallas,
+    x2: FpPallas,
+    H_prime: G1_vesta,
+    R: G1_vesta,
+    a: Seq<G1_vesta>,
     q: Seq<Seq<u128>>,
     sigma_list: Seq<u128>,
-) -> (Seq<G1>, Fp, Fp) {
+) -> (Seq<G1_vesta>, FpPallas, FpPallas) {
     let n_q: usize = q.len();
-    let mut qs: Seq<G1> = Seq::<G1>::create(n_q as usize);
+    let mut qs: Seq<G1_vesta> = Seq::<G1_vesta>::create(n_q as usize);
     for i in 0..qs.len() {
-        qs[i] = g1_default();
+        qs[i] = g1_default_vesta();
     }
 
     // bullet 1
     for i in 0..(n_a as usize) {
-        let a_i: G1 = a[i as usize];
+        let a_i: G1_vesta = a[i as usize];
         // TODO is this what is meant by Q_sigma(i) ?
         let sigma_i = sigma(i as u128, sigma_list.clone(), q.clone());
         for k in 0..sigma_i.len() {
             let j: u128 = sigma_i[k];
-            let q_sigma_i: G1 = qs[j as usize];
-            let product: G1 = g1mul(x1, q_sigma_i);
-            qs[j as usize] = g1add(product, a_i);
+            let q_sigma_i: G1_vesta = qs[j as usize];
+            let product: G1_vesta = g1mul_vesta(x1, q_sigma_i);
+            qs[j as usize] = g1add_vesta(product, a_i);
         }
     }
 
     // bullet 2
-    let x1_squared: Fp = x1 * x1;
-    let q0: G1 = qs[0];
-    let product1: G1 = g1mul(x1_squared, q0);
-    let product2: G1 = g1mul(x1, H_prime);
-    let sum1: G1 = g1add(product1, product2);
-    let final_sum: G1 = g1add(sum1, R);
+    let x1_squared: FpPallas = x1 * x1;
+    let q0: G1_vesta = qs[0];
+    let product1: G1_vesta = g1mul_vesta(x1_squared, q0);
+    let product2: G1_vesta = g1mul_vesta(x1, H_prime);
+    let sum1: G1_vesta = g1add_vesta(product1, product2);
+    let final_sum: G1_vesta = g1add_vesta(sum1, R);
     qs[0] = final_sum;
 
     (qs, x1, x2)
@@ -944,35 +949,35 @@ fn step_11(
 /// * `a_blind` - the blindness used in step 1 for the A_i commitments
 fn step_12(
     n_a: u128,
-    x1: Fp,
-    h_prime: Seq<Fp>,
-    r: Seq<Fp>,
-    a_prime: Seq<Seq<Fp>>,
+    x1: FpPallas,
+    h_prime: Seq<FpPallas>,
+    r: Seq<FpPallas>,
+    a_prime: Seq<Seq<FpPallas>>,
     q: Seq<Seq<u128>>,
     sigma_list: Seq<u128>,
-    a_blinds: Seq<Fp>,
-) -> (Seq<Seq<Fp>>, Seq<Fp>) {
+    a_blinds: Seq<FpPallas>,
+) -> (Seq<Seq<FpPallas>>, Seq<FpPallas>) {
     let n_q: usize = q.len();
 
-    let mut qs: Seq<Seq<Fp>> = Seq::<Seq<Fp>>::create(n_q as usize);
+    let mut qs: Seq<Seq<FpPallas>> = Seq::<Seq<FpPallas>>::create(n_q as usize);
 
     // used for f later
-    let mut q_blinds = Seq::<Fp>::create(n_q as usize);
+    let mut q_blinds = Seq::<FpPallas>::create(n_q as usize);
 
     // initialize all polys to constant 0
     for i in 0..qs.len() {
-        qs[i] = Seq::<Fp>::create(1);
+        qs[i] = Seq::<FpPallas>::create(1);
     }
 
     // bullet 1
     for i in 0..(n_a as usize) {
-        let a_i: Seq<Fp> = a_prime[i as usize].clone();
-        let a_blind_i: Fp = a_blinds[i as usize];
+        let a_i: Seq<FpPallas> = a_prime[i as usize].clone();
+        let a_blind_i: FpPallas = a_blinds[i as usize];
         let sigma_i: Seq<u128> = sigma(i as u128, sigma_list.clone(), q.clone());
         for j in 0..sigma_i.len() {
             let j: u128 = sigma_i[j];
-            let q_sigma_i: Seq<Fp> = qs[j as usize].clone();
-            let product: Seq<Fp> = mul_scalar_polyx(q_sigma_i.clone(), x1);
+            let q_sigma_i: Seq<FpPallas> = qs[j as usize].clone();
+            let product: Seq<FpPallas> = mul_scalar_polyx(q_sigma_i.clone(), x1);
             qs[j as usize] = add_polyx(product, a_i.clone());
 
             q_blinds[j as usize] = x1 * q_blinds[j as usize] + a_blind_i;
@@ -980,12 +985,12 @@ fn step_12(
     }
 
     // bullet 2
-    let x1_squared: Fp = x1 * x1;
-    let q0: Seq<Fp> = qs[0 as usize].clone();
-    let product1: Seq<Fp> = mul_scalar_polyx(q0, x1_squared);
-    let product2: Seq<Fp> = mul_scalar_polyx(h_prime, x1);
-    let sum1: Seq<Fp> = add_polyx(product1, product2);
-    let final_sum: Seq<Fp> = add_polyx(sum1, r);
+    let x1_squared: FpPallas = x1 * x1;
+    let q0: Seq<FpPallas> = qs[0 as usize].clone();
+    let product1: Seq<FpPallas> = mul_scalar_polyx(q0, x1_squared);
+    let product2: Seq<FpPallas> = mul_scalar_polyx(h_prime, x1);
+    let sum1: Seq<FpPallas> = add_polyx(product1, product2);
+    let final_sum: Seq<FpPallas> = add_polyx(sum1, r);
     qs[0] = final_sum;
 
     (qs, q_blinds)
@@ -1007,28 +1012,28 @@ fn step_12(
 /// * `g_prime` - the polynomial from step 2
 fn step_13(
     n: u128,
-    omega: Fp,
-    x: Fp,
-    x1: Fp,
-    r: Fp,
-    s: Seq<Seq<Fp>>,
+    omega: FpPallas,
+    x: FpPallas,
+    x1: FpPallas,
+    r: FpPallas,
+    s: Seq<Seq<FpPallas>>,
     q: Seq<Seq<u128>>,
     sigma_list: Seq<u128>,
-    a: Seq<Seq<Fp>>,
-    g_prime: Seq<Fp>,
-) -> Seq<Seq<Fp>> {
+    a: Seq<Seq<FpPallas>>,
+    g_prime: Seq<FpPallas>,
+) -> Seq<Seq<FpPallas>> {
     let n_a: usize = a.len();
     let n_q: usize = q.len();
-    let mut rs: Seq<Seq<Fp>> = Seq::<Seq<Fp>>::create(n_q as usize);
+    let mut rs: Seq<Seq<FpPallas>> = Seq::<Seq<FpPallas>>::create(n_q as usize);
 
     // initialize all polys to constant 0
     for i in 0..rs.len() {
-        rs[i] = Seq::<Fp>::create(1);
+        rs[i] = Seq::<FpPallas>::create(1);
     }
 
     // bullet 1
     for i in 0..(n_a as usize) {
-        let s_i: Seq<Fp> = s[i as usize].clone();
+        let s_i: Seq<FpPallas> = s[i as usize].clone();
         let sigma_i: Seq<u128> = sigma(i as u128, sigma_list.clone(), q.clone());
         for j in 0..sigma_i.len() {
             let j = sigma_i[j];
@@ -1039,12 +1044,12 @@ fn step_13(
     }
 
     // bullet 2
-    let g_prime_x: Fp = eval_polyx(g_prime, x);
-    let vanishing_poly: Seq<Fp> = compute_vanishing_polynomial(omega, n);
-    let vanishing_poly_x: Fp = eval_polyx(vanishing_poly, x);
+    let g_prime_x: FpPallas = eval_polyx(g_prime, x);
+    let vanishing_poly: Seq<FpPallas> = compute_vanishing_polynomial(omega, n);
+    let vanishing_poly_x: FpPallas = eval_polyx(vanishing_poly, x);
     let h = g_prime_x / vanishing_poly_x;
-    let x1_squared: Fp = x1 * x1;
-    let r0: Seq<Fp> = rs[0 as usize].clone();
+    let x1_squared: FpPallas = x1 * x1;
+    let r0: Seq<FpPallas> = rs[0 as usize].clone();
     let product1 = mul_scalar_polyx(r0, x1_squared);
     let product2 = h * x1;
     let sum1 = add_scalar_polyx(product1, product2);
@@ -1067,40 +1072,40 @@ fn step_13(
 /// * `x` - the challenge from step 7
 fn step_14(
     crs: &CRS,
-    x2: Fp,
-    q_polys: Seq<Seq<Fp>>,
-    r_polys: Seq<Seq<Fp>>,
+    x2: FpPallas,
+    q_polys: Seq<Seq<FpPallas>>,
+    r_polys: Seq<Seq<FpPallas>>,
     q: Seq<Seq<u128>>,
-    blinding: Fp,
-    omega: Fp,
-    x: Fp,
-) -> (G1, Seq<Fp>, Fp) {
-    let mut q_prime: Seq<Fp> = Seq::<Fp>::create(1); // initialize q' to the constant zero poly
+    blinding: FpPallas,
+    omega: FpPallas,
+    x: FpPallas,
+) -> (G1_vesta, Seq<FpPallas>, FpPallas) {
+    let mut q_prime: Seq<FpPallas> = Seq::<FpPallas>::create(1); // initialize q' to the constant zero poly
     let n_q: usize = q.len();
     for i in 0..(n_q as usize) {
-        let x2_powered: Fp = x2.pow((n_q - 1 - i) as u128);
-        let q_poly_i: Seq<Fp> = q_polys[i].clone();
-        let r_i: Seq<Fp> = r_polys[i].clone();
-        let q_i_sub_r_i: Seq<Fp> = sub_polyx(q_poly_i, r_i);
+        let x2_powered: FpPallas = x2.pow((n_q - 1 - i) as u128);
+        let q_poly_i: Seq<FpPallas> = q_polys[i].clone();
+        let r_i: Seq<FpPallas> = r_polys[i].clone();
+        let q_i_sub_r_i: Seq<FpPallas> = sub_polyx(q_poly_i, r_i);
         let q_i: Seq<u128> = q[i].clone();
-        let mut divisor: Seq<Fp> = Seq::<Fp>::create(1);
-        divisor[0] = Fp::ONE();
+        let mut divisor: Seq<FpPallas> = Seq::<FpPallas>::create(1);
+        divisor[0] = FpPallas::ONE();
 
         for j in 0..(q_i.len()) {
             let q_i_j: u128 = q_i[j];
-            let scalar: Fp = omega.pow(q_i_j).mul(x);
-            let divisor_mul_x: Seq<Fp> = multi_poly_with_x(divisor.clone());
-            let divisor_mul_scalar: Seq<Fp> = mul_scalar_polyx(divisor.clone(), scalar.neg());
+            let scalar: FpPallas = omega.pow(q_i_j).mul(x);
+            let divisor_mul_x: Seq<FpPallas> = multi_poly_with_x(divisor.clone());
+            let divisor_mul_scalar: Seq<FpPallas> = mul_scalar_polyx(divisor.clone(), scalar.neg());
             divisor = add_polyx(divisor_mul_x, divisor_mul_scalar);
         }
 
         let (divided_poly, remainder) = divide_poly(q_i_sub_r_i.clone(), divisor);
 
-        let multed_poly: Seq<Fp> = mul_scalar_polyx(divided_poly, x2_powered);
+        let multed_poly: Seq<FpPallas> = mul_scalar_polyx(divided_poly, x2_powered);
 
         q_prime = add_polyx(q_prime, multed_poly);
     }
-    let commitment: G1 = commit_polyx(crs, q_prime.clone(), blinding);
+    let commitment: G1_vesta = commit_polyx(crs, q_prime.clone(), blinding);
 
     (commitment, q_prime, blinding)
 }
@@ -1110,7 +1115,7 @@ fn step_14(
 /// # Arguments
 ///  * `x_3` - the challenge to be send
 ///
-fn step_15(x_3: Fp) -> Fp {
+fn step_15(x_3: FpPallas) -> FpPallas {
     x_3
 }
 
@@ -1121,11 +1126,11 @@ fn step_15(x_3: Fp) -> Fp {
 /// * `n_q` - n_q from the protocol
 /// * `x3` - the challenge from step 15
 /// * `q_polys` - the q polynomials from step 12
-fn step_16(n_q: u128, x3: Fp, q_polys: Seq<Seq<Fp>>) -> Seq<Fp> {
-    let mut u: Seq<Fp> = Seq::<Fp>::create(n_q as usize);
+fn step_16(n_q: u128, x3: FpPallas, q_polys: Seq<Seq<FpPallas>>) -> Seq<FpPallas> {
+    let mut u: Seq<FpPallas> = Seq::<FpPallas>::create(n_q as usize);
     for i in 0..(n_q as usize) {
-        let q_i: Seq<Fp> = q_polys[i].clone();
-        let u_i: Fp = eval_polyx(q_i, x3);
+        let q_i: Seq<FpPallas> = q_polys[i].clone();
+        let u_i: FpPallas = eval_polyx(q_i, x3);
         u[i] = u_i;
     }
 
@@ -1138,7 +1143,7 @@ fn step_16(n_q: u128, x3: Fp, q_polys: Seq<Seq<Fp>>) -> Seq<Fp> {
 /// # Arguments
 ///  * `x_4` - the challenge to be send
 ///
-fn step_17(x_4: Fp) -> Fp {
+fn step_17(x_4: FpPallas) -> FpPallas {
     x_4
 }
 ///
@@ -1156,55 +1161,55 @@ fn step_17(x_4: Fp) -> Fp {
 /// * `r` - list of polynomials from step 13
 /// * `q` - q, from the protocol
 fn step_18(
-    x: Fp,
-    x1: Fp,
-    x2: Fp,
-    x3: Fp,
-    x4: Fp,
-    omega: Fp,
-    Q_prime: G1,
-    Q: Seq<G1>,
-    u: Seq<Fp>,
-    r: Seq<Seq<Fp>>,
+    x: FpPallas,
+    x1: FpPallas,
+    x2: FpPallas,
+    x3: FpPallas,
+    x4: FpPallas,
+    omega: FpPallas,
+    Q_prime: G1_vesta,
+    Q: Seq<G1_vesta>,
+    u: Seq<FpPallas>,
+    r: Seq<Seq<FpPallas>>,
     q: Seq<Seq<u128>>,
-) -> (G1, Fp) {
+) -> (G1_vesta, FpPallas) {
     let n_q = q.len();
-    let v = Fp::ZERO();
+    let v = FpPallas::ZERO();
 
-    let mut P_sum: G1 = g1_default();
+    let mut P_sum: G1_vesta = g1_default_vesta();
     for i in 0..n_q {
-        let Q_i: G1 = Q[i];
-        let term: G1 = g1mul(x4.pow((n_q - i - 1) as u128), Q_i);
-        P_sum = g1add(P_sum, term)
+        let Q_i: G1_vesta = Q[i];
+        let term: G1_vesta = g1mul_vesta(x4.pow((n_q - i - 1) as u128), Q_i);
+        P_sum = g1add_vesta(P_sum, term)
     }
-    let first_term: G1 = g1mul(x4.pow(n_q as u128), Q_prime);
-    let P: G1 = g1add(first_term, P_sum);
+    let first_term: G1_vesta = g1mul_vesta(x4.pow(n_q as u128), Q_prime);
+    let P: G1_vesta = g1add_vesta(first_term, P_sum);
 
-    let mut v_first_sum: Fp = Fp::ZERO();
+    let mut v_first_sum: FpPallas = FpPallas::ZERO();
     for i in 0..n_q as usize {
         let q_i: Seq<u128> = q[i].clone();
         let n_e: usize = q_i.len();
-        let u_i: Fp = u[i];
-        let r_i: Seq<Fp> = r[i].clone();
-        let r_i_x3: Fp = eval_polyx(r_i, x3);
-        let numerator: Fp = u_i - r_i_x3;
-        let mut product: Fp = Fp::ONE();
+        let u_i: FpPallas = u[i];
+        let r_i: Seq<FpPallas> = r[i].clone();
+        let r_i_x3: FpPallas = eval_polyx(r_i, x3);
+        let numerator: FpPallas = u_i - r_i_x3;
+        let mut product: FpPallas = FpPallas::ONE();
         for j in 0..n_e {
             let q_i_j: u128 = q_i[j];
             let rhs = omega.pow(q_i_j) * x;
             let term = x3 - rhs;
             product = product * term;
         }
-        let sum_term: Fp = x2.pow((n_q - i - 1) as u128) * (numerator / product);
+        let sum_term: FpPallas = x2.pow((n_q - i - 1) as u128) * (numerator / product);
 
         v_first_sum = v_first_sum + sum_term;
     }
     v_first_sum = v_first_sum * x4.pow(n_q as u128);
 
-    let mut v_second_sum: Fp = Fp::ZERO();
+    let mut v_second_sum: FpPallas = FpPallas::ZERO();
     for i in 0..n_q {
-        let u_i: Fp = u[i];
-        let term: Fp = x4.pow((n_q - 1 - i) as u128) * u_i;
+        let u_i: FpPallas = u[i];
+        let term: FpPallas = x4.pow((n_q - 1 - i) as u128) * u_i;
         v_second_sum = v_second_sum + term;
     }
     let v = v_first_sum + v_second_sum;
@@ -1221,17 +1226,17 @@ fn step_18(
 /// * `q_blinds` - the blinds from step 12
 /// * `q_prime_blind` - the blinding from step 14
 fn step_19(
-    x4: Fp,
-    q_prime: Seq<Fp>,
-    q_polys: Seq<Seq<Fp>>,
-    q_blinds: Seq<Fp>,
-    q_prime_blind: Fp,
-) -> (Seq<Fp>, Fp) {
-    let mut p = Seq::<Fp>::create(1); // initialize p to the constant zero poly
+    x4: FpPallas,
+    q_prime: Seq<FpPallas>,
+    q_polys: Seq<Seq<FpPallas>>,
+    q_blinds: Seq<FpPallas>,
+    q_prime_blind: FpPallas,
+) -> (Seq<FpPallas>, FpPallas) {
+    let mut p = Seq::<FpPallas>::create(1); // initialize p to the constant zero poly
     let n_q: usize = q_polys.len();
 
     // used for f later on (accumlated blindness)
-    let mut p_blind = Fp::ZERO();
+    let mut p_blind = FpPallas::ZERO();
 
     //  Sum_i^nq-1 {x4^(n_q-1-i) q_i(X)}
     for i in 0..n_q {
@@ -1246,8 +1251,8 @@ fn step_19(
     }
 
     // q'(X) + [x4] Sum_i^nq-1 {x4^i q_i(X)}
-    let x4n_q: Fp = x4.pow(n_q as u128);
-    let first_term: Seq<Fp> = mul_scalar_polyx(q_prime, x4n_q);
+    let x4n_q: FpPallas = x4.pow(n_q as u128);
+    let first_term: Seq<FpPallas> = mul_scalar_polyx(q_prime, x4n_q);
     p = add_polyx(p, first_term);
 
     p_blind = p_blind + (x4n_q * q_prime_blind);
@@ -1263,8 +1268,8 @@ fn step_19(
 /// * `s` - a randomly sampled poly (degree n-1) with a root at x3 from [step_15]
 /// * `crs` - the common reference string
 /// * `r` - randomness for commiting
-fn step_20(s: Seq<Fp>, crs: CRS, r: Fp) -> (G1, Fp) {
-    let S: G1 = commit_polyx(&crs, s, r);
+fn step_20(s: Seq<FpPallas>, crs: CRS, r: FpPallas) -> (G1_vesta, FpPallas) {
+    let S: G1_vesta = commit_polyx(&crs, s, r);
     (S, r)
 }
 
@@ -1275,7 +1280,7 @@ fn step_20(s: Seq<Fp>, crs: CRS, r: Fp) -> (G1, Fp) {
 /// # Arguments
 /// * `xi` - the ξ challenge
 /// * `z` - the z challenge
-fn step_21(xi: Fp, z: Fp) -> (Fp, Fp) {
+fn step_21(xi: FpPallas, z: FpPallas) -> (FpPallas, FpPallas) {
     (xi, z)
 }
 
@@ -1288,12 +1293,12 @@ fn step_21(xi: Fp, z: Fp) -> (Fp, Fp) {
 /// * `s` - the group element/commitment from step 20
 /// * `v` - v as calculated in step 18
 /// * `xi` - the ξ challenge from step 21
-fn step_22(p: G1, g0: G1, s: G1, v: Fp, xi: Fp) -> G1 {
-    let prod1: G1 = g1mul(v, g0);
-    let prod1_neg: G1 = g1neg(prod1);
-    let prod2: G1 = g1mul(xi, s);
-    let lhs_sum: G1 = g1add(p, prod1_neg);
-    let p_prime: G1 = g1add(lhs_sum, prod2);
+fn step_22(p: G1_vesta, g0: G1_vesta, s: G1_vesta, v: FpPallas, xi: FpPallas) -> G1_vesta {
+    let prod1: G1_vesta = g1mul_vesta(v, g0);
+    let prod1_neg: G1_vesta = g1neg_vesta(prod1);
+    let prod2: G1_vesta = g1mul_vesta(xi, s);
+    let lhs_sum: G1_vesta = g1add_vesta(p, prod1_neg);
+    let p_prime: G1_vesta = g1add_vesta(lhs_sum, prod2);
     p_prime
 }
 
@@ -1307,7 +1312,14 @@ fn step_22(p: G1, g0: G1, s: G1, v: Fp, xi: Fp) -> G1 {
 /// * `xi` - the ξ challenge from step 21
 /// * `p_blind` - the blindness from step 19
 /// * `s_blind` - the blindness from step 20
-fn step_23(p: Seq<Fp>, s: Seq<Fp>, x3: Fp, xi: Fp, p_blind: Fp, s_blind: Fp) -> (Seq<Fp>, Fp) {
+fn step_23(
+    p: Seq<FpPallas>,
+    s: Seq<FpPallas>,
+    x3: FpPallas,
+    xi: FpPallas,
+    p_blind: FpPallas,
+    s_blind: FpPallas,
+) -> (Seq<FpPallas>, FpPallas) {
     // TODO what happens if v does not correspond with v?
     let p_eval_x3 = eval_polyx(p.clone(), x3);
     let xi_mul_s = mul_scalar_polyx(s, xi);
@@ -1346,34 +1358,34 @@ fn step_23(p: Seq<Fp>, s: Seq<Fp>, x3: Fp, xi: Fp, p_blind: Fp, s_blind: Fp) -> 
 /// * `L_blinding`- `Seq<Fp>` the sequence of blinding used for `L_j`
 /// * `R_blinding`- `Seq<Fp>` the sequence of blinding used for `R_j`
 fn step_24(
-    p_prime_poly: Seq<Fp>,
-    G: Seq<G1>,
-    x3: Fp,
-    z: Fp,
-    U: G1,
-    W: G1,
+    p_prime_poly: Seq<FpPallas>,
+    G: Seq<G1_vesta>,
+    x3: FpPallas,
+    z: FpPallas,
+    U: G1_vesta,
+    W: G1_vesta,
     n: u128,
     k: usize,
-    u: Seq<Fp>,
-    L_blinding: Seq<Fp>,
-    R_blinding: Seq<Fp>,
+    u: Seq<FpPallas>,
+    L_blinding: Seq<FpPallas>,
+    R_blinding: Seq<FpPallas>,
 ) -> (
-    Seq<Fp>,
-    Seq<G1>,
-    Seq<Fp>,
-    Seq<G1>,
-    Seq<G1>,
-    Seq<Fp>,
-    Seq<Fp>,
+    Seq<FpPallas>,
+    Seq<G1_vesta>,
+    Seq<FpPallas>,
+    Seq<G1_vesta>,
+    Seq<G1_vesta>,
+    Seq<FpPallas>,
+    Seq<FpPallas>,
 ) {
-    let mut p_prime: Seq<Fp> = p_prime_poly;
-    let mut g_prime: Seq<G1> = G;
-    let mut b: Seq<Fp> = Seq::<Fp>::create(n as usize);
-    let mut L: Seq<G1> = Seq::<G1>::create(k);
-    let mut R: Seq<G1> = Seq::<G1>::create(k);
+    let mut p_prime: Seq<FpPallas> = p_prime_poly;
+    let mut g_prime: Seq<G1_vesta> = G;
+    let mut b: Seq<FpPallas> = Seq::<FpPallas>::create(n as usize);
+    let mut L: Seq<G1_vesta> = Seq::<G1_vesta>::create(k);
+    let mut R: Seq<G1_vesta> = Seq::<G1_vesta>::create(k);
 
     for i in 0..b.len() {
-        let x3_powered: Fp = x3.pow(i as u128);
+        let x3_powered: FpPallas = x3.pow(i as u128);
         b[i] = x3_powered;
     }
 
@@ -1384,17 +1396,17 @@ fn step_24(
 
         // BULLET 1
         // PROVER WORKS HERE
-        let p_prime_lo: Seq<Fp> = p_prime.slice(0, p_prime_half);
-        let p_prime_hi: Seq<Fp> = p_prime.slice(p_prime_half, p_prime_half);
+        let p_prime_lo: Seq<FpPallas> = p_prime.slice(0, p_prime_half);
+        let p_prime_hi: Seq<FpPallas> = p_prime.slice(p_prime_half, p_prime_half);
 
-        let g_prime_lo: Seq<G1> = g_prime.slice(0, g_prime_half);
-        let g_prime_hi: Seq<G1> = g_prime.slice(g_prime_half, g_prime_half);
+        let g_prime_lo: Seq<G1_vesta> = g_prime.slice(0, g_prime_half);
+        let g_prime_hi: Seq<G1_vesta> = g_prime.slice(g_prime_half, g_prime_half);
 
-        let b_lo: Seq<Fp> = b.slice(0, b_half);
-        let b_hi: Seq<Fp> = b.slice(b_half, b_half);
+        let b_lo: Seq<FpPallas> = b.slice(0, b_half);
+        let b_hi: Seq<FpPallas> = b.slice(b_half, b_half);
 
         // calcuate L_j and R_j, using the right parts of p', G' and b
-        let L_j: G1 = calculate_L_or_R(
+        let L_j: G1_vesta = calculate_L_or_R(
             p_prime_hi.clone(),
             b_lo.clone(),
             g_prime_lo.clone(),
@@ -1405,7 +1417,7 @@ fn step_24(
         );
         L[j] = L_j;
 
-        let R_j: G1 = calculate_L_or_R(
+        let R_j: G1_vesta = calculate_L_or_R(
             p_prime_lo.clone(),
             b_hi.clone(),
             g_prime_hi.clone(),
@@ -1418,29 +1430,29 @@ fn step_24(
 
         // BULLET 2
         // VERIFIER WORKS HERE
-        let u_j: Fp = u[j];
+        let u_j: FpPallas = u[j];
 
         // BULLET 3
         // VERIFIER & PROVER WORKS HERE
-        let mut new_g_prime: Seq<G1> = Seq::<G1>::create(g_prime_half);
+        let mut new_g_prime: Seq<G1_vesta> = Seq::<G1_vesta>::create(g_prime_half);
         for i in 0..new_g_prime.len() {
             // TODO, this is entry-wise multiplication and pairwise addition!!!
-            let g_prime_hi_indexed: G1 = g_prime_hi[i];
-            let g_prime_lo_indexed: G1 = g_prime_lo[i];
-            let rhs_product: G1 = g1mul(u_j, g_prime_hi_indexed);
-            let sum: G1 = g1add(g_prime_lo_indexed, rhs_product);
+            let g_prime_hi_indexed: G1_vesta = g_prime_hi[i];
+            let g_prime_lo_indexed: G1_vesta = g_prime_lo[i];
+            let rhs_product: G1_vesta = g1mul_vesta(u_j, g_prime_hi_indexed);
+            let sum: G1_vesta = g1add_vesta(g_prime_lo_indexed, rhs_product);
             new_g_prime[i] = sum;
         }
         g_prime = new_g_prime;
 
-        let rhs: Seq<Fp> = mul_scalar_polyx(b_hi.clone(), u_j);
-        let new_b: Seq<Fp> = add_polyx(b_lo.clone(), rhs);
+        let rhs: Seq<FpPallas> = mul_scalar_polyx(b_hi.clone(), u_j);
+        let new_b: Seq<FpPallas> = add_polyx(b_lo.clone(), rhs);
         b = new_b;
         // BULLET 4
         // PROVER WORKS HERE
-        let u_j_inv: Fp = u_j.inv();
-        let rhs: Seq<Fp> = mul_scalar_polyx(p_prime_hi.clone(), u_j_inv);
-        let new_p_prime: Seq<Fp> = add_polyx(p_prime_lo.clone(), rhs);
+        let u_j_inv: FpPallas = u_j.inv();
+        let rhs: Seq<FpPallas> = mul_scalar_polyx(p_prime_hi.clone(), u_j_inv);
+        let new_p_prime: Seq<FpPallas> = add_polyx(p_prime_lo.clone(), rhs);
         p_prime = new_p_prime;
     }
 
@@ -1458,19 +1470,19 @@ fn step_24(
 /// * `p_prime_blind` - the the accumulated blinding from step 23
 /// * `u` - u challenges from 24
 fn step_25(
-    p_prime: Seq<Fp>,
-    L_blinding: Seq<Fp>,
-    R_blinding: Seq<Fp>,
-    p_prime_blind: Fp,
-    u: Seq<Fp>,
-) -> (Fp, Fp) {
+    p_prime: Seq<FpPallas>,
+    L_blinding: Seq<FpPallas>,
+    R_blinding: Seq<FpPallas>,
+    p_prime_blind: FpPallas,
+    u: Seq<FpPallas>,
+) -> (FpPallas, FpPallas) {
     let c = p_prime[0];
-    let mut f: Fp = p_prime_blind;
+    let mut f: FpPallas = p_prime_blind;
     for j in 0..L_blinding.len() {
-        let u_j: Fp = u[j];
-        let u_j_inv: Fp = u_j.inv();
-        let L_j_blinding: Fp = L_blinding[j];
-        let R_j_blinding: Fp = R_blinding[j];
+        let u_j: FpPallas = u[j];
+        let u_j_inv: FpPallas = u_j.inv();
+        let L_j_blinding: FpPallas = L_blinding[j];
+        let R_j_blinding: FpPallas = R_blinding[j];
         f = f + L_j_blinding * u_j_inv;
         f = f + R_j_blinding * u_j;
     }
@@ -1493,48 +1505,46 @@ fn step_25(
 /// * `W` - from public parameters
 ///
 fn step_26(
-    u: Seq<Fp>,
-    L: Seq<G1>,
-    P_prime: G1,
-    R: Seq<G1>,
-    c: Fp,
-    G_prime_0: G1,
-    b_0: Fp,
-    z: Fp,
-    U: G1,
-    f: Fp,
-    W: G1,
+    u: Seq<FpPallas>,
+    L: Seq<G1_vesta>,
+    P_prime: G1_vesta,
+    R: Seq<G1_vesta>,
+    c: FpPallas,
+    G_prime_0: G1_vesta,
+    b_0: FpPallas,
+    z: FpPallas,
+    U: G1_vesta,
+    f: FpPallas,
+    W: G1_vesta,
 ) -> bool {
-    let mut first_sum: G1 = g1_default();
+    let mut first_sum: G1_vesta = g1_default_vesta();
     for j in 0..u.len() {
-        let u_j_inv: Fp = u[j].inv();
-        let L_j: G1 = L[j];
-        let prod_j: G1 = g1mul(u_j_inv, L_j);
-        first_sum = g1add(first_sum, prod_j);
+        let u_j_inv: FpPallas = u[j].inv();
+        let L_j: G1_vesta = L[j];
+        let prod_j: G1_vesta = g1mul_vesta(u_j_inv, L_j);
+        first_sum = g1add_vesta(first_sum, prod_j);
     }
 
-    let mut second_sum: G1 = g1_default();
+    let mut second_sum: G1_vesta = g1_default_vesta();
     for j in 0..u.len() {
-        let u_j: Fp = u[j];
-        let R_j: G1 = R[j];
-        let prod_j: G1 = g1mul(u_j, R_j);
-        second_sum = g1add(second_sum, prod_j);
+        let u_j: FpPallas = u[j];
+        let R_j: G1_vesta = R[j];
+        let prod_j: G1_vesta = g1mul_vesta(u_j, R_j);
+        second_sum = g1add_vesta(second_sum, prod_j);
     }
-    let lhs: G1 = g1add(first_sum, g1add(P_prime, second_sum));
+    let lhs: G1_vesta = g1add_vesta(first_sum, g1add_vesta(P_prime, second_sum));
 
-    let rhs_term_1: G1 = g1mul(c, G_prime_0);
+    let rhs_term_1: G1_vesta = g1mul_vesta(c, G_prime_0);
 
-    let cb_0z: Fp = c * b_0 * z;
+    let cb_0z: FpPallas = c * b_0 * z;
 
-    let rhs_term_2: G1 = g1mul(cb_0z, U);
+    let rhs_term_2: G1_vesta = g1mul_vesta(cb_0z, U);
 
-    let rhs_term_3: G1 = g1mul(f, W);
+    let rhs_term_3: G1_vesta = g1mul_vesta(f, W);
 
-    let rhs: G1 = g1add(rhs_term_1, g1add(rhs_term_2, rhs_term_3));
+    let rhs: G1_vesta = g1add_vesta(rhs_term_1, g1add_vesta(rhs_term_2, rhs_term_3));
 
     let check: bool = lhs == rhs;
-    println!("{:?}", lhs);
-    println!("{:?}", rhs);
     check
 }
 
@@ -1553,11 +1563,11 @@ use rand::thread_rng;
 
 #[cfg(test)]
 #[derive(Clone, Debug, Default)]
-struct UniPolynomial(Seq<Fp>);
+struct UniPolynomial(Seq<FpPallas>);
 
 #[cfg(test)]
 #[derive(Clone, Debug)]
-struct SeqOfUniPoly(Seq<Seq<Fp>>);
+struct SeqOfUniPoly(Seq<Seq<FpPallas>>);
 
 #[cfg(test)]
 #[derive(Clone, Debug)]
@@ -1567,12 +1577,12 @@ struct PorQ(Seq<Seq<u128>>);
 impl Arbitrary for UniPolynomial {
     fn arbitrary(g: &mut quickcheck::Gen) -> UniPolynomial {
         let size = u8::arbitrary(g) % 20 + 1;
-        let mut v: Vec<Fp> = vec![];
+        let mut v: Vec<FpPallas> = vec![];
         for _ in 0..size {
-            let new_val: Fp = Fp::from_literal(u8::arbitrary(g) as u128);
+            let new_val: FpPallas = FpPallas::from_literal(u8::arbitrary(g) as u128);
             v.push(new_val);
         }
-        UniPolynomial(Seq::<Fp>::from_vec(v))
+        UniPolynomial(Seq::<FpPallas>::from_vec(v))
     }
 }
 
@@ -1580,7 +1590,7 @@ impl Arbitrary for UniPolynomial {
 impl Arbitrary for SeqOfUniPoly {
     fn arbitrary(g: &mut quickcheck::Gen) -> SeqOfUniPoly {
         let size = (u8::arbitrary(g) % 20 + 1); // min 1, max 100
-        let mut seq_of_uni_poly = Seq::<Seq<Fp>>::create(size as usize);
+        let mut seq_of_uni_poly = Seq::<Seq<FpPallas>>::create(size as usize);
         for i in 0..size {
             let uni_poly = (UniPolynomial::arbitrary(g));
             seq_of_uni_poly[i] = uni_poly.0
@@ -1628,7 +1638,7 @@ impl Arbitrary for PorQ {
 }
 #[cfg(test)]
 #[derive(Clone, Debug)]
-struct Points(Seq<(Fp, Fp)>);
+struct Points(Seq<(FpPallas, FpPallas)>);
 
 #[cfg(test)]
 impl Arbitrary for Points {
@@ -1637,46 +1647,47 @@ impl Arbitrary for Points {
         let mut x_cords = vec![];
         let mut points = vec![];
         for _ in 0..size {
-            let x: Fp = Fp::from_literal(u128::arbitrary(g) % 7);
-            let y: Fp = Fp::from_literal(u128::arbitrary(g) % 7);
+            let x: FpPallas = FpPallas::from_literal(u128::arbitrary(g) % 7);
+            let y: FpPallas = FpPallas::from_literal(u128::arbitrary(g) % 7);
             if !x_cords.contains(&x) {
                 points.push((x, y));
                 x_cords.push(x)
             }
         }
-        Points(Seq::<(Fp, Fp)>::from_vec(points))
+        Points(Seq::<(FpPallas, FpPallas)>::from_vec(points))
     }
 }
 
 #[cfg(test)]
 #[derive(Clone, Debug)]
-pub struct G1Container(G1);
+pub struct G1Container(G1_vesta);
 
 #[cfg(test)]
 impl Arbitrary for G1Container {
     fn arbitrary(g: &mut Gen) -> G1Container {
-        let a = Fp::from_literal(u128::arbitrary(g));
+        let a = FpPallas::from_literal(u128::arbitrary(g));
         let generator = g1_generator();
-        G1Container(g1mul(a, generator))
+        G1Container(g1mul_vesta(a, generator))
     }
 }
 
 #[cfg(test)]
 #[test]
 fn test_divide_poly() {
-    let p1: Seq<Fp> = Seq::<Fp>::from_vec(vec![
-        Fp::from_literal(12),
-        Fp::from_literal(4000),
-        Fp::from_literal(20),
+    let p1: Seq<FpPallas> = Seq::<FpPallas>::from_vec(vec![
+        FpPallas::from_literal(12),
+        FpPallas::from_literal(4000),
+        FpPallas::from_literal(20),
     ]);
-    let p2: Seq<Fp> = Seq::<Fp>::from_vec(vec![Fp::from_literal(4), Fp::from_literal(0)]);
+    let p2: Seq<FpPallas> =
+        Seq::<FpPallas>::from_vec(vec![FpPallas::from_literal(4), FpPallas::from_literal(0)]);
 
-    let p3: Seq<Fp> = divide_poly(p1, p2).0;
+    let p3: Seq<FpPallas> = divide_poly(p1, p2).0;
 
-    let p4: Seq<Fp> = Seq::<Fp>::from_vec(vec![
-        Fp::from_literal(3),
-        Fp::from_literal(1000),
-        Fp::from_literal(5),
+    let p4: Seq<FpPallas> = Seq::<FpPallas>::from_vec(vec![
+        FpPallas::from_literal(3),
+        FpPallas::from_literal(1000),
+        FpPallas::from_literal(5),
     ]);
     assert_eq!(p3.len(), p4.len());
     for i in 0..p3.len() {
@@ -1689,7 +1700,7 @@ fn test_divide_poly() {
 fn test_poly_add(p1: UniPolynomial, p2: UniPolynomial, x: u128) {
     let p1 = p1.0;
     let p2 = p2.0;
-    let x = Fp::from_literal(x);
+    let x = FpPallas::from_literal(x);
     let sum_poly = add_polyx(p1.clone(), p2.clone());
 
     let expected = eval_polyx(p1, x) + eval_polyx(p2, x);
@@ -1702,7 +1713,7 @@ fn test_poly_add(p1: UniPolynomial, p2: UniPolynomial, x: u128) {
 fn test_poly_sub(p1: UniPolynomial, p2: UniPolynomial, x: u128) {
     let p1 = p1.0;
     let p2 = p2.0;
-    let x = Fp::from_literal(x);
+    let x = FpPallas::from_literal(x);
     let sum_poly = sub_polyx(p1.clone(), p2.clone());
 
     let expected = eval_polyx(p1, x) - eval_polyx(p2, x);
@@ -1715,7 +1726,7 @@ fn test_poly_sub(p1: UniPolynomial, p2: UniPolynomial, x: u128) {
 fn test_poly_mul(p1: UniPolynomial, p2: UniPolynomial, x: u128) {
     let p1 = p1.0;
     let p2 = p2.0;
-    let x = Fp::from_literal(x);
+    let x = FpPallas::from_literal(x);
     let mul_poly = mul_polyx(p1.clone(), p2.clone());
 
     let expected = eval_polyx(p1, x) * eval_polyx(p2, x);
@@ -1728,7 +1739,7 @@ fn test_poly_mul(p1: UniPolynomial, p2: UniPolynomial, x: u128) {
 fn test_poly_div(p1: UniPolynomial, p2: UniPolynomial, x: u128) {
     let p1 = p1.0;
     let p2 = p2.0;
-    let x = Fp::from_literal(x);
+    let x = FpPallas::from_literal(x);
     let (_, remainder) = divide_poly(p1.clone(), p2.clone());
 
     let p_1_no_remainder = sub_polyx(p1, remainder);
@@ -1754,9 +1765,9 @@ fn test_step_4() {
             r = r + 2;
         }
 
-        let omega: Fp = Fp::from_literal((omega_value as u128) + 1);
+        let omega: FpPallas = FpPallas::from_literal((omega_value as u128) + 1);
         let g_prime = compute_vanishing_polynomial(omega, g_prime_degree as u128);
-        let g_prime = mul_scalar_polyx(g_prime, Fp::from_literal(r));
+        let g_prime = mul_scalar_polyx(g_prime, FpPallas::from_literal(r));
         let h = step_4(g_prime, omega, vanishing_poly_degree);
         let h_degree = poly_degree(h);
         let expected_h_degree = g_prime_degree - vanishing_poly_degree;
@@ -1784,7 +1795,7 @@ fn test_step_5(h: UniPolynomial, n: u8) -> TestResult {
     let h_parts = step_5(h.clone(), n, n_g); // split the h poly
     let n = n as usize;
 
-    let mut h_summed = Seq::<Fp>::create(1); // initialize a sum to the constant zero poly
+    let mut h_summed = Seq::<FpPallas>::create(1); // initialize a sum to the constant zero poly
 
     // h(x) = sum from 0 to n_g-2 (X^ni h_i(X))
     for i in 0..h_parts.len() {
@@ -1817,10 +1828,10 @@ fn test_step_5(h: UniPolynomial, n: u8) -> TestResult {
 // https://o1-labs.github.io/proof-systems/specs/pasta.html#pallas
 // (mina generator: (1,12418654782883325593414442427049395787963493412651469444558597405572177144507))
 #[cfg(test)]
-fn g1_generator() -> G1 {
+fn g1_generator() -> G1_vesta {
     (
-        FpCurve::from_hex("1"),
-        FpCurve::from_hex("1B74B5A30A12937C53DFA9F06378EE548F655BD4333D477119CF7A23CAED2ABB"),
+        FpVesta::from_hex("1"),
+        FpVesta::from_hex("1B74B5A30A12937C53DFA9F06378EE548F655BD4333D477119CF7A23CAED2ABB"),
         false,
     )
 }
@@ -1837,28 +1848,28 @@ fn test_step_5_6_7_8_manual(x: u8, w: u8) -> bool {
     // blinding: u8,
 
     // the original h poly
-    let h: Seq<Fp> = Seq::<Fp>::from_vec(vec![
-        Fp::from_literal(3),
-        Fp::from_literal(7),
-        Fp::from_literal(4),
-        Fp::from_literal(10),
-        Fp::from_literal(15),
-        Fp::from_literal(35),
+    let h: Seq<FpPallas> = Seq::<FpPallas>::from_vec(vec![
+        FpPallas::from_literal(3),
+        FpPallas::from_literal(7),
+        FpPallas::from_literal(4),
+        FpPallas::from_literal(10),
+        FpPallas::from_literal(15),
+        FpPallas::from_literal(35),
     ]);
     let n = 4;
     let n_g: u128 = 4;
-    let x = Fp::from_literal(x as u128);
-    let blinding = Fp::from_literal(345);
-    let W = g1mul(Fp::from_literal(w as u128), g1_generator());
+    let x = FpPallas::from_literal(x as u128);
+    let blinding = FpPallas::from_literal(345);
+    let W = g1mul_vesta(FpPallas::from_literal(w as u128), g1_generator());
     // there should be as many G elements as there are elements in the h_i polys
-    let G = Seq::<G1>::from_vec(vec![
-        g1mul(Fp::ONE(), g1_generator()),
-        g1mul(Fp::TWO(), g1_generator()),
-        g1mul(Fp::from_literal(3), g1_generator()),
-        g1mul(Fp::from_literal(4), g1_generator()),
+    let G = Seq::<G1_vesta>::from_vec(vec![
+        g1mul_vesta(FpPallas::ONE(), g1_generator()),
+        g1mul_vesta(FpPallas::TWO(), g1_generator()),
+        g1mul_vesta(FpPallas::from_literal(3), g1_generator()),
+        g1mul_vesta(FpPallas::from_literal(4), g1_generator()),
     ]);
     // there should be as many random elements as there are h_i polys
-    let randomness = Seq::<Fp>::from_vec(vec![Fp::ONE(), Fp::TWO()]);
+    let randomness = Seq::<FpPallas>::from_vec(vec![FpPallas::ONE(), FpPallas::TWO()]);
     // let crs: CRS = (G, W);
 
     let h_s = step_5(h, n, n_g);
@@ -1866,7 +1877,7 @@ fn test_step_5_6_7_8_manual(x: u8, w: u8) -> bool {
     let H_prime = step_7(H_s, x, n);
     let h_prime = step_8(h_s, x, n);
 
-    let mut randomness_sum = Fp::ZERO();
+    let mut randomness_sum = FpPallas::ZERO();
     for i in 0..randomness.len() {
         let x_pow_ni = x.pow(n * (i as u128));
         randomness_sum = randomness_sum + (randomness[i] * x_pow_ni);
@@ -1893,32 +1904,32 @@ fn test_step_5_6_7_8() {
         ////////////////////////////////////////////////////////////////////////////////////
         /// SETTING UP THE REQUIRED VALUES (W, G, x, commitment-randomness), NOT INTERESTING
         ////////////////////////////////////////////////////////////////////////////////////
-        let x = Fp::from_literal(x as u128);
-        let W = g1mul(Fp::from_literal(w as u128), g1_generator());
+        let x = FpPallas::from_literal(x as u128);
+        let W = g1mul_vesta(FpPallas::from_literal(w as u128), g1_generator());
 
         // get the length of a h_i, which is the same as the length of G
-        let h_i_len: &Seq<Fp> = &(h_s[0]);
+        let h_i_len: &Seq<FpPallas> = &(h_s[0]);
         let h_i_len = h_i_len.len();
         // get the number of h_i polys, which is the same as the number
         // of random elements for comitting
         let h_s_len = h_s.len();
 
         // there should be as many G elements as there are elements in the h_i polys
-        let mut G = Seq::<G1>::create(h_i_len);
-        let G_seed = Fp::from_literal(G_seed as u128 + 1); // +1, so it non-zero
+        let mut G = Seq::<G1_vesta>::create(h_i_len);
+        let G_seed = FpPallas::from_literal(G_seed as u128 + 1); // +1, so it non-zero
 
         // create some "randomness" for G
-        G[0] = g1mul(G_seed, g1_generator());
+        G[0] = g1mul_vesta(G_seed, g1_generator());
         for i in 1..G.len() {
-            G[i] = g1mul(G_seed, G[i - 1]);
+            G[i] = g1mul_vesta(G_seed, G[i - 1]);
         }
 
         // there should be as many random elements as there are h_i polys
-        let mut randomness = Seq::<Fp>::create(h_s_len);
+        let mut randomness = Seq::<FpPallas>::create(h_s_len);
         // create some "randomness" for commitments
-        randomness[0] = Fp::from_literal(randomness_seed as u128 + 1); // +1, so it non-zero
+        randomness[0] = FpPallas::from_literal(randomness_seed as u128 + 1); // +1, so it non-zero
         for i in 1..randomness.len() {
-            randomness[i] = (randomness[i - 1] + Fp::ONE()) * Fp::TWO();
+            randomness[i] = (randomness[i - 1] + FpPallas::ONE()) * FpPallas::TWO();
         }
         //////////////////////////////////////////////////////////////////////////////////
         /// SETTING UP VALUES DONE
@@ -1932,7 +1943,7 @@ fn test_step_5_6_7_8() {
         let h_prime = step_8(h_s, x, n);
 
         // sum the randomess corresponding (see the thesis for furhter explanation)
-        let mut randomness_sum = Fp::ZERO();
+        let mut randomness_sum = FpPallas::ZERO();
         for i in 0..randomness.len() {
             let x_pow_ni = x.pow(n * (i as u128));
             randomness_sum = randomness_sum + (randomness[i] * x_pow_ni);
@@ -1957,12 +1968,12 @@ fn test_step_5_6_7_8() {
 //     let n_q = 3;
 //     let n_a = 3;
 //     let x1 = Fp::TWO();
-//     let H_prime = g1mul(Fp::TWO(), g1_generator());
+//     let H_prime = g1mul_vesta(Fp::TWO(), g1_generator());
 //     let R = g1_generator();
 //     let a = Seq::<G1>::from_vec(vec![
-//         g1mul(Fp::from_literal(2), g1_generator()),
-//         g1mul(Fp::from_literal(3), g1_generator()),
-//         g1mul(Fp::from_literal(4), g1_generator()),
+//         g1mul_vesta(Fp::from_literal(2), g1_generator()),
+//         g1mul_vesta(Fp::from_literal(3), g1_generator()),
+//         g1mul_vesta(Fp::from_literal(4), g1_generator()),
 //     ]);
 //     let q = Seq::<Seq<u128>>::from_vec(vec![
 //         (Seq::<u128>::from_vec(vec![0])),
@@ -1973,11 +1984,11 @@ fn test_step_5_6_7_8() {
 
 //     // testing BULLET 1
 //     // Q_i = [x1]Q_i + A_j, for every time i is in some sigma(j)
-//     assert_eq!(g1mul(Fp::from_literal(3), g1_generator()), Q_s[1]);
-//     assert_eq!(g1mul(Fp::from_literal(24), g1_generator()), Q_s[2]);
+//     assert_eq!(g1mul_vesta(Fp::from_literal(3), g1_generator()), Q_s[1]);
+//     assert_eq!(g1mul_vesta(Fp::from_literal(24), g1_generator()), Q_s[2]);
 
 //     // testing BULLET 2
-//     assert_eq!(g1mul(Fp::from_literal(77), g1_generator()), Q_s[0]);
+//     assert_eq!(g1mul_vesta(Fp::from_literal(77), g1_generator()), Q_s[0]);
 // }
 
 #[cfg(test)]
@@ -1998,16 +2009,16 @@ fn test_step_11() {
         if n_q > n_a {
             n_q = n_q % n_a
         }
-        let x1 = Fp::from_literal(x1 as u128);
-        let x2 = Fp::from_literal(x2 as u128);
+        let x1 = FpPallas::from_literal(x1 as u128);
+        let x2 = FpPallas::from_literal(x2 as u128);
 
-        let H_prime = g1mul(Fp::from_literal(H_power as u128), g1_generator());
-        let R = g1mul(Fp::from_literal(R_power as u128), g1_generator());
+        let H_prime = g1mul_vesta(FpPallas::from_literal(H_power as u128), g1_generator());
+        let R = g1mul_vesta(FpPallas::from_literal(R_power as u128), g1_generator());
 
-        let mut a = Seq::<G1>::create(n_a as usize);
-        a[0] = g1mul(Fp::from_literal(a_seed as u128), g1_generator());
+        let mut a = Seq::<G1_vesta>::create(n_a as usize);
+        a[0] = g1mul_vesta(FpPallas::from_literal(a_seed as u128), g1_generator());
         for i in 1..a.len() {
-            a[i] = g1mul(Fp::from_literal(a_seed as u128), a[i - 1]);
+            a[i] = g1mul_vesta(FpPallas::from_literal(a_seed as u128), a[i - 1]);
         }
 
         let mut sigma_list: Vec<u128> = vec![];
@@ -2038,7 +2049,7 @@ fn test_step_11() {
         //////////////////////////////////////////////////////////////////////////////////
         /// SETTING UP VALUES DONE
         //////////////////////////////////////////////////////////////////////////////////
-        let (Q_s, x1, x2): (Seq<G1>, Fp, Fp) = step_11(
+        let (Q_s, x1, x2): (Seq<G1_vesta>, FpPallas, FpPallas) = step_11(
             n_a as u128,
             x1,
             x2,
@@ -2051,23 +2062,23 @@ fn test_step_11() {
 
         // calculate each Q_i and check that it corresponds with the output of step_11
         for i in 0..n_q {
-            let mut Q = g1_default();
+            let mut Q = g1_default_vesta();
             // BULLET 1
             // Q_i := [x1]Q_i + A_j, for every time i is in some sigma(j)
             for j in 0..a.len() {
                 let p_j = sigma(j as u128, sigma_seq.clone(), q.clone());
                 for k in 0..p_j.len() {
                     if i == p_j[k] as usize {
-                        Q = g1add(g1mul(x1, Q), a[j]);
+                        Q = g1add_vesta(g1mul_vesta(x1, Q), a[j]);
                     }
                 }
             }
             // BULLET 2
             // Q_0 := [x1^2]Q_0 + [x1]H' + R
             if i == 0 {
-                Q = g1mul(x1.pow(2), Q);
-                Q = g1add(Q, g1mul(x1, H_prime));
-                Q = g1add(Q, R);
+                Q = g1mul_vesta(x1.pow(2), Q);
+                Q = g1add_vesta(Q, g1mul_vesta(x1, H_prime));
+                Q = g1add_vesta(Q, R);
             }
             if Q != Q_s[i as usize] {
                 return false;
@@ -2107,7 +2118,7 @@ fn test_step_12() {
         if n_q > n_a {
             n_q = n_q % n_a
         }
-        let x1 = Fp::from_literal(x1 as u128);
+        let x1 = FpPallas::from_literal(x1 as u128);
 
         let mut sigma_list: Vec<u128> = vec![];
         let mut q = Seq::<Seq<u128>>::create(n_a as usize);
@@ -2142,7 +2153,7 @@ fn test_step_12() {
             let diff = n_a as usize - a_polys.len();
             for _ in 0..diff {
                 // if wrong size, just use 0
-                a_polys = a_polys.push(&Seq::<Fp>::from_vec(vec![Fp::ZERO()]));
+                a_polys = a_polys.push(&Seq::<FpPallas>::from_vec(vec![FpPallas::ZERO()]));
             }
         }
         //////////////////////////////////////////////////////////////////////////////////
@@ -2162,7 +2173,7 @@ fn test_step_12() {
         );
         // calculate each Q_i and check that it corresponds with the output of step_12
         for i in 0..n_q {
-            let mut q_poly = Seq::<Fp>::create(1);
+            let mut q_poly = Seq::<FpPallas>::create(1);
             // BULLET 1
             // q_i := x1 * q_i + a'_j(X), for every time i is in some sigma(j)
             for j in 0..n_a {
@@ -2240,10 +2251,10 @@ fn test_step_13() {
         if n == 0 {
             n = 1;
         }
-        let omega = Fp::from_literal(omega as u128);
-        let x = Fp::from_literal(x as u128);
-        let x1 = x * Fp::TWO(); // a bit of reuse, due the above restrictions
-        let r = Fp::from_literal(r as u128);
+        let omega = FpPallas::from_literal(omega as u128);
+        let x = FpPallas::from_literal(x as u128);
+        let x1 = x * FpPallas::TWO(); // a bit of reuse, due the above restrictions
+        let r = FpPallas::from_literal(r as u128);
         let s = s.0;
         let mut q = Seq::<Seq<u128>>::create(n_a as usize);
         let a = a.0;
@@ -2282,7 +2293,7 @@ fn test_step_13() {
             let diff = n_a as usize - s_polys.len();
             for _ in 0..diff {
                 // if wrong size, just use 0
-                s_polys = s_polys.push(&Seq::<Fp>::from_vec(vec![Fp::ZERO()]));
+                s_polys = s_polys.push(&Seq::<FpPallas>::from_vec(vec![FpPallas::ZERO()]));
             }
         }
 
@@ -2304,7 +2315,7 @@ fn test_step_13() {
 
         // calculate each r_i and check that it corresponds with the output of step_13
         for i in 0..n_q {
-            let mut r_poly = Seq::<Fp>::create(1);
+            let mut r_poly = Seq::<FpPallas>::create(1);
             // BULLET 1
             // r_i := x1 * r_i + s_j(X), for every time i is in some sigma(j)
             for j in 0..n_a {
@@ -2325,9 +2336,9 @@ fn test_step_13() {
                 // TODO for this to make sense we should test
                 // * eval_poly_x
                 // * compute_vanishing_polynomial
-                let g_prime_x: Fp = eval_polyx(g_prime.clone(), x);
-                let vanishing_poly: Seq<Fp> = compute_vanishing_polynomial(omega, n);
-                let vanishing_poly_x: Fp = eval_polyx(vanishing_poly, x);
+                let g_prime_x: FpPallas = eval_polyx(g_prime.clone(), x);
+                let vanishing_poly: Seq<FpPallas> = compute_vanishing_polynomial(omega, n);
+                let vanishing_poly_x: FpPallas = eval_polyx(vanishing_poly, x);
                 let h = g_prime_x / vanishing_poly_x;
 
                 r_poly = add_scalar_polyx(r_poly, x1 * h);
@@ -2370,13 +2381,13 @@ fn test_step_13() {
 //     ////////////////////////////////////////////////////////////////////////////////////
 //     let w = 3;
 //     // W and G from CRS
-//     let W = g1mul(Fp::from_literal(w as u128), g1_generator());
+//     let W = g1mul_vesta(Fp::from_literal(w as u128), g1_generator());
 //     // there should be as many G elements as there are elements in the h_i polys
 //     let G = Seq::<G1>::from_vec(vec![
-//         g1mul(Fp::ONE(), g1_generator()),
-//         g1mul(Fp::TWO(), g1_generator()),
-//         g1mul(Fp::from_literal(3), g1_generator()),
-//         g1mul(Fp::from_literal(4), g1_generator()),
+//         g1mul_vesta(Fp::ONE(), g1_generator()),
+//         g1mul_vesta(Fp::TWO(), g1_generator()),
+//         g1mul_vesta(Fp::from_literal(3), g1_generator()),
+//         g1mul_vesta(Fp::from_literal(4), g1_generator()),
 //     ]);
 //     // let crs: CRS = (G, W);
 
@@ -2510,7 +2521,7 @@ fn test_step_13() {
 //     let i_2_division = divide_poly(i_2_dividend, i_1_divisor).0;
 //     let i_2 = mul_scalar_polyx(i_2_division, Fp::from_literal(16));
 //     let result = add_polyx(i_0, add_polyx(i_1, i_2));
-//     let commitment: (FpCurve, FpCurve, bool) = commit_polyx(&(G.clone(), W), result, r);
+//     let commitment: (FpVesta, FpVesta, bool) = commit_polyx(&(G.clone(), W), result, r);
 //     assert_eq!(commitment, q_prime);
 // }
 #[cfg(test)]
@@ -2529,18 +2540,18 @@ fn test_step_14() {
         ////////////////////////////////////////////////////////////////////////////////////
         /// SETTING UP THE REQUIRED VALUES (n_a, n_q, x1, H', R, the q list, the A commitemtns), NOT INTERESTING
         ////////////////////////////////////////////////////////////////////////////////////
-        let W = g1mul(Fp::from_literal(w as u128), g1_generator());
+        let W = g1mul_vesta(FpPallas::from_literal(w as u128), g1_generator());
 
-        let x = Fp::from_literal(x as u128);
+        let x = FpPallas::from_literal(x as u128);
 
-        let x2 = x.mul(x.add(Fp::TWO().pow(19)));
+        let x2 = x.mul(x.add(FpPallas::TWO().pow(19)));
 
-        let omega: Fp = Fp::TWO();
+        let omega: FpPallas = FpPallas::TWO();
 
         let r_polys = r_polys.0;
         let q_polys = q_polys.0;
 
-        let r = Fp::from_literal(r as u128);
+        let r = FpPallas::from_literal(r as u128);
         let mut n_q = q_polys.len() as u128;
         if n_q > r_polys.len() as u128 {
             n_q = r_polys.len() as u128
@@ -2574,29 +2585,29 @@ fn test_step_14() {
         //////////////////////////////////////////////////////////////////////////////////
         /// MANUEL CALCULATION
         //////////////////////////////////////////////////////////////////////////////////
-        let mut sum_result = Seq::from_vec(vec![Fp::from_literal(0)]);
+        let mut sum_result = Seq::from_vec(vec![FpPallas::from_literal(0)]);
 
         for i in 0..n_q as usize {
-            let dividend_lhs: Seq<Fp> =
+            let dividend_lhs: Seq<FpPallas> =
                 mul_scalar_polyx(q_polys[i].clone(), x2.pow((n_q as usize - i - 1) as u128));
-            let dividend_rhs: Seq<Fp> =
+            let dividend_rhs: Seq<FpPallas> =
                 mul_scalar_polyx(r_polys[i].clone(), x2.pow((n_q as usize - i - 1) as u128));
-            let dividend: Seq<Fp> = sub_polyx(dividend_lhs, dividend_rhs);
+            let dividend: Seq<FpPallas> = sub_polyx(dividend_lhs, dividend_rhs);
 
             let q_i = q[i].clone();
             let n_e = q_i.len();
             // let mut divisor: Seq<Fp> = Seq::from_vec(vec![Fp::from_literal(1)]);
-            let mut divisor: Seq<Fp> = Seq::<Fp>::create(q_i.len() + 1 as usize);
-            divisor[0] = Fp::ONE();
+            let mut divisor: Seq<FpPallas> = Seq::<FpPallas>::create(q_i.len() + 1 as usize);
+            divisor[0] = FpPallas::ONE();
 
             for j in 0..n_e as usize {
-                let divisor_lhs: Seq<Fp> = multi_poly_with_x(divisor.clone());
+                let divisor_lhs: Seq<FpPallas> = multi_poly_with_x(divisor.clone());
                 let q_i_j: u128 = q_i[j];
-                let rhs_scalar: Fp = omega.pow(q_i_j).mul(x).neg();
-                let divisor_rhs_mult: Seq<Fp> = mul_scalar_polyx(divisor, rhs_scalar);
+                let rhs_scalar: FpPallas = omega.pow(q_i_j).mul(x).neg();
+                let divisor_rhs_mult: Seq<FpPallas> = mul_scalar_polyx(divisor, rhs_scalar);
                 divisor = add_polyx(divisor_lhs, divisor_rhs_mult);
             }
-            let division: Seq<Fp> = divide_poly(dividend.clone(), divisor).0;
+            let division: Seq<FpPallas> = divide_poly(dividend.clone(), divisor).0;
 
             sum_result = add_polyx(sum_result, division);
         }
@@ -2604,13 +2615,13 @@ fn test_step_14() {
         //////////////////////////////
         /// CREATE G WITH CORRECT LENGTH - NEEDS TO BE SAME LENGTH AS POLY YOU WANT TO COMMIT TO
         //////////////////////////////
-        let mut G = Seq::<G1>::create(sum_result.clone().len());
-        let G_seed = Fp::from_literal(G_seed as u128 + 1); // +1, so it non-zero
+        let mut G = Seq::<G1_vesta>::create(sum_result.clone().len());
+        let G_seed = FpPallas::from_literal(G_seed as u128 + 1); // +1, so it non-zero
 
         // create some "randomness" for G
-        G[0] = g1mul(G_seed, g1_generator());
+        G[0] = g1mul_vesta(G_seed, g1_generator());
         for i in 1..G.len() {
-            G[i] = g1mul(G_seed, G[i - 1]);
+            G[i] = g1mul_vesta(G_seed, G[i - 1]);
         }
         /////////////////////////////
         /// FINISHED CREATHING G
@@ -2650,14 +2661,14 @@ fn test_step_14() {
 #[test]
 fn test_step_16() {
     fn a(x3: u8, q_polys: SeqOfUniPoly) -> bool {
-        let q_polys: Seq<Seq<Fp>> = q_polys.0;
+        let q_polys: Seq<Seq<FpPallas>> = q_polys.0;
         let n_q: u128 = q_polys.len() as u128;
-        let x3: Fp = Fp::from_literal(x3 as u128);
-        let u: Seq<Fp> = step_16(n_q, x3, q_polys.clone());
+        let x3: FpPallas = FpPallas::from_literal(x3 as u128);
+        let u: Seq<FpPallas> = step_16(n_q, x3, q_polys.clone());
         for i in 0..u.len() as usize {
-            let u_i: Fp = u[i];
-            let q_i: Seq<Fp> = q_polys[i].clone();
-            let q_i_eval: Fp = eval_polyx(q_i, x3);
+            let u_i: FpPallas = u[i];
+            let q_i: Seq<FpPallas> = q_polys[i].clone();
+            let q_i_eval: FpPallas = eval_polyx(q_i, x3);
             assert_eq!(u_i, q_i_eval);
         }
         true
@@ -2677,11 +2688,11 @@ fn test_step_16() {
 //     let x3: Fp = Fp::from_literal(2);
 //     let x4: Fp = Fp::from_literal(2340938);
 //     let omega: Fp = Fp::from_literal(929392);
-//     let Q_prime: G1 = g1mul(Fp::from_literal(123231), g1_generator());
+//     let Q_prime: G1 = g1mul_vesta(Fp::from_literal(123231), g1_generator());
 //     let Q: Seq<G1> = Seq::<G1>::from_vec(vec![
-//         g1mul(Fp::from_literal(2), g1_generator()),
-//         g1mul(Fp::from_literal(3), g1_generator()),
-//         g1mul(Fp::from_literal(4), g1_generator()),
+//         g1mul_vesta(Fp::from_literal(2), g1_generator()),
+//         g1mul_vesta(Fp::from_literal(3), g1_generator()),
+//         g1mul_vesta(Fp::from_literal(4), g1_generator()),
 //     ]);
 //     let q: Seq<Seq<u128>> = Seq::<Seq<u128>>::from_vec(vec![
 //         (Seq::<u128>::from_vec(vec![0])),
@@ -2711,11 +2722,11 @@ fn test_step_16() {
 //         ])),
 //     ]);
 
-//     let P_sum_0: (FpCurve, FpCurve, bool) = Q[0];
-//     let P_sum_1: (FpCurve, FpCurve, bool) = g1mul(x4, Q[1]);
-//     let P_sum_2: (FpCurve, FpCurve, bool) = g1mul(x4.pow(2), Q[2]);
-//     let P_sum: (FpCurve, FpCurve, bool) = g1add(g1add(P_sum_0, P_sum_1), P_sum_2);
-//     let P_test: (FpCurve, FpCurve, bool) = g1add(g1mul(x4, P_sum), Q_prime);
+//     let P_sum_0: (FpVesta, FpVesta, bool) = Q[0];
+//     let P_sum_1: (FpVesta, FpVesta, bool) = g1mul_vesta(x4, Q[1]);
+//     let P_sum_2: (FpVesta, FpVesta, bool) = g1mul_vesta(x4.pow(2), Q[2]);
+//     let P_sum: (FpVesta, FpVesta, bool) = g1add_vesta(g1add_vesta(P_sum_0, P_sum_1), P_sum_2);
+//     let P_test: (FpVesta, FpVesta, bool) = g1add_vesta(g1mul_vesta(x4, P_sum), Q_prime);
 //     let (P, v) = step_18(
 //         x,
 //         x1,
@@ -2744,11 +2755,11 @@ fn test_step_16() {
 //     let mut first_sum_0_divisor: Fp = x3 - x;
 //     let first_sum_0: Fp = first_sum_0_dividend / first_sum_0_divisor;
 
-// let P_sum_0: (FpCurve, FpCurve, bool) = g1mul(x4.pow(2), Q[0]);
-// let P_sum_1: (FpCurve, FpCurve, bool) = g1mul(x4.pow(1), Q[1]);
-// let P_sum_2: (FpCurve, FpCurve, bool) = g1mul(x4.pow(0), Q[2]);
-// let P_sum: (FpCurve, FpCurve, bool) = g1add(g1add(P_sum_0, P_sum_1), P_sum_2);
-// let P_test: (FpCurve, FpCurve, bool) = g1add(g1mul(x4.pow(3), Q_prime), P_sum);
+// let P_sum_0: (FpVesta, FpVesta, bool) = g1mul_vesta(x4.pow(2), Q[0]);
+// let P_sum_1: (FpVesta, FpVesta, bool) = g1mul_vesta(x4.pow(1), Q[1]);
+// let P_sum_2: (FpVesta, FpVesta, bool) = g1mul_vesta(x4.pow(0), Q[2]);
+// let P_sum: (FpVesta, FpVesta, bool) = g1add_vesta(g1add_vesta(P_sum_0, P_sum_1), P_sum_2);
+// let P_test: (FpVesta, FpVesta, bool) = g1add_vesta(g1mul_vesta(x4.pow(3), Q_prime), P_sum);
 // let (P, v) = step_18(
 //     x,
 //     x1,
@@ -2824,41 +2835,43 @@ fn test_step_16() {
 #[test]
 fn test_step_18() {
     fn a(rnd1: u8, rnd2: u8, omega: u8, r: SeqOfUniPoly) -> bool {
-        let r: Seq<Seq<Fp>> = r.0;
+        let r: Seq<Seq<FpPallas>> = r.0;
         let n_q: usize = r.len();
-        let mut x1: Fp = Fp::from_literal(rnd1 as u128).pow(123);
-        if x1 == Fp::ZERO() {
-            x1 = Fp::ONE()
+        let mut x1: FpPallas = FpPallas::from_literal(rnd1 as u128).pow(123);
+        if x1 == FpPallas::ZERO() {
+            x1 = FpPallas::ONE()
         }
-        let mut x2: Fp = x1.pow(rnd1 as u128);
-        if x2 == Fp::ZERO() {
-            x2 = Fp::ONE()
+        let mut x2: FpPallas = x1.pow(rnd1 as u128);
+        if x2 == FpPallas::ZERO() {
+            x2 = FpPallas::ONE()
         }
-        let mut x3: Fp = x2 + x1 + Fp::from_literal(rnd2 as u128 + 7).pow(42);
-        if x3 == Fp::ZERO() {
-            x3 = Fp::ONE()
+        let mut x3: FpPallas = x2 + x1 + FpPallas::from_literal(rnd2 as u128 + 7).pow(42);
+        if x3 == FpPallas::ZERO() {
+            x3 = FpPallas::ONE()
         }
-        let mut x4: Fp = x1 * x2 + Fp::from_literal(929299292);
-        if x4 == Fp::ZERO() {
-            x4 = Fp::ONE()
+        let mut x4: FpPallas = x1 * x2 + FpPallas::from_literal(929299292);
+        if x4 == FpPallas::ZERO() {
+            x4 = FpPallas::ONE()
         }
-        let mut x: Fp = Fp::from_literal(rnd1 as u128);
-        if x == Fp::ZERO() {
-            x = Fp::ONE()
+        let mut x: FpPallas = FpPallas::from_literal(rnd1 as u128);
+        if x == FpPallas::ZERO() {
+            x = FpPallas::ONE()
         }
-        let mut omega: Fp = Fp::from_literal(omega as u128);
-        if omega == Fp::ZERO() {
-            omega = Fp::from_literal(123)
+        let mut omega: FpPallas = FpPallas::from_literal(omega as u128);
+        if omega == FpPallas::ZERO() {
+            omega = FpPallas::from_literal(123)
         }
-        let Q_prime: G1 = g1mul(Fp::from_literal(rnd2 as u128), g1_generator());
-        let mut Q: Seq<(FpCurve, FpCurve, bool)> = Seq::<G1>::create(n_q);
+        let Q_prime: G1_vesta = g1mul_vesta(FpPallas::from_literal(rnd2 as u128), g1_generator());
+        let mut Q: Seq<(FpVesta, FpVesta, bool)> = Seq::<G1_vesta>::create(n_q);
         for i in 0..n_q {
-            let g1_seed: Fp = Fp::from_literal(rnd1 as u128 % (i + 1) as u128).pow(rnd2 as u128);
-            Q[i] = g1mul(g1_seed, g1_generator());
+            let g1_seed: FpPallas =
+                FpPallas::from_literal(rnd1 as u128 % (i + 1) as u128).pow(rnd2 as u128);
+            Q[i] = g1mul_vesta(g1_seed, g1_generator());
         }
-        let mut u: Seq<Fp> = Seq::<Fp>::create(n_q);
+        let mut u: Seq<FpPallas> = Seq::<FpPallas>::create(n_q);
         for i in 0..n_q {
-            let random_Fp: Fp = Fp::from_literal(rnd2 as u128 % (i + 1) as u128).pow(rnd1 as u128);
+            let random_Fp: FpPallas =
+                FpPallas::from_literal(rnd2 as u128 % (i + 1) as u128).pow(rnd1 as u128);
             u[i] = random_Fp;
         }
 
@@ -2897,22 +2910,22 @@ fn test_step_18() {
         );
 
         ///////////TEST IMPLEMENTATION FOR P////////////////////
-        let mut test_P: G1 = g1mul(x4.pow(n_q as u128), Q_prime);
+        let mut test_P: G1_vesta = g1mul_vesta(x4.pow(n_q as u128), Q_prime);
         for i in 0..n_q {
-            test_P = g1add(test_P, g1mul(x4.pow((n_q - 1 - i) as u128), Q[i]));
+            test_P = g1add_vesta(test_P, g1mul_vesta(x4.pow((n_q - 1 - i) as u128), Q[i]));
         }
         assert_eq!(P, test_P);
         ////////////TEST IMPLEMENTATION FOR v//////////////////
         ///
-        let mut test_v = Fp::ZERO();
+        let mut test_v = FpPallas::ZERO();
         // let mut second_sum: Fp = Fp::ZERO();
-        let mut first_sum: Fp = Fp::ZERO();
-        let mut second_sum: Fp = Fp::ZERO();
+        let mut first_sum: FpPallas = FpPallas::ZERO();
+        let mut second_sum: FpPallas = FpPallas::ZERO();
         for i in 0..n_q {
-            let first_sum_dividend: Fp =
+            let first_sum_dividend: FpPallas =
                 x2.pow((n_q - 1 - i) as u128) * (u[i] - eval_polyx(r[i].clone(), x3));
             let q_i = q[i].clone();
-            let mut first_sum_divisor = Fp::ONE();
+            let mut first_sum_divisor = FpPallas::ONE();
             for j in 0..q_i.len() {
                 first_sum_divisor = first_sum_divisor * (x3 - omega.pow(q_i[j]) * x);
             }
@@ -2920,7 +2933,7 @@ fn test_step_18() {
             first_sum = first_sum + (first_sum_dividend / first_sum_divisor);
         }
         first_sum = first_sum * x4.pow(n_q as u128);
-        let test_v: Fp = first_sum + second_sum;
+        let test_v: FpPallas = first_sum + second_sum;
 
         assert_eq!(v, test_v);
 
@@ -2936,23 +2949,23 @@ fn test_step_18() {
 #[test]
 fn test_step_19() {
     fn a(x4: u8, q_prime: UniPolynomial, q_polys: SeqOfUniPoly) -> bool {
-        let q_polys: Seq<Seq<Fp>> = q_polys.0;
+        let q_polys: Seq<Seq<FpPallas>> = q_polys.0;
         let n_q: usize = q_polys.len();
-        let x4: Fp = Fp::from_literal(x4 as u128);
-        let x4nq: Fp = x4.pow(n_q as u128);
-        let mut q_prime: Seq<Fp> = q_prime.0;
+        let x4: FpPallas = FpPallas::from_literal(x4 as u128);
+        let x4nq: FpPallas = x4.pow(n_q as u128);
+        let mut q_prime: Seq<FpPallas> = q_prime.0;
         // ignores blindness
         let (p, _) = step_19(
             x4,
             q_prime.clone(),
             q_polys.clone(),
             Seq::create(q_prime.len()),
-            Fp::ZERO(),
+            FpPallas::ZERO(),
         );
         q_prime = mul_scalar_polyx(q_prime, x4nq);
 
         for i in 0..q_polys.len() {
-            let mut q_i: Seq<Fp> = q_polys[i].clone();
+            let mut q_i: Seq<FpPallas> = q_polys[i].clone();
             q_i = mul_scalar_polyx(q_i, x4.pow((n_q - 1 - i) as u128));
             // q_i = mul_scalar_polyx(q_i, x4);
             q_prime = add_polyx(q_i, q_prime.clone());
@@ -2972,15 +2985,18 @@ fn test_step_19() {
 #[test]
 fn test_step_22() {
     fn a(p_val: u8, g0_val: u8, s_val: u8, v_val: u8, xi_val: u8) -> bool {
-        let p: G1 = g1mul(Fp::from_literal(p_val as u128), g1_generator());
-        let g0: G1 = g1mul(Fp::from_literal(g0_val as u128), g1_generator());
-        let s: G1 = g1mul(Fp::from_literal(s_val as u128), g1_generator());
-        let v: Fp = Fp::from_literal(v_val as u128);
-        let xi: Fp = Fp::from_literal(xi_val as u128);
+        let p: G1_vesta = g1mul_vesta(FpPallas::from_literal(p_val as u128), g1_generator());
+        let g0: G1_vesta = g1mul_vesta(FpPallas::from_literal(g0_val as u128), g1_generator());
+        let s: G1_vesta = g1mul_vesta(FpPallas::from_literal(s_val as u128), g1_generator());
+        let v: FpPallas = FpPallas::from_literal(v_val as u128);
+        let xi: FpPallas = FpPallas::from_literal(xi_val as u128);
 
-        let test_result: G1 = g1add(p, g1add(g1neg(g1mul(v, g0)), g1mul(xi, s)));
+        let test_result: G1_vesta = g1add_vesta(
+            p,
+            g1add_vesta(g1neg_vesta(g1mul_vesta(v, g0)), g1mul_vesta(xi, s)),
+        );
 
-        let p_prime: G1 = step_22(p, g0, s, v, xi);
+        let p_prime: G1_vesta = step_22(p, g0, s, v, xi);
 
         assert_eq!(p_prime, test_result);
 
@@ -2996,16 +3012,16 @@ fn test_step_22() {
 #[test]
 fn test_step_23() {
     fn a(p: UniPolynomial, s: UniPolynomial, x3: u8, xi: u8) -> bool {
-        let p: Seq<Fp> = p.0;
-        let s: Seq<Fp> = s.0;
-        let x3: Fp = Fp::from_literal(x3 as u128);
-        let xi: Fp = Fp::from_literal(xi as u128);
+        let p: Seq<FpPallas> = p.0;
+        let s: Seq<FpPallas> = s.0;
+        let x3: FpPallas = FpPallas::from_literal(x3 as u128);
+        let xi: FpPallas = FpPallas::from_literal(xi as u128);
         let test_result = add_polyx(
             add_scalar_polyx(p.clone(), eval_polyx(p.clone(), x3).neg()),
             mul_scalar_polyx(s.clone(), xi),
         );
         // ignore blindess
-        let (p_prime, _) = step_23(p, s, x3, xi, Fp::ZERO(), Fp::ZERO());
+        let (p_prime, _) = step_23(p, s, x3, xi, FpPallas::ZERO(), FpPallas::ZERO());
         assert_eq!(p_prime.len(), test_result.len());
         for i in 0..p_prime.len() {
             assert_eq!(p_prime[i], test_result[i])
@@ -3021,36 +3037,40 @@ fn test_step_23() {
 #[test]
 fn test_step_24() {
     use hacspec_lib::num::traits::Pow;
-    let p_prime_poly: Seq<Fp> = Seq::<Fp>::from_vec(vec![
-        Fp::from_literal(12398129),
-        Fp::from_literal(2222),
-        Fp::from_literal(3038300),
-        Fp::from_literal(4),
+    let p_prime_poly: Seq<FpPallas> = Seq::<FpPallas>::from_vec(vec![
+        FpPallas::from_literal(12398129),
+        FpPallas::from_literal(2222),
+        FpPallas::from_literal(3038300),
+        FpPallas::from_literal(4),
     ]);
-    let G: Seq<G1> = Seq::<G1>::from_vec(vec![
-        g1mul(Fp::from_literal(2123), g1_generator()),
-        g1mul(Fp::from_literal(30283), g1_generator()),
-        g1mul(Fp::from_literal(4), g1_generator()),
-        g1mul(Fp::from_literal(999999999999), g1_generator()),
+    let G: Seq<G1_vesta> = Seq::<G1_vesta>::from_vec(vec![
+        g1mul_vesta(FpPallas::from_literal(2123), g1_generator()),
+        g1mul_vesta(FpPallas::from_literal(30283), g1_generator()),
+        g1mul_vesta(FpPallas::from_literal(4), g1_generator()),
+        g1mul_vesta(FpPallas::from_literal(999999999999), g1_generator()),
     ]);
-    let x3: Fp = Fp::from_literal(981298129832983298);
-    let z: Fp = Fp::from_literal(9812398329834298123123);
-    let U: G1 = g1mul(Fp::from_literal(99), g1_generator());
-    let W: G1 = g1mul(Fp::from_literal(42), g1_generator());
+    let x3: FpPallas = FpPallas::from_literal(981298129832983298);
+    let z: FpPallas = FpPallas::from_literal(9812398329834298123123);
+    let U: G1_vesta = g1mul_vesta(FpPallas::from_literal(99), g1_generator());
+    let W: G1_vesta = g1mul_vesta(FpPallas::from_literal(42), g1_generator());
     let k: usize = 2;
     let n: usize = 2.exp(2) as usize;
-    let L_blinding: Seq<Fp> =
-        Seq::<Fp>::from_vec(vec![Fp::from_literal(298398123), Fp::from_literal(3232323)]);
-    let R_blinding: Seq<Fp> =
-        Seq::<Fp>::from_vec(vec![Fp::from_literal(939), Fp::from_literal(10293)]);
-    let mut L: Seq<G1> = Seq::<G1>::create(k);
-    let mut R: Seq<G1> = Seq::<G1>::create(k);
+    let L_blinding: Seq<FpPallas> = Seq::<FpPallas>::from_vec(vec![
+        FpPallas::from_literal(298398123),
+        FpPallas::from_literal(3232323),
+    ]);
+    let R_blinding: Seq<FpPallas> = Seq::<FpPallas>::from_vec(vec![
+        FpPallas::from_literal(939),
+        FpPallas::from_literal(10293),
+    ]);
+    let mut L: Seq<G1_vesta> = Seq::<G1_vesta>::create(k);
+    let mut R: Seq<G1_vesta> = Seq::<G1_vesta>::create(k);
 
-    let u: Seq<Fp> = Seq::<Fp>::from_vec(vec![
-        Fp::from_literal(1),
-        Fp::from_literal(2),
-        Fp::from_literal(3),
-        Fp::from_literal(4),
+    let u: Seq<FpPallas> = Seq::<FpPallas>::from_vec(vec![
+        FpPallas::from_literal(1),
+        FpPallas::from_literal(2),
+        FpPallas::from_literal(3),
+        FpPallas::from_literal(4),
     ]);
     // ignore blindness
     let (real_p_prime, real_G_prime, real_b, real_L, real_R, _, _) = step_24(
@@ -3068,75 +3088,80 @@ fn test_step_24() {
     );
 
     ////////manuel calculation////////////////
-    let mut G_prime: Seq<G1> = G.clone();
+    let mut G_prime: Seq<G1_vesta> = G.clone();
 
     //First round
-    let p_prime_lo: Seq<Fp> = Seq::<Fp>::from_vec(vec![p_prime_poly[0], p_prime_poly[1]]);
-    let p_prime_hi: Seq<Fp> = Seq::<Fp>::from_vec(vec![p_prime_poly[2], p_prime_poly[3]]);
-    let G_prime_lo: Seq<G1> = Seq::<G1>::from_vec(vec![G[0], G[1]]);
-    let G_prime_hi: Seq<G1> = Seq::<G1>::from_vec(vec![G[2], G[3]]);
-    let b_lo: Seq<Fp> = Seq::<Fp>::from_vec(vec![x3.pow(0), x3.pow(1)]);
-    let b_hi: Seq<Fp> = Seq::<Fp>::from_vec(vec![x3.pow(2), x3.pow(3)]);
-    let L_0: G1 = g1add(
-        g1add(
+    let p_prime_lo: Seq<FpPallas> =
+        Seq::<FpPallas>::from_vec(vec![p_prime_poly[0], p_prime_poly[1]]);
+    let p_prime_hi: Seq<FpPallas> =
+        Seq::<FpPallas>::from_vec(vec![p_prime_poly[2], p_prime_poly[3]]);
+    let G_prime_lo: Seq<G1_vesta> = Seq::<G1_vesta>::from_vec(vec![G[0], G[1]]);
+    let G_prime_hi: Seq<G1_vesta> = Seq::<G1_vesta>::from_vec(vec![G[2], G[3]]);
+    let b_lo: Seq<FpPallas> = Seq::<FpPallas>::from_vec(vec![x3.pow(0), x3.pow(1)]);
+    let b_hi: Seq<FpPallas> = Seq::<FpPallas>::from_vec(vec![x3.pow(2), x3.pow(3)]);
+    let L_0: G1_vesta = g1add_vesta(
+        g1add_vesta(
             msm(p_prime_hi.clone(), G_prime_lo.clone()),
-            g1mul(z * inner_product(p_prime_hi.clone(), b_lo.clone()), U),
+            g1mul_vesta(z * inner_product(p_prime_hi.clone(), b_lo.clone()), U),
         ),
-        g1mul(L_blinding[0], W),
+        g1mul_vesta(L_blinding[0], W),
     );
     L[0] = L_0;
 
-    let R_0: G1 = g1add(
-        g1add(
+    let R_0: G1_vesta = g1add_vesta(
+        g1add_vesta(
             msm(p_prime_lo.clone(), G_prime_hi.clone()),
-            g1mul(z * inner_product(p_prime_lo.clone(), b_hi.clone()), U),
+            g1mul_vesta(z * inner_product(p_prime_lo.clone(), b_hi.clone()), U),
         ),
-        g1mul(R_blinding[0], W),
+        g1mul_vesta(R_blinding[0], W),
     );
     R[0] = R_0;
 
-    G_prime = Seq::<G1>::from_vec(vec![
-        g1add(G_prime_lo[0], g1mul(u[0], G_prime_hi[0])),
-        g1add(G_prime_lo[1], g1mul(u[0], G_prime_hi[1])),
+    G_prime = Seq::<G1_vesta>::from_vec(vec![
+        g1add_vesta(G_prime_lo[0], g1mul_vesta(u[0], G_prime_hi[0])),
+        g1add_vesta(G_prime_lo[1], g1mul_vesta(u[0], G_prime_hi[1])),
     ]);
-    let mut b: Seq<Fp> =
-        Seq::<Fp>::from_vec(vec![b_lo[0] + u[0] * b_hi[0], b_lo[1] + u[0] * b_hi[1]]);
-    let u_j: Fp = u[0];
-    let mut p_prime: Seq<Fp> = Seq::<Fp>::from_vec(vec![
+    let mut b: Seq<FpPallas> =
+        Seq::<FpPallas>::from_vec(vec![b_lo[0] + u[0] * b_hi[0], b_lo[1] + u[0] * b_hi[1]]);
+    let u_j: FpPallas = u[0];
+    let mut p_prime: Seq<FpPallas> = Seq::<FpPallas>::from_vec(vec![
         p_prime_lo[0] + u_j.inv() * p_prime_hi[0],
         p_prime_lo[1] + u_j.inv() * p_prime_hi[1],
     ]);
 
     //second round
-    let p_prime_lo: Seq<Fp> = Seq::<Fp>::from_vec(vec![p_prime[0]]);
-    let p_prime_hi: Seq<Fp> = Seq::<Fp>::from_vec(vec![p_prime[1]]);
-    let G_prime_lo: Seq<G1> = Seq::<G1>::from_vec(vec![G_prime[0]]);
-    let G_prime_hi: Seq<G1> = Seq::<G1>::from_vec(vec![G_prime[1]]);
-    let b_lo: Seq<Fp> = Seq::<Fp>::from_vec(vec![b[0]]);
-    let b_hi: Seq<Fp> = Seq::<Fp>::from_vec(vec![b[1]]);
-    let L_1: G1 = g1add(
-        g1add(
+    let p_prime_lo: Seq<FpPallas> = Seq::<FpPallas>::from_vec(vec![p_prime[0]]);
+    let p_prime_hi: Seq<FpPallas> = Seq::<FpPallas>::from_vec(vec![p_prime[1]]);
+    let G_prime_lo: Seq<G1_vesta> = Seq::<G1_vesta>::from_vec(vec![G_prime[0]]);
+    let G_prime_hi: Seq<G1_vesta> = Seq::<G1_vesta>::from_vec(vec![G_prime[1]]);
+    let b_lo: Seq<FpPallas> = Seq::<FpPallas>::from_vec(vec![b[0]]);
+    let b_hi: Seq<FpPallas> = Seq::<FpPallas>::from_vec(vec![b[1]]);
+    let L_1: G1_vesta = g1add_vesta(
+        g1add_vesta(
             msm(p_prime_hi.clone(), G_prime_lo.clone()),
-            g1mul(z * inner_product(p_prime_hi.clone(), b_lo.clone()), U),
+            g1mul_vesta(z * inner_product(p_prime_hi.clone(), b_lo.clone()), U),
         ),
-        g1mul(L_blinding[1], W),
+        g1mul_vesta(L_blinding[1], W),
     );
     L[1] = L_1;
 
-    let R_1: G1 = g1add(
-        g1add(
+    let R_1: G1_vesta = g1add_vesta(
+        g1add_vesta(
             msm(p_prime_lo.clone(), G_prime_hi.clone()),
-            g1mul(z * inner_product(p_prime_lo.clone(), b_hi.clone()), U),
+            g1mul_vesta(z * inner_product(p_prime_lo.clone(), b_hi.clone()), U),
         ),
-        g1mul(R_blinding[1], W),
+        g1mul_vesta(R_blinding[1], W),
     );
     R[1] = R_1;
 
-    G_prime = Seq::<G1>::from_vec(vec![g1add(G_prime_lo[0], g1mul(u[1], G_prime_hi[0]))]);
-    b = Seq::<Fp>::from_vec(vec![b_lo[0] + u[0] * b_hi[0]]);
-    let u_j: Fp = u[1];
+    G_prime = Seq::<G1_vesta>::from_vec(vec![g1add_vesta(
+        G_prime_lo[0],
+        g1mul_vesta(u[1], G_prime_hi[0]),
+    )]);
+    b = Seq::<FpPallas>::from_vec(vec![b_lo[0] + u[0] * b_hi[0]]);
+    let u_j: FpPallas = u[1];
 
-    p_prime = Seq::<Fp>::from_vec(vec![p_prime_lo[0] + u_j.inv() * p_prime_hi[0]]);
+    p_prime = Seq::<FpPallas>::from_vec(vec![p_prime_lo[0] + u_j.inv() * p_prime_hi[0]]);
     assert_eq!(G_prime[0], real_G_prime[0]);
     assert_eq!(p_prime[0], real_p_prime[0]);
     assert_eq!(L[0], real_L[0]);
@@ -3160,75 +3185,79 @@ fn test_step_24() {
 #[cfg(test)]
 #[test]
 fn test_step_26() {
-    let u: Seq<Fp> = Seq::<Fp>::from_vec(vec![Fp::from_literal(743), Fp::from_literal(9)]);
-    let L: Seq<G1> = Seq::<G1>::from_vec(vec![
-        g1mul(Fp::from_literal(74), g1_generator()),
-        g1mul(Fp::from_literal(749292992), g1_generator()),
+    let u: Seq<FpPallas> =
+        Seq::<FpPallas>::from_vec(vec![FpPallas::from_literal(743), FpPallas::from_literal(9)]);
+    let L: Seq<G1_vesta> = Seq::<G1_vesta>::from_vec(vec![
+        g1mul_vesta(FpPallas::from_literal(74), g1_generator()),
+        g1mul_vesta(FpPallas::from_literal(749292992), g1_generator()),
     ]);
-    let R: Seq<G1> = Seq::<G1>::from_vec(vec![
-        g1mul(Fp::from_literal(7), g1_generator()),
-        g1mul(Fp::from_literal(92929929292), g1_generator()),
+    let R: Seq<G1_vesta> = Seq::<G1_vesta>::from_vec(vec![
+        g1mul_vesta(FpPallas::from_literal(7), g1_generator()),
+        g1mul_vesta(FpPallas::from_literal(92929929292), g1_generator()),
     ]);
 
-    let P_prime: G1 = g1mul(Fp::from_literal(1239734), g1_generator());
-    let c: Fp = Fp::from_literal(1919191);
-    let G_prime_0: G1 = g1mul(Fp::from_literal(9191203983123123123123), g1_generator());
-    let b_0: Fp = Fp::from_literal(87410923091283);
-    let z: Fp = Fp::from_literal(699388299374);
-    let U: G1 = g1mul(Fp::from_literal(77777777), g1_generator());
-    let f: Fp = Fp::ONE();
-    let W: G1 = (
-        FpCurve::from_hex("29A35E837F1BC8F4D83DD8E452DAC6691BDEDE5F0916BB02E7EB3BF0D8724746"),
-        FpCurve::from_hex("2E7E5A3C4EFBE72E130E31E28F22E98BF0A3225FCB5E579B61B98F28083A8A05"),
+    let P_prime: G1_vesta = g1mul_vesta(FpPallas::from_literal(1239734), g1_generator());
+    let c: FpPallas = FpPallas::from_literal(1919191);
+    let G_prime_0: G1_vesta = g1mul_vesta(
+        FpPallas::from_literal(9191203983123123123123),
+        g1_generator(),
+    );
+    let b_0: FpPallas = FpPallas::from_literal(87410923091283);
+    let z: FpPallas = FpPallas::from_literal(699388299374);
+    let U: G1_vesta = g1mul_vesta(FpPallas::from_literal(77777777), g1_generator());
+    let f: FpPallas = FpPallas::ONE();
+    let W: G1_vesta = (
+        FpVesta::from_hex("29A35E837F1BC8F4D83DD8E452DAC6691BDEDE5F0916BB02E7EB3BF0D8724746"),
+        FpVesta::from_hex("2E7E5A3C4EFBE72E130E31E28F22E98BF0A3225FCB5E579B61B98F28083A8A05"),
         false,
     );
 
-    let mut rhs: G1 = g1add(
-        g1mul(Fp::from_literal(743).inv(), L[0]),
-        g1mul(Fp::from_literal(9).inv(), L[1]),
+    let mut rhs: G1_vesta = g1add_vesta(
+        g1mul_vesta(FpPallas::from_literal(743).inv(), L[0]),
+        g1mul_vesta(FpPallas::from_literal(9).inv(), L[1]),
     );
-    rhs = g1add(rhs, P_prime);
-    rhs = g1add(
+    rhs = g1add_vesta(rhs, P_prime);
+    rhs = g1add_vesta(
         rhs,
-        g1add(
-            g1mul(Fp::from_literal(743), R[0]),
-            g1mul(Fp::from_literal(9), R[1]),
+        g1add_vesta(
+            g1mul_vesta(FpPallas::from_literal(743), R[0]),
+            g1mul_vesta(FpPallas::from_literal(9), R[1]),
         ),
     );
-    let mut lhs: G1 = g1mul(c, G_prime_0);
-    lhs = g1add(lhs, g1mul((c * b_0 * z), U));
-    lhs = g1add(lhs, g1mul(f, W));
-    let diff: G1 = g1add(rhs, g1neg(lhs));
+    let mut lhs: G1_vesta = g1mul_vesta(c, G_prime_0);
+    lhs = g1add_vesta(lhs, g1mul_vesta((c * b_0 * z), U));
+    lhs = g1add_vesta(lhs, g1mul_vesta(f, W));
+    let diff: G1_vesta = g1add_vesta(rhs, g1neg_vesta(lhs));
     assert!(step_26(u, L, P_prime, R, c, G_prime_0, b_0, z, U, f, W))
 }
 #[cfg(test)]
 #[test]
 fn testmsm() {
-    let fs1 = Seq::<Fp>::from_vec(vec![
-        Fp::from_literal(144),
-        Fp::from_literal(22),
-        Fp::from_literal(3),
-        Fp::from_literal(74),
-        Fp::from_literal(79),
+    let fs1 = Seq::<FpPallas>::from_vec(vec![
+        FpPallas::from_literal(144),
+        FpPallas::from_literal(22),
+        FpPallas::from_literal(3),
+        FpPallas::from_literal(74),
+        FpPallas::from_literal(79),
     ]);
 
-    let fs2 = Seq::<Fp>::from_vec(vec![
-        Fp::from_literal(112),
-        Fp::from_literal(2231),
-        Fp::from_literal(88),
-        Fp::from_literal(9),
-        Fp::from_literal(98),
+    let fs2 = Seq::<FpPallas>::from_vec(vec![
+        FpPallas::from_literal(112),
+        FpPallas::from_literal(2231),
+        FpPallas::from_literal(88),
+        FpPallas::from_literal(9),
+        FpPallas::from_literal(98),
     ]);
-    let gs = Seq::<G1>::from_vec(vec![
-        (FpCurve::from_literal(2), FpCurve::from_literal(2), false),
-        (FpCurve::from_literal(2), FpCurve::from_literal(5), false),
-        (FpCurve::from_literal(5), FpCurve::from_literal(3), false),
-        (FpCurve::from_literal(6), FpCurve::from_literal(8), false),
-        (FpCurve::from_literal(2), FpCurve::from_literal(5), false),
+    let gs = Seq::<G1_vesta>::from_vec(vec![
+        (FpVesta::from_literal(2), FpVesta::from_literal(2), false),
+        (FpVesta::from_literal(2), FpVesta::from_literal(5), false),
+        (FpVesta::from_literal(5), FpVesta::from_literal(3), false),
+        (FpVesta::from_literal(6), FpVesta::from_literal(8), false),
+        (FpVesta::from_literal(2), FpVesta::from_literal(5), false),
     ]);
     let msmed1 = msm(fs1.clone(), gs.clone());
     let msmed2 = msm(fs2.clone(), gs.clone());
-    let msm_sum = g1add(msmed1, msmed2);
+    let msm_sum = g1add_vesta(msmed1, msmed2);
     let mut fs_sum = add_polyx(fs1, fs2);
     let sum_sum = msm(fs_sum, gs);
 }
@@ -3237,8 +3266,8 @@ fn testmsm() {
 #[quickcheck]
 fn test_step_9(r_poly: UniPolynomial, a_prime_seq: SeqOfUniPoly, x: u128, omega: u128) {
     let r_poly = r_poly.0;
-    let x = Fp::from_literal(x);
-    let omega = Fp::from_literal(omega);
+    let x = FpPallas::from_literal(x);
+    let omega = FpPallas::from_literal(omega);
     let a_prime_seq = a_prime_seq.0;
     let p = gen_p(a_prime_seq.len(), 20);
     let (r, a) = step_9(r_poly.clone(), a_prime_seq.clone(), omega, p.clone(), x);
@@ -3270,10 +3299,10 @@ fn test_step_9_10() {
         let a_prime_seq = a_prime_seq.0;
         let p = gen_p(a_prime_seq.len(), 50);
 
-        let r = Seq::<Fp>::from_vec(vec![Fp::ZERO()]);
+        let r = Seq::<FpPallas>::from_vec(vec![FpPallas::ZERO()]);
 
-        let omega: Fp = Fp::from_literal(omega_value);
-        let x: Fp = Fp::from_literal(x_value);
+        let omega: FpPallas = FpPallas::from_literal(omega_value);
+        let x: FpPallas = FpPallas::from_literal(x_value);
 
         let p: Seq<Seq<u128>> = p;
         let n_a: usize = a_prime_seq.len();
@@ -3288,14 +3317,14 @@ fn test_step_9_10() {
 
         for i in 0..n_a {
             let p_i: Seq<u128> = p[i].clone();
-            let s_i: Seq<Fp> = s[i].clone();
-            let a_i: Seq<Fp> = a[i].clone();
+            let s_i: Seq<FpPallas> = s[i].clone();
+            let a_i: Seq<FpPallas> = a[i].clone();
             let n_e = p_i.len();
             for j in 0..n_e {
                 let p_i_j = p_i[j];
-                let function_arg: Fp = omega.pow(p_i_j) * x;
-                let s_eval: Fp = eval_polyx(s_i.clone(), function_arg);
-                let a_i_j: Fp = a_i[j];
+                let function_arg: FpPallas = omega.pow(p_i_j) * x;
+                let s_eval: FpPallas = eval_polyx(s_i.clone(), function_arg);
+                let a_i_j: FpPallas = a_i[j];
                 assert_eq!(s_eval, a_i_j);
             }
         }
@@ -3350,9 +3379,9 @@ fn test_lagrange_basis(a: Points) {
             let eval_x = points_seq[j].0;
             let res = eval_polyx(basis.clone(), eval_x);
             if x == eval_x {
-                assert_eq!(res, Fp::ONE())
+                assert_eq!(res, FpPallas::ONE())
             } else {
-                assert_eq!(res, Fp::ZERO())
+                assert_eq!(res, FpPallas::ZERO())
             }
         }
     }
@@ -3363,38 +3392,49 @@ fn test_lagrange_basis(a: Points) {
 fn test_part_8() {
     let v1 = vec![5, 10, 20]
         .iter()
-        .map(|e| Fp::from_literal((*e) as u128))
+        .map(|e| FpPallas::from_literal((*e) as u128))
         .collect();
     let p1 = Seq::from_vec(v1);
     let n = 3;
     let n_g = p1.len() as u128 / n + 1;
     let poly_parts = step_5(p1, n, n_g);
-    let x: Fp = Fp::default();
-    let res: Seq<Fp> = step_8(poly_parts, x, n);
+    let x: FpPallas = FpPallas::default();
+    let res: Seq<FpPallas> = step_8(poly_parts, x, n);
 }
 
 #[cfg(test)]
 #[test]
 fn test_part_7() {
-    let commitment_seq: Seq<G1> =
-        Seq::<G1>::from_vec(vec![g1_default(), g1_default(), g1_default()]);
-    let x: Fp = Fp::default();
+    let commitment_seq: Seq<G1_vesta> = Seq::<G1_vesta>::from_vec(vec![
+        g1_default_vesta(),
+        g1_default_vesta(),
+        g1_default_vesta(),
+    ]);
+    let x: FpPallas = FpPallas::default();
     let n: u128 = 128;
-    let res: G1 = step_7(commitment_seq, x, n);
+    let res: G1_vesta = step_7(commitment_seq, x, n);
 }
 
 #[cfg(test)]
 #[test]
 fn test_commit_to_poly_parts() {
     let crs: CRS = (
-        Seq::<G1>::from_vec(vec![g1_default(), g1_default(), g1_default()]),
-        g1_default(),
+        Seq::<G1_vesta>::from_vec(vec![
+            g1_default_vesta(),
+            g1_default_vesta(),
+            g1_default_vesta(),
+        ]),
+        g1_default_vesta(),
     );
 
-    let r_seq = Seq::<Fp>::from_vec(vec![Fp::default(), Fp::default(), Fp::default()]);
+    let r_seq = Seq::<FpPallas>::from_vec(vec![
+        FpPallas::default(),
+        FpPallas::default(),
+        FpPallas::default(),
+    ]);
     let v1 = vec![5, 10, 20]
         .iter()
-        .map(|e| Fp::from_literal((*e) as u128))
+        .map(|e| FpPallas::from_literal((*e) as u128))
         .collect();
     let p1 = Seq::from_vec(v1);
     let n = 3 as u128;
@@ -3445,27 +3485,30 @@ fn test_commit_to_poly_parts() {
 fn test_poly_eval() {
     let v1 = vec![5, 10, 20]
         .iter()
-        .map(|e| Fp::from_literal((*e) as u128))
+        .map(|e| FpPallas::from_literal((*e) as u128))
         .collect();
     let p1 = Seq::from_vec(v1);
 
-    assert_eq!(eval_polyx(p1, Fp::TWO()), Fp::from_literal(105));
+    assert_eq!(eval_polyx(p1, FpPallas::TWO()), FpPallas::from_literal(105));
 }
 
 #[cfg(test)]
 #[test]
 fn test_reduce_multi_poly() {
     // 1 + 3xy + 5x*y^2 + 2x^2 + 2y
-    let t1 = (Fp::from_literal(1), Seq::from_vec(vec![0, 0]));
-    let t2 = (Fp::from_literal(3), Seq::from_vec(vec![1, 1]));
-    let t3 = (Fp::from_literal(5), Seq::from_vec(vec![1, 2]));
-    let t4 = (Fp::from_literal(2), Seq::from_vec(vec![2, 0]));
-    let t5 = (Fp::from_literal(2), Seq::from_vec(vec![0, 1]));
+    let t1 = (FpPallas::from_literal(1), Seq::from_vec(vec![0, 0]));
+    let t2 = (FpPallas::from_literal(3), Seq::from_vec(vec![1, 1]));
+    let t3 = (FpPallas::from_literal(5), Seq::from_vec(vec![1, 2]));
+    let t4 = (FpPallas::from_literal(2), Seq::from_vec(vec![2, 0]));
+    let t5 = (FpPallas::from_literal(2), Seq::from_vec(vec![0, 1]));
 
     // the multivariate poly
     let p = Seq::from_vec(vec![t1, t2, t3, t4, t5]);
     // input value for y (2nd var), do not eval for x (1st var)
-    let i1 = Seq::from_vec(vec![(false, Fp::ZERO()), (true, Fp::from_literal(5))]);
+    let i1 = Seq::from_vec(vec![
+        (false, FpPallas::ZERO()),
+        (true, FpPallas::from_literal(5)),
+    ]);
     // check that there are 5 terms, t1 through t5
     assert_eq!(p.len(), 5);
 
@@ -3477,14 +3520,14 @@ fn test_reduce_multi_poly() {
     assert_eq!(evaluation1.len(), 4);
 
     // input 2 for x (1st var)
-    let i2 = Seq::from_vec(vec![(true, Fp::TWO())]);
+    let i2 = Seq::from_vec(vec![(true, FpPallas::TWO())]);
     let evaluation2 = reduce_multi_poly(evaluation1, i2);
 
     // check that there is only 1 term left (a constant)
     assert_eq!(evaluation2.len(), 1);
     let (res, powers) = evaluation2.iter().next().unwrap();
     // this constant is the final evaluation of the poly
-    assert_eq!(*res, Fp::from_literal(299));
+    assert_eq!(*res, FpPallas::from_literal(299));
     // no more vars, no more powers
     assert_eq!(powers.len(), 0);
 }
@@ -3493,58 +3536,61 @@ fn test_reduce_multi_poly() {
 #[test]
 fn test_eval_multi_poly() {
     // 1 + 3xy + 5x*y^2 + 2x^2 + 2y
-    let t1 = (Fp::from_literal(1), Seq::from_vec(vec![0, 0]));
-    let t2 = (Fp::from_literal(3), Seq::from_vec(vec![1, 1]));
-    let t3 = (Fp::from_literal(5), Seq::from_vec(vec![1, 2]));
-    let t4 = (Fp::from_literal(2), Seq::from_vec(vec![2, 0]));
-    let t5 = (Fp::from_literal(2), Seq::from_vec(vec![0, 1]));
+    let t1 = (FpPallas::from_literal(1), Seq::from_vec(vec![0, 0]));
+    let t2 = (FpPallas::from_literal(3), Seq::from_vec(vec![1, 1]));
+    let t3 = (FpPallas::from_literal(5), Seq::from_vec(vec![1, 2]));
+    let t4 = (FpPallas::from_literal(2), Seq::from_vec(vec![2, 0]));
+    let t5 = (FpPallas::from_literal(2), Seq::from_vec(vec![0, 1]));
 
     // the multivariate poly
     let p = Seq::from_vec(vec![t1, t2, t3, t4, t5]);
     // input values x=2 and y=5
-    let i = Seq::from_vec(vec![Fp::TWO(), Fp::from_literal(5)]);
+    let i = Seq::from_vec(vec![FpPallas::TWO(), FpPallas::from_literal(5)]);
     // check that there are 5 terms, t1 through t5
     assert_eq!(p.len(), 5);
     // evaluate the poly
     let res = eval_multi_poly(p, i);
     // check the result
-    assert_eq!(res, Fp::from_literal(299));
+    assert_eq!(res, FpPallas::from_literal(299));
 }
 
 #[cfg(test)]
 #[test]
 fn test_multi_to_uni_poly() {
     // 1 + 3xy + 5x*y^2 + 2x^2 + 2y
-    let t1 = (Fp::from_literal(1), Seq::from_vec(vec![0, 0]));
-    let t2 = (Fp::from_literal(3), Seq::from_vec(vec![1, 1]));
-    let t3 = (Fp::from_literal(5), Seq::from_vec(vec![1, 2]));
-    let t4 = (Fp::from_literal(2), Seq::from_vec(vec![2, 0]));
-    let t5 = (Fp::from_literal(2), Seq::from_vec(vec![0, 1]));
+    let t1 = (FpPallas::from_literal(1), Seq::from_vec(vec![0, 0]));
+    let t2 = (FpPallas::from_literal(3), Seq::from_vec(vec![1, 1]));
+    let t3 = (FpPallas::from_literal(5), Seq::from_vec(vec![1, 2]));
+    let t4 = (FpPallas::from_literal(2), Seq::from_vec(vec![2, 0]));
+    let t5 = (FpPallas::from_literal(2), Seq::from_vec(vec![0, 1]));
 
     // the multivariate poly
     let p = Seq::from_vec(vec![t1, t2, t3, t4, t5]);
     // input value for y (2nd var), do not eval for x (1st var)
-    let i1 = Seq::from_vec(vec![(false, Fp::ZERO()), (true, Fp::from_literal(5))]);
+    let i1 = Seq::from_vec(vec![
+        (false, FpPallas::ZERO()),
+        (true, FpPallas::from_literal(5)),
+    ]);
     // 11 + 140x + 2x^2
     let u = multi_to_uni_poly(p, i1);
-    assert_eq!(u[0], Fp::from_literal(11));
-    assert_eq!(u[1], Fp::from_literal(140));
-    assert_eq!(u[2], Fp::from_literal(2));
+    assert_eq!(u[0], FpPallas::from_literal(11));
+    assert_eq!(u[1], FpPallas::from_literal(140));
+    assert_eq!(u[2], FpPallas::from_literal(2));
 }
 
 #[cfg(test)]
 #[test]
 fn test_trim_poly() {
     let p = Seq::from_vec(vec![
-        Fp::ZERO(),
-        Fp::from_literal(6),
-        Fp::from_literal(4),
-        Fp::ZERO(),
-        Fp::ZERO(),
-        Fp::from_literal(2),
-        Fp::ZERO(),
-        Fp::ZERO(),
-        Fp::ZERO(),
+        FpPallas::ZERO(),
+        FpPallas::from_literal(6),
+        FpPallas::from_literal(4),
+        FpPallas::ZERO(),
+        FpPallas::ZERO(),
+        FpPallas::from_literal(2),
+        FpPallas::ZERO(),
+        FpPallas::ZERO(),
+        FpPallas::ZERO(),
     ]);
 
     let trimmed_p = trim_poly(p.clone());
@@ -3581,13 +3627,13 @@ fn test_trim_poly() {
 #[quickcheck]
 // fn test_vanishing_poly(omega_value:u128, n: u128){
 fn test_vanishing_poly(omega_value: u128, n: u128) {
-    let omega: Fp = Fp::from_literal((omega_value % 50) + 1);
+    let omega: FpPallas = FpPallas::from_literal((omega_value % 50) + 1);
     let n = n % 20 + 2;
 
     let vanishing_poly = compute_vanishing_polynomial(omega, n);
     for i in 0..(n) {
         let should_be_zero = eval_polyx(vanishing_poly.clone(), omega.pow(i));
-        assert_eq!(should_be_zero, Fp::ZERO())
+        assert_eq!(should_be_zero, FpPallas::ZERO())
     }
     let vanishing_degree: u128 = poly_degree(vanishing_poly);
     assert_eq!(vanishing_degree, n);
@@ -3616,25 +3662,26 @@ fn example_run() {
     let n: u128 = 4;
     let n_a: usize = 3;
     let n_q: u128 = 2;
-    let omega: Fp = Fp::from_hex("96E31EEA5205EE7829A559CEC3CAB14D83233F67234D59A2F17C7C5B54146EA");
-    let G: Seq<G1> = Seq::<G1>::from_vec(vec![
-        g1mul(Fp::from_literal(22), g1_generator()),
-        g1mul(Fp::from_literal(7), g1_generator()),
-        g1mul(Fp::from_literal(9), g1_generator()),
-        g1mul(Fp::from_literal(43), g1_generator()),
+    let omega: FpPallas =
+        FpPallas::from_hex("96E31EEA5205EE7829A559CEC3CAB14D83233F67234D59A2F17C7C5B54146EA");
+    let G: Seq<G1_vesta> = Seq::<G1_vesta>::from_vec(vec![
+        g1mul_vesta(FpPallas::from_literal(22), g1_generator()),
+        g1mul_vesta(FpPallas::from_literal(7), g1_generator()),
+        g1mul_vesta(FpPallas::from_literal(9), g1_generator()),
+        g1mul_vesta(FpPallas::from_literal(43), g1_generator()),
     ]);
-    let W: G1 = g1mul(Fp::from_literal(123), g1_generator());
+    let W: G1_vesta = g1mul_vesta(FpPallas::from_literal(123), g1_generator());
     let crs: CRS = (G.clone(), W);
-    let U: G1 = g1mul(Fp::from_literal(743), g1_generator());
+    let U: G1_vesta = g1mul_vesta(FpPallas::from_literal(743), g1_generator());
 
-    let r_poly = Seq::<Fp>::from_vec(vec![
-        Fp::from_literal(987),
-        Fp::from_literal(2),
-        Fp::from_literal(64),
-        Fp::from_literal(355),
+    let r_poly = Seq::<FpPallas>::from_vec(vec![
+        FpPallas::from_literal(987),
+        FpPallas::from_literal(2),
+        FpPallas::from_literal(64),
+        FpPallas::from_literal(355),
     ]);
-    let R_blind: Fp = Fp::from_literal(78);
-    let R: G1 = commit_polyx(&crs, r_poly.clone(), R_blind);
+    let R_blind: FpPallas = FpPallas::from_literal(78);
+    let R: G1_vesta = commit_polyx(&crs, r_poly.clone(), R_blind);
 
     let p: Seq<Seq<u128>> = Seq::<Seq<u128>>::from_vec(vec![
         Seq::<u128>::from_vec(vec![0, 1]),
@@ -3642,105 +3689,81 @@ fn example_run() {
         Seq::<u128>::from_vec(vec![0]),
     ]);
 
-    let a0_points: Seq<(Fp, Fp)> = Seq::<(Fp, Fp)>::from_vec(vec![
-        (omega.pow(0), Fp::from_literal(2)),
-        (omega.pow(1), Fp::from_literal(10)),
-        (omega.pow(2), Fp::from_literal(5)),
-        (omega.pow(3), Fp::from_literal(26)),
+    let a0_points: Seq<(FpPallas, FpPallas)> = Seq::<(FpPallas, FpPallas)>::from_vec(vec![
+        (omega.pow(0), FpPallas::from_literal(2)),
+        (omega.pow(1), FpPallas::from_literal(10)),
+        (omega.pow(2), FpPallas::from_literal(5)),
+        (omega.pow(3), FpPallas::from_literal(26)),
     ]);
 
-    let a1_points: Seq<(Fp, Fp)> = Seq::<(Fp, Fp)>::from_vec(vec![
-        (omega.pow(0), Fp::from_literal(3)),
-        (omega.pow(1), Fp::from_literal(0)),
-        (omega.pow(2), Fp::from_literal(8)),
-        (omega.pow(3), Fp::from_literal(0)),
+    let a1_points: Seq<(FpPallas, FpPallas)> = Seq::<(FpPallas, FpPallas)>::from_vec(vec![
+        (omega.pow(0), FpPallas::from_literal(3)),
+        (omega.pow(1), FpPallas::from_literal(0)),
+        (omega.pow(2), FpPallas::from_literal(8)),
+        (omega.pow(3), FpPallas::from_literal(0)),
     ]);
 
-    let a2_points: Seq<(Fp, Fp)> = Seq::<(Fp, Fp)>::from_vec(vec![
-        (omega.pow(0), Fp::from_literal(5)),
-        (omega.pow(1), Fp::from_literal(0)),
-        (omega.pow(2), Fp::from_literal(13)),
-        (omega.pow(3), Fp::from_literal(0)),
+    let a2_points: Seq<(FpPallas, FpPallas)> = Seq::<(FpPallas, FpPallas)>::from_vec(vec![
+        (omega.pow(0), FpPallas::from_literal(5)),
+        (omega.pow(1), FpPallas::from_literal(0)),
+        (omega.pow(2), FpPallas::from_literal(13)),
+        (omega.pow(3), FpPallas::from_literal(0)),
     ]);
 
-    let q_add_points: Seq<(Fp, Fp)> = Seq::<(Fp, Fp)>::from_vec(vec![
-        (omega.pow(0), Fp::from_literal(1)),
-        (omega.pow(1), Fp::from_literal(0)),
-        (omega.pow(2), Fp::from_literal(1)),
-        (omega.pow(3), Fp::from_literal(0)),
+    let q_add_points: Seq<(FpPallas, FpPallas)> = Seq::<(FpPallas, FpPallas)>::from_vec(vec![
+        (omega.pow(0), FpPallas::from_literal(1)),
+        (omega.pow(1), FpPallas::from_literal(0)),
+        (omega.pow(2), FpPallas::from_literal(1)),
+        (omega.pow(3), FpPallas::from_literal(0)),
     ]);
 
-    let a_0: Seq<Fp> = lagrange_poly(a0_points);
-    let a_1: Seq<Fp> = lagrange_poly(a1_points);
-    let a_2: Seq<Fp> = lagrange_poly(a2_points);
-    let a_primes: Seq<Seq<Fp>> =
-        Seq::<Seq<Fp>>::from_vec(vec![a_0.clone(), a_1.clone(), a_2.clone()]);
-    let q_add: Seq<Fp> = lagrange_poly(q_add_points);
-    // println!("q_add");
-    // println!("{:?}", q_add);
-    // println!("a_0");
-    // println!("{:?}", a_0);
-    // println!("a_1");
-    // println!("{:?}", a_1);
-    // println!("a_2");
-    // println!("{:?}", a_2);
+    let a_0: Seq<FpPallas> = lagrange_poly(a0_points);
+    let a_1: Seq<FpPallas> = lagrange_poly(a1_points);
+    let a_2: Seq<FpPallas> = lagrange_poly(a2_points);
+    let a_primes: Seq<Seq<FpPallas>> =
+        Seq::<Seq<FpPallas>>::from_vec(vec![a_0.clone(), a_1.clone(), a_2.clone()]);
+    let q_add: Seq<FpPallas> = lagrange_poly(q_add_points);
 
     // construct A_i's (commitments)
-    let A_0_blinding: Fp = Fp::from_literal(99);
-    let A_0: G1 = commit_polyx(&crs, a_0.clone(), A_0_blinding);
-    let A_1_blinding: Fp = Fp::from_literal(123);
-    let A_1: G1 = commit_polyx(&crs, a_1.clone(), A_1_blinding);
-    let A_2_blinding: Fp = Fp::from_literal(748);
-    let A_2: G1 = commit_polyx(&crs, a_2.clone(), A_2_blinding);
-    let A_list: Seq<G1> = Seq::<G1>::from_vec(vec![A_0, A_1, A_2]);
+    let A_0_blinding: FpPallas = FpPallas::from_literal(99);
+    let A_0: G1_vesta = commit_polyx(&crs, a_0.clone(), A_0_blinding);
+    let A_1_blinding: FpPallas = FpPallas::from_literal(123);
+    let A_1: G1_vesta = commit_polyx(&crs, a_1.clone(), A_1_blinding);
+    let A_2_blinding: FpPallas = FpPallas::from_literal(748);
+    let A_2: G1_vesta = commit_polyx(&crs, a_2.clone(), A_2_blinding);
+    let A_list: Seq<G1_vesta> = Seq::<G1_vesta>::from_vec(vec![A_0, A_1, A_2]);
     // save a_blinds
     let a_blinds = Seq::from_vec(vec![A_0_blinding, A_1_blinding, A_2_blinding]);
 
     // construct g'(X) = q_add(X) * (a_0(X)+a_1(X)+a_2(X)-a_0(omega * X))
-    let mut g_prime: Seq<Fp> = add_polyx(a_0.clone(), a_1.clone());
+    let mut g_prime: Seq<FpPallas> = add_polyx(a_0.clone(), a_1.clone());
     g_prime = add_polyx(g_prime, a_2.clone());
-    let a_0_rotated: Seq<Fp> = rotate_polyx(a_0.clone(), omega);
+    let a_0_rotated: Seq<FpPallas> = rotate_polyx(a_0.clone(), omega);
     g_prime = sub_polyx(g_prime, a_0_rotated);
     g_prime = mul_polyx(g_prime, q_add);
     for i in 0..4 {
-        assert_eq!(eval_polyx(g_prime.clone(), omega.pow(i)), Fp::ZERO());
+        assert_eq!(eval_polyx(g_prime.clone(), omega.pow(i)), FpPallas::ZERO());
     }
 
     let q: Seq<Seq<u128>> =
         Seq::<Seq<u128>>::from_vec(vec![Seq::from_vec(vec![0]), Seq::from_vec(vec![0, 1])]);
     let sigma_list: Seq<u128> = Seq::<u128>::from_vec(vec![1, 0, 0]);
 
-    let h: Seq<Fp> = step_4(g_prime.clone(), omega, n);
-    println!("g:");
-    println!("{:?}", g_prime.clone());
+    let h: Seq<FpPallas> = step_4(g_prime.clone(), omega, n);
 
-    let h_is: Seq<Seq<Fp>> = step_5(h.clone(), n, 4);
-    println!("h:");
-    println!("{:?}", h);
-    println!("h_is:");
-    println!("{:?}", h_is);
-    let h_is: Seq<Seq<Fp>> = Seq::<Seq<Fp>>::from_vec(vec![
-        Seq::from_vec(vec![
-            Fp::from_hex("28000000000000000000000000000000156C1F9D85FCE98A77AC52F49FFFFFFD"),
-            Fp::from_hex("199A496937D31E9A29D174AB4EEFE9AE983DB753B7F20357F95CB5E33184F795"),
-            Fp::ZERO(),
-            Fp::ZERO(),
-        ]),
-        Seq::from_vec(vec![Fp::ZERO(), Fp::ZERO(), Fp::ZERO(), Fp::ZERO()]),
-        Seq::from_vec(vec![Fp::ZERO(), Fp::ZERO(), Fp::ZERO(), Fp::ZERO()]),
+    let h_is: Seq<Seq<FpPallas>> = step_5(h.clone(), n, 4);
+
+    let h_blindings: Seq<FpPallas> = Seq::<FpPallas>::from_vec(vec![
+        FpPallas::from_literal(5),
+        FpPallas::from_literal(76),
+        FpPallas::from_literal(726),
     ]);
+    let H_is: Seq<G1_vesta> = step_6(h_is.clone(), &crs, h_blindings);
 
-    let h_blindings: Seq<Fp> = Seq::<Fp>::from_vec(vec![
-        Fp::from_literal(5),
-        Fp::from_literal(76),
-        Fp::from_literal(726),
-    ]);
-    let H_is: Seq<G1> = step_6(h_is.clone(), &crs, h_blindings);
+    let x_challenge: FpPallas = FpPallas::from_literal(345);
+    let H_prime: G1_vesta = step_7(H_is, x_challenge, n);
 
-    let x_challenge: Fp = Fp::from_literal(345);
-    let H_prime: G1 = step_7(H_is, x_challenge, n);
-
-    let h_prime: Seq<Fp> = step_8(h_is, x_challenge, n);
+    let h_prime: Seq<FpPallas> = step_8(h_is, x_challenge, n);
 
     let (r, fat_a) = step_9(
         r_poly.clone(),
@@ -3750,12 +3773,12 @@ fn example_run() {
         x_challenge,
     );
 
-    let s_is: Seq<Seq<Fp>> = step_10(omega, p.clone(), x_challenge, fat_a.clone());
+    let s_is: Seq<Seq<FpPallas>> = step_10(omega, p.clone(), x_challenge, fat_a.clone());
 
-    let x1_challenge = Fp::from_literal(475);
-    let x2_challenge: Fp = Fp::from_literal(286);
+    let x1_challenge = FpPallas::from_literal(475);
+    let x2_challenge: FpPallas = FpPallas::from_literal(286);
 
-    let (Q_is, _, _): (Seq<G1>, Fp, Fp) = step_11(
+    let (Q_is, _, _): (Seq<G1_vesta>, FpPallas, FpPallas) = step_11(
         n_a as u128,
         x1_challenge,
         x2_challenge,
@@ -3777,7 +3800,7 @@ fn example_run() {
         a_blinds,
     );
 
-    let r_is: Seq<Seq<Fp>> = step_13(
+    let r_is: Seq<Seq<FpPallas>> = step_13(
         n,
         omega,
         x_challenge,
@@ -3790,7 +3813,7 @@ fn example_run() {
         g_prime,
     );
 
-    let step14_blinding: Fp = Fp::from_literal(32);
+    let step14_blinding: FpPallas = FpPallas::from_literal(32);
     let (Q_prime, q_prime, Q_prime_blind) = step_14(
         &crs,
         x2_challenge,
@@ -3802,11 +3825,11 @@ fn example_run() {
         x_challenge,
     );
 
-    let x3_challenge: Fp = step_15(Fp::from_literal(175));
+    let x3_challenge: FpPallas = step_15(FpPallas::from_literal(175));
 
-    let u: Seq<Fp> = step_16(n_q, x3_challenge, q_is.clone());
+    let u: Seq<FpPallas> = step_16(n_q, x3_challenge, q_is.clone());
 
-    let x4_challenge: Fp = step_17(Fp::from_literal(391));
+    let x4_challenge: FpPallas = step_17(FpPallas::from_literal(391));
 
     let (P, v) = step_18(
         x_challenge,
@@ -3825,17 +3848,17 @@ fn example_run() {
 
     let (p_poly, p_blind) = step_19(x4_challenge, q_prime, q_is, q_blinds, Q_prime_blind);
 
-    let step20_blinding: Fp = Fp::from_literal(532);
-    let s_poly_points: Seq<(Fp, Fp)> = Seq::from_vec(vec![
-        (Fp::from_literal(729), Fp::from_literal(23)),
-        (Fp::from_literal(73), Fp::from_literal(102)),
-        (Fp::from_literal(444), Fp::from_literal(484)),
-        (x3_challenge, Fp::ZERO()),
+    let step20_blinding: FpPallas = FpPallas::from_literal(532);
+    let s_poly_points: Seq<(FpPallas, FpPallas)> = Seq::from_vec(vec![
+        (FpPallas::from_literal(729), FpPallas::from_literal(23)),
+        (FpPallas::from_literal(73), FpPallas::from_literal(102)),
+        (FpPallas::from_literal(444), FpPallas::from_literal(484)),
+        (x3_challenge, FpPallas::ZERO()),
     ]);
-    let s_poly: Seq<Fp> = lagrange_poly(s_poly_points);
+    let s_poly: Seq<FpPallas> = lagrange_poly(s_poly_points);
     assert_eq!(
         eval_polyx(s_poly.clone(), x3_challenge),
-        Fp::ZERO(),
+        FpPallas::ZERO(),
         "s(X) should have root at x3"
     );
     assert_eq!(
@@ -3846,9 +3869,9 @@ fn example_run() {
     );
     let (S, s_blind) = step_20(s_poly.clone(), crs, step20_blinding);
 
-    let (xi, z) = step_21(Fp::from_literal(98), Fp::from_literal(8438));
+    let (xi, z) = step_21(FpPallas::from_literal(98), FpPallas::from_literal(8438));
 
-    let P_prime: G1 = step_22(P, G[0], S, v, xi);
+    let P_prime: G1_vesta = step_22(P, G[0], S, v, xi);
 
     assert_eq!(
         eval_polyx(p_poly.clone(), x3_challenge),
@@ -3857,11 +3880,18 @@ fn example_run() {
     );
     let (p_prime_poly, p_prime_blind) = step_23(p_poly, s_poly, x3_challenge, xi, p_blind, s_blind);
 
-    let L_blinding: Seq<Fp> =
-        Seq::<Fp>::from_vec(vec![Fp::from_literal(549), Fp::from_literal(634)]);
-    let R_blinding: Seq<Fp> =
-        Seq::<Fp>::from_vec(vec![Fp::from_literal(827), Fp::from_literal(826)]);
-    let u_challenges: Seq<Fp> = Seq::from_vec(vec![Fp::from_literal(723), Fp::from_literal(9283)]);
+    let L_blinding: Seq<FpPallas> = Seq::<FpPallas>::from_vec(vec![
+        FpPallas::from_literal(549),
+        FpPallas::from_literal(634),
+    ]);
+    let R_blinding: Seq<FpPallas> = Seq::<FpPallas>::from_vec(vec![
+        FpPallas::from_literal(827),
+        FpPallas::from_literal(826),
+    ]);
+    let u_challenges: Seq<FpPallas> = Seq::from_vec(vec![
+        FpPallas::from_literal(723),
+        FpPallas::from_literal(9283),
+    ]);
     let (p_prime, G_prime, b, L, R, L_blinding, R_blinding) = step_24(
         p_prime_poly,
         G,
@@ -3871,6 +3901,322 @@ fn example_run() {
         W,
         n,
         2,
+        u_challenges.clone(),
+        L_blinding,
+        R_blinding,
+    );
+    let (c, f) = step_25(
+        p_prime,
+        L_blinding,
+        R_blinding,
+        p_prime_blind,
+        u_challenges.clone(),
+    );
+
+    let V_accepts = step_26(u_challenges, L, P_prime, R, c, G_prime[0], b[0], z, U, f, W);
+
+    assert!(V_accepts);
+}
+#[cfg(test)]
+#[test]
+fn example_run2() {
+    /*
+     * let n = 2^3 = 8
+     * k = 3
+     * then ω = big is 8 prime root of unity over Fp::Canvas
+     *
+     * | i | a_0 | a_1 | a_2 | q_add |
+     * |---|-----|-----|-----|-------|
+     * | 0 | 2   | 3   | 5   | 1     |
+     * | 1 | 10  |     |     | 0     |
+     * | 2 | 5   | 8   | 13  | 1     |
+     * | 3 | 26  |     |     | 0     |
+     * | 4 | 11  | 0   |  7  | 1     |
+     * | 5 | 18  |     |     |       |
+     * | 6 | 1   | 1   |  1  | 1     |
+     * | 7 | 3   |     |     |       |
+     *
+     *
+     * then, g(X) = q_add(X) * (a_0(X) + a_1(X) + a_2(X) - a_0(ωX))
+     * and g(ω^i) = 0 for all i in [0,n) (should hold)
+     *
+     *
+     * (n_g - 2 = 2 ??? )
+     */
+    let k = 3;
+    let n: u128 = 8;
+    let n_a: usize = 3;
+    let n_q: u128 = 2;
+    let omega: FpPallas =
+        FpPallas::from_hex("ABBF0854924172DE43AC8291F4C7BFE65008B10372D434FA931DF4CE2230320");
+    let G: Seq<G1_vesta> = Seq::<G1_vesta>::from_vec(vec![
+        g1mul_vesta(FpPallas::from_literal(22), g1_generator()),
+        g1mul_vesta(FpPallas::from_literal(7), g1_generator()),
+        g1mul_vesta(FpPallas::from_literal(9), g1_generator()),
+        g1mul_vesta(FpPallas::from_literal(43), g1_generator()),
+        g1mul_vesta(FpPallas::from_literal(42), g1_generator()),
+        g1mul_vesta(FpPallas::from_literal(111), g1_generator()),
+        g1mul_vesta(FpPallas::from_literal(168), g1_generator()),
+        g1mul_vesta(FpPallas::from_literal(984), g1_generator()),
+    ]);
+    let W: G1_vesta = g1mul_vesta(FpPallas::from_literal(123), g1_generator());
+    let crs: CRS = (G.clone(), W);
+    let U: G1_vesta = g1mul_vesta(FpPallas::from_literal(743), g1_generator());
+
+    let r_poly = Seq::<FpPallas>::from_vec(vec![
+        FpPallas::from_literal(987),
+        FpPallas::from_literal(2),
+        FpPallas::from_literal(64),
+        FpPallas::from_literal(355),
+        FpPallas::from_literal(33),
+        FpPallas::from_literal(123),
+        FpPallas::from_literal(5423),
+        FpPallas::from_literal(523),
+    ]);
+    let R_blind: FpPallas = FpPallas::from_literal(78);
+    let R: G1_vesta = commit_polyx(&crs, r_poly.clone(), R_blind);
+
+    let p: Seq<Seq<u128>> = Seq::<Seq<u128>>::from_vec(vec![
+        Seq::<u128>::from_vec(vec![0, 1]),
+        Seq::<u128>::from_vec(vec![0]),
+        Seq::<u128>::from_vec(vec![0]),
+    ]);
+
+    let a0_points: Seq<(FpPallas, FpPallas)> = Seq::<(FpPallas, FpPallas)>::from_vec(vec![
+        (omega.pow(0), FpPallas::from_literal(2)),
+        (omega.pow(1), FpPallas::from_literal(10)),
+        (omega.pow(2), FpPallas::from_literal(5)),
+        (omega.pow(3), FpPallas::from_literal(26)),
+        (omega.pow(4), FpPallas::from_literal(11)),
+        (omega.pow(5), FpPallas::from_literal(18)),
+        (omega.pow(6), FpPallas::from_literal(1)),
+        (omega.pow(7), FpPallas::from_literal(3)),
+    ]);
+
+    let a1_points: Seq<(FpPallas, FpPallas)> = Seq::<(FpPallas, FpPallas)>::from_vec(vec![
+        (omega.pow(0), FpPallas::from_literal(3)),
+        (omega.pow(1), FpPallas::from_literal(0)),
+        (omega.pow(2), FpPallas::from_literal(8)),
+        (omega.pow(3), FpPallas::from_literal(0)),
+        (omega.pow(4), FpPallas::from_literal(0)),
+        (omega.pow(5), FpPallas::from_literal(0)),
+        (omega.pow(6), FpPallas::from_literal(1)),
+        (omega.pow(7), FpPallas::from_literal(0)),
+    ]);
+
+    let a2_points: Seq<(FpPallas, FpPallas)> = Seq::<(FpPallas, FpPallas)>::from_vec(vec![
+        (omega.pow(0), FpPallas::from_literal(5)),
+        (omega.pow(1), FpPallas::from_literal(0)),
+        (omega.pow(2), FpPallas::from_literal(13)),
+        (omega.pow(3), FpPallas::from_literal(0)),
+        (omega.pow(4), FpPallas::from_literal(7)),
+        (omega.pow(5), FpPallas::from_literal(0)),
+        (omega.pow(6), FpPallas::from_literal(1)),
+        (omega.pow(7), FpPallas::from_literal(0)),
+    ]);
+
+    let q_add_points: Seq<(FpPallas, FpPallas)> = Seq::<(FpPallas, FpPallas)>::from_vec(vec![
+        (omega.pow(0), FpPallas::from_literal(1)),
+        (omega.pow(1), FpPallas::from_literal(0)),
+        (omega.pow(2), FpPallas::from_literal(1)),
+        (omega.pow(3), FpPallas::from_literal(0)),
+        (omega.pow(4), FpPallas::from_literal(1)),
+        (omega.pow(5), FpPallas::from_literal(0)),
+        (omega.pow(6), FpPallas::from_literal(1)),
+        (omega.pow(7), FpPallas::from_literal(0)),
+    ]);
+
+    let a_0: Seq<FpPallas> = lagrange_poly(a0_points);
+    let a_1: Seq<FpPallas> = lagrange_poly(a1_points);
+    let a_2: Seq<FpPallas> = lagrange_poly(a2_points);
+    let a_primes: Seq<Seq<FpPallas>> =
+        Seq::<Seq<FpPallas>>::from_vec(vec![a_0.clone(), a_1.clone(), a_2.clone()]);
+    let q_add: Seq<FpPallas> = lagrange_poly(q_add_points);
+
+    // construct A_i's (commitments)
+    let A_0_blinding: FpPallas = FpPallas::from_literal(99);
+    let A_0: G1_vesta = commit_polyx(&crs, a_0.clone(), A_0_blinding);
+    let A_1_blinding: FpPallas = FpPallas::from_literal(123);
+    let A_1: G1_vesta = commit_polyx(&crs, a_1.clone(), A_1_blinding);
+    let A_2_blinding: FpPallas = FpPallas::from_literal(748);
+    let A_2: G1_vesta = commit_polyx(&crs, a_2.clone(), A_2_blinding);
+    let A_list: Seq<G1_vesta> = Seq::<G1_vesta>::from_vec(vec![A_0, A_1, A_2]);
+    // save a_blinds
+    let a_blinds = Seq::from_vec(vec![A_0_blinding, A_1_blinding, A_2_blinding]);
+
+    // construct g'(X) = q_add(X) * (a_0(X)+a_1(X)+a_2(X)-a_0(omega * X))
+    let mut g_prime: Seq<FpPallas> = add_polyx(a_0.clone(), a_1.clone());
+    g_prime = add_polyx(g_prime, a_2.clone());
+    let a_0_rotated: Seq<FpPallas> = rotate_polyx(a_0.clone(), omega);
+    g_prime = sub_polyx(g_prime, a_0_rotated);
+    g_prime = mul_polyx(g_prime, q_add);
+    for i in 0..8 {
+        assert_eq!(eval_polyx(g_prime.clone(), omega.pow(i)), FpPallas::ZERO());
+    }
+
+    let q: Seq<Seq<u128>> =
+        Seq::<Seq<u128>>::from_vec(vec![Seq::from_vec(vec![0]), Seq::from_vec(vec![0, 1])]);
+    let sigma_list: Seq<u128> = Seq::<u128>::from_vec(vec![1, 0, 0]);
+
+    let h: Seq<FpPallas> = step_4(g_prime.clone(), omega, n);
+
+    let h_is: Seq<Seq<FpPallas>> = step_5(h.clone(), n, 4);
+
+    let h_blindings: Seq<FpPallas> = Seq::<FpPallas>::from_vec(vec![
+        FpPallas::from_literal(5),
+        FpPallas::from_literal(76),
+        FpPallas::from_literal(726),
+    ]);
+    let H_is: Seq<G1_vesta> = step_6(h_is.clone(), &crs, h_blindings);
+
+    let x_challenge: FpPallas = FpPallas::from_literal(345);
+    let H_prime: G1_vesta = step_7(H_is, x_challenge, n);
+
+    let h_prime: Seq<FpPallas> = step_8(h_is, x_challenge, n);
+
+    let (r, fat_a) = step_9(
+        r_poly.clone(),
+        a_primes.clone(),
+        omega,
+        p.clone(),
+        x_challenge,
+    );
+
+    let s_is: Seq<Seq<FpPallas>> = step_10(omega, p.clone(), x_challenge, fat_a.clone());
+
+    let x1_challenge = FpPallas::from_literal(475);
+    let x2_challenge: FpPallas = FpPallas::from_literal(286);
+
+    let (Q_is, _, _): (Seq<G1_vesta>, FpPallas, FpPallas) = step_11(
+        n_a as u128,
+        x1_challenge,
+        x2_challenge,
+        H_prime,
+        R,
+        A_list,
+        q.clone(),
+        sigma_list.clone(),
+    );
+
+    let (q_is, q_blinds) = step_12(
+        n_a as u128,
+        x1_challenge,
+        h_prime,
+        r_poly,
+        a_primes.clone(),
+        q.clone(),
+        sigma_list.clone(),
+        a_blinds,
+    );
+
+    let r_is: Seq<Seq<FpPallas>> = step_13(
+        n,
+        omega,
+        x_challenge,
+        x1_challenge,
+        r,
+        s_is,
+        q.clone(),
+        sigma_list.clone(),
+        fat_a,
+        g_prime,
+    );
+
+    let step14_blinding: FpPallas = FpPallas::from_literal(32);
+    let (Q_prime, q_prime, Q_prime_blind) = step_14(
+        &crs,
+        x2_challenge,
+        q_is.clone(),
+        r_is.clone(),
+        q.clone(),
+        step14_blinding,
+        omega,
+        x_challenge,
+    );
+
+    let x3_challenge: FpPallas = step_15(FpPallas::from_literal(175));
+
+    let u: Seq<FpPallas> = step_16(n_q, x3_challenge, q_is.clone());
+
+    let x4_challenge: FpPallas = step_17(FpPallas::from_literal(391));
+
+    let (P, v) = step_18(
+        x_challenge,
+        x1_challenge,
+        x2_challenge,
+        x3_challenge,
+        x4_challenge,
+        omega,
+        Q_prime,
+        Q_is,
+        u.clone(),
+        r_is,
+        q,
+    );
+    let u = 123;
+
+    let (p_poly, p_blind) = step_19(x4_challenge, q_prime, q_is, q_blinds, Q_prime_blind);
+
+    let step20_blinding: FpPallas = FpPallas::from_literal(532);
+    let s_poly_points: Seq<(FpPallas, FpPallas)> = Seq::from_vec(vec![
+        (FpPallas::from_literal(729), FpPallas::from_literal(23)),
+        (FpPallas::from_literal(73), FpPallas::from_literal(102)),
+        (FpPallas::from_literal(444), FpPallas::from_literal(484)),
+        (FpPallas::from_literal(712329), FpPallas::from_literal(231)),
+        (FpPallas::from_literal(7333), FpPallas::from_literal(1022)),
+        (FpPallas::from_literal(44124), FpPallas::from_literal(4834)),
+        (FpPallas::from_literal(2), FpPallas::from_literal(4)),
+        (x3_challenge, FpPallas::ZERO()),
+    ]);
+    let s_poly: Seq<FpPallas> = lagrange_poly(s_poly_points);
+    assert_eq!(
+        eval_polyx(s_poly.clone(), x3_challenge),
+        FpPallas::ZERO(),
+        "s(X) should have root at x3"
+    );
+    assert_eq!(
+        poly_degree(s_poly.clone()),
+        n - 1,
+        "s(X) should have degree n-1: {}",
+        n - 1
+    );
+    let (S, s_blind) = step_20(s_poly.clone(), crs, step20_blinding);
+
+    let (xi, z) = step_21(FpPallas::from_literal(98), FpPallas::from_literal(8438));
+
+    let P_prime: G1_vesta = step_22(P, G[0], S, v, xi);
+
+    assert_eq!(
+        eval_polyx(p_poly.clone(), x3_challenge),
+        v,
+        "p(x3) should correspond with v"
+    );
+    let (p_prime_poly, p_prime_blind) = step_23(p_poly, s_poly, x3_challenge, xi, p_blind, s_blind);
+
+    let L_blinding: Seq<FpPallas> = Seq::<FpPallas>::from_vec(vec![
+        FpPallas::from_literal(549),
+        FpPallas::from_literal(634),
+        FpPallas::from_literal(63454),
+    ]);
+    let R_blinding: Seq<FpPallas> = Seq::<FpPallas>::from_vec(vec![
+        FpPallas::from_literal(827),
+        FpPallas::from_literal(826),
+        FpPallas::from_literal(6),
+    ]);
+    let u_challenges: Seq<FpPallas> = Seq::from_vec(vec![
+        FpPallas::from_literal(723),
+        FpPallas::from_literal(9283),
+        FpPallas::from_literal(13548),
+    ]);
+    let (p_prime, G_prime, b, L, R, L_blinding, R_blinding) = step_24(
+        p_prime_poly,
+        G,
+        x3_challenge,
+        z,
+        U,
+        W,
+        n,
+        3,
         u_challenges.clone(),
         L_blinding,
         R_blinding,
@@ -3924,15 +4270,20 @@ fn example_run() {
 #[test]
 fn test_primitive_root_of_unity() {
     // https://crypto.stackexchange.com/questions/63614/finding-the-n-th-root-of-unity-in-a-finite-field
-    let n = 4;
-    let mut x = Fp::TWO();
+    let n = 16;
+    let mut x = FpPallas::TWO();
+    let mut g: FpPallas = FpPallas::ZERO();
     loop {
-        let g = x.pow_self(Fp::max_val() / Fp::from_literal(n));
-        if g.pow(n / 2) != Fp::ONE() {
+        g = x.pow_self(FpPallas::max_val() / FpPallas::from_literal(n));
+        if g.pow(n / 2) != FpPallas::ONE() {
             break;
         }
         let r: u128 = rand::Rng::gen(&mut rand::thread_rng());
-        x = x * Fp::from_literal(r);
+        x = x * FpPallas::from_literal(r);
+    }
+    println!("{:?}", g);
+    for i in 0..n * 2 {
+        println!("{:?}", g.pow(i))
     }
     // n = 8, k = 3
     // ABBF0854924172DE43AC8291F4C7BFE65008B10372D434FA931DF4CE2230320
@@ -3941,4 +4292,8 @@ fn test_primitive_root_of_unity() {
     // n = 4, k = 2
     // 96E31EEA5205EE7829A559CEC3CAB14D83233F67234D59A2F17C7C5B54146EA
     // 4265513433803163958251475299683560813532603332905934989976535652412227143402
+
+    //n = 16, k = 4
+    // 1E84C131C00EF5E0BECC724167EC7CDB46D8FD71AA4EA57330B5A6CF7040A65A
+    //13803942648357170028780649679183673168585732045000043587712121170790388377178
 }
