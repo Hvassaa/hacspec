@@ -718,7 +718,7 @@ fn step_4(g_prime: Seq<Fp>, omega: Fp, n: u128) -> Seq<Fp> {
 /// * `n_g` - splits into n_g-2 new polynomials
 fn step_5(h: Seq<Fp>, n: u128, n_g: u128) -> Seq<Seq<Fp>> {
     let h: Seq<Fp> = trim_poly(h);
-    let no_of_parts: usize = (n_g - 2) as usize;
+    let no_of_parts: usize = (n_g - 1) as usize;
     let n: usize = n as usize;
 
     let mut original_index: usize = 0;
@@ -3719,16 +3719,6 @@ fn example_run() {
     println!("{:?}", h);
     println!("h_is:");
     println!("{:?}", h_is);
-    let h_is: Seq<Seq<Fp>> = Seq::<Seq<Fp>>::from_vec(vec![
-        Seq::from_vec(vec![
-            Fp::from_hex("28000000000000000000000000000000156C1F9D85FCE98A77AC52F49FFFFFFD"),
-            Fp::from_hex("199A496937D31E9A29D174AB4EEFE9AE983DB753B7F20357F95CB5E33184F795"),
-            Fp::ZERO(),
-            Fp::ZERO(),
-        ]),
-        Seq::from_vec(vec![Fp::ZERO(), Fp::ZERO(), Fp::ZERO(), Fp::ZERO()]),
-        Seq::from_vec(vec![Fp::ZERO(), Fp::ZERO(), Fp::ZERO(), Fp::ZERO()]),
-    ]);
 
     let h_blindings: Seq<Fp> = Seq::<Fp>::from_vec(vec![
         Fp::from_literal(5),
