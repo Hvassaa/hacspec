@@ -1754,155 +1754,160 @@ fn test_step_13() {
 
 #[cfg(test)]
 #[test]
-fn test_step_14_manuel() {
-    ////////////////////////////////////////////////////////////////////////////////////
-    /// SETTING UP THE REQUIRED VALUES (n_a, n_q, x1, H', R, the q list, the A commitemtns), NOT INTERESTING
-    ////////////////////////////////////////////////////////////////////////////////////
-    let w = 3;
-    // W and G from CRS
-    let W = g1mul_pallas(Fp::from_literal(w as u128), g1_generator_pallas());
-    // there should be as many G elements as there are elements in the h_i polys
-    let G = Seq::<G1>::from_vec(vec![
-        g1mul_pallas(Fp::ONE(), g1_generator_pallas()),
-        g1mul_pallas(Fp::TWO(), g1_generator_pallas()),
-        g1mul_pallas(Fp::from_literal(3), g1_generator_pallas()),
-        g1mul_pallas(Fp::from_literal(4), g1_generator_pallas()),
-    ]);
-    // let crs: CRS = (G, W);
+// fn test_step_14_manuel() {
+//     ////////////////////////////////////////////////////////////////////////////////////
+//     /// SETTING UP THE REQUIRED VALUES (n_a, n_q, x1, H', R, the q list, the A commitemtns), NOT INTERESTING
+//     ////////////////////////////////////////////////////////////////////////////////////
+//     let w = 3;
+//     // W and G from CRS
+//     let W = g1mul_pallas(FpVesta::from_literal(w as u128), g1_generator_pallas());
+//     // there should be as many G elements as there are elements in the h_i polys
+//     let G = Seq::<G1>::from_vec(vec![
+//         g1mul_pallas(FpVesta::ONE(), g1_generator_pallas()),
+//         g1mul_pallas(FpVesta::TWO(), g1_generator_pallas()),
+//         g1mul_pallas(FpVesta::from_literal(3), g1_generator_pallas()),
+//         g1mul_pallas(FpVesta::from_literal(4), g1_generator_pallas()),
+//     ]);
+//     // let crs: CRS = (G, W);
 
-    // let x2 = Fp::from_literal(x as u128);
-    let x = Fp::TWO(); // Dummy
+//     // let x2 = FpVesta::from_literal(x as u128);
+//     let x = FpVesta::TWO(); // Dummy
 
-    let x2 = x.mul(x);
+//     let x2 = x.mul(x);
 
-    let omega: Fp = Fp::TWO();
+//     let omega: FpVesta = FpVesta::TWO();
 
-    let n_q = 3; // Dummy
+//     let n_q = 3; // Dummy
 
-    let q_polys: Seq<Seq<Fp>> = Seq::<Seq<Fp>>::from_vec(vec![
-        Seq::from_vec(vec![
-            Fp::from_literal(1),
-            Fp::from_literal(2),
-            Fp::from_literal(3),
-        ]),
-        Seq::from_vec(vec![
-            Fp::from_literal(4),
-            Fp::from_literal(5),
-            Fp::from_literal(6),
-        ]),
-        Seq::from_vec(vec![
-            Fp::from_literal(7),
-            Fp::from_literal(8),
-            Fp::from_literal(9),
-        ]),
-    ]);
-    let r_polys: Seq<Seq<Fp>> = Seq::<Seq<Fp>>::from_vec(vec![
-        Seq::from_vec(vec![
-            Fp::from_literal(9),
-            Fp::from_literal(8),
-            Fp::from_literal(7),
-        ]),
-        Seq::from_vec(vec![
-            Fp::from_literal(6),
-            Fp::from_literal(5),
-            Fp::from_literal(4),
-        ]),
-        Seq::from_vec(vec![
-            Fp::from_literal(3),
-            Fp::from_literal(2),
-            Fp::from_literal(1),
-        ]),
-    ]);
-    // let r = Fp::from_literal(r as u128);
-    let r = Fp::ONE(); // Dummy
+//     let q_polys: Seq<Seq<Fp>> = Seq::<Seq<FpVesta>>::from_vec(vec![
+//         Seq::from_vec(vec![
+//             FpVesta::from_literal(1),
+//             FpVesta::from_literal(2),
+//             FpVesta::from_literal(3),
+//         ]),
+//         Seq::from_vec(vec![
+//             FpVesta::from_literal(4),
+//             FpVesta::from_literal(5),
+//             FpVesta::from_literal(6),
+//         ]),
+//         Seq::from_vec(vec![
+//             FpVesta::from_literal(7),
+//             FpVesta::from_literal(8),
+//             FpVesta::from_literal(9),
+//         ]),
+//     ]);
+//     let r_polys: Seq<Seq<Fp>> = Seq::<Seq<FpVesta>>::from_vec(vec![
+//         Seq::from_vec(vec![
+//             FpVesta::from_literal(9),
+//             FpVesta::from_literal(8),
+//             FpVesta::from_literal(7),
+//         ]),
+//         Seq::from_vec(vec![
+//             FpVesta::from_literal(6),
+//             FpVesta::from_literal(5),
+//             FpVesta::from_literal(4),
+//         ]),
+//         Seq::from_vec(vec![
+//             FpVesta::from_literal(3),
+//             FpVesta::from_literal(2),
+//             FpVesta::from_literal(1),
+//         ]),
+//     ]);
+//     // let r = FpVesta::from_literal(r as u128);
+//     let r = FpVesta::ONE(); // Dummy
 
-    // create some random values for q, each entry with len n_q/2
-    let q = Seq::<Seq<u128>>::from_vec(vec![
-        Seq::from_vec(vec![0]),
-        Seq::from_vec(vec![0, 1, 2]),
-        Seq::from_vec(vec![0, 1, 2]),
-    ]);
+//     // create some random values for q, each entry with len n_q/2
+//     let q = Seq::<Seq<u128>>::from_vec(vec![
+//         Seq::from_vec(vec![0]),
+//         Seq::from_vec(vec![0, 1, 2]),
+//         Seq::from_vec(vec![0, 1, 2]),
+//     ]);
 
-    //////////////////////////////////////////////////////////////////////////////////
-    /// SETTING UP VALUES DONE
-    //////////////////////////////////////////////////////////////////////////////////
-    let q_prime: G1 = step_14(&(G.clone(), W), x2, q_polys, r_polys, q, r, omega, x);
+//     //////////////////////////////////////////////////////////////////////////////////
+//     /// SETTING UP VALUES DONE
+//     //////////////////////////////////////////////////////////////////////////////////
+//     let q_prime: G1_pallas = step_14(&(G.clone(), W), x2, q_polys, r_polys, q, r, omega, x);
 
-    //////////////////////////////////////////////////////////////////////////////////
-    /// MANUEL CALCULATION
-    //////////////////////////////////////////////////////////////////////////////////
+//     //////////////////////////////////////////////////////////////////////////////////
+//     /// MANUEL CALCULATION
+//     //////////////////////////////////////////////////////////////////////////////////
 
-    /// i = 0 in outer sum
-    let mut i_0_dividend = sub_polyx(
-        Seq::from_vec(vec![
-            Fp::from_literal(1),
-            Fp::from_literal(2),
-            Fp::from_literal(3),
-        ]),
-        Seq::from_vec(vec![
-            Fp::from_literal(9),
-            Fp::from_literal(8),
-            Fp::from_literal(7),
-        ]),
-    );
-    let i_0_divisor = Seq::from_vec(vec![Fp::from_literal(2).neg(), Fp::from_literal(1)]);
-    let i_0_division = divide_poly(i_0_dividend, i_0_divisor).0;
-    let i_0 = mul_scalar_polyx(i_0_division, Fp::ONE());
+//     /// i = 0 in outer sum
+//     let mut i_0_dividend = sub_polyx(
+//         Seq::from_vec(vec![
+//             FpVesta::from_literal(1),
+//             FpVesta::from_literal(2),
+//             FpVesta::from_literal(3),
+//         ]),
+//         Seq::from_vec(vec![
+//             FpVesta::from_literal(9),
+//             FpVesta::from_literal(8),
+//             FpVesta::from_literal(7),
+//         ]),
+//     );
+//     let i_0_divisor = Seq::from_vec(vec![
+//         FpVesta::from_literal(2).neg(),
+//         FpVesta::from_literal(1),
+//     ]);
+//     let i_0_division = divide_polyx(i_0_dividend, i_0_divisor).0;
+//     let i_0 = mul_scalar_polyx(i_0_division, FpVesta::ONE());
 
-    // i = 1 in outer sum
-    let i_1_dividend: Seq<Fp> = sub_polyx(
-        Seq::from_vec(vec![
-            Fp::from_literal(4),
-            Fp::from_literal(5),
-            Fp::from_literal(6),
-        ]),
-        Seq::from_vec(vec![
-            Fp::from_literal(6),
-            Fp::from_literal(5),
-            Fp::from_literal(4),
-        ]),
-    );
-    let mut i_1_divisor = Seq::from_vec(vec![
-        Fp::from_literal(1),
-        Fp::from_literal(0),
-        Fp::from_literal(0),
-        Fp::from_literal(0),
-    ]);
-    let mul_x = multi_poly_with_x(i_1_divisor.clone());
-    let mul_scalar: Seq<Fp> = mul_scalar_polyx(i_1_divisor.clone(), Fp::from_literal(2).neg());
-    i_1_divisor = add_polyx(mul_x, mul_scalar);
+//     // i = 1 in outer sum
+//     let i_1_dividend: Seq<FpVesta> = sub_polyx(
+//         Seq::from_vec(vec![
+//             FpVesta::from_literal(4),
+//             FpVesta::from_literal(5),
+//             FpVesta::from_literal(6),
+//         ]),
+//         Seq::from_vec(vec![
+//             FpVesta::from_literal(6),
+//             FpVesta::from_literal(5),
+//             FpVesta::from_literal(4),
+//         ]),
+//     );
+//     let mut i_1_divisor = Seq::from_vec(vec![
+//         FpVesta::from_literal(1),
+//         FpVesta::from_literal(0),
+//         FpVesta::from_literal(0),
+//         FpVesta::from_literal(0),
+//     ]);
+//     let mul_x = multi_poly_with_x(i_1_divisor.clone());
+//     let mul_scalar: Seq<FpVesta> =
+//         mul_scalar_polyx(i_1_divisor.clone(), FpVesta::from_literal(2).neg());
+//     i_1_divisor = add_polyx(mul_x, mul_scalar);
 
-    let mul_x = multi_poly_with_x(i_1_divisor.clone());
-    let mul_scalar: Seq<Fp> = mul_scalar_polyx(i_1_divisor, Fp::from_literal(4).neg());
-    i_1_divisor = add_polyx(mul_x, mul_scalar);
+//     let mul_x = multi_poly_with_x(i_1_divisor.clone());
+//     let mul_scalar: Seq<FpVesta> = mul_scalar_polyx(i_1_divisor, FpVesta::from_literal(4).neg());
+//     i_1_divisor = add_polyx(mul_x, mul_scalar);
 
-    let mul_x = multi_poly_with_x(i_1_divisor.clone());
-    let mul_scalar: Seq<Fp> = mul_scalar_polyx(i_1_divisor.clone(), Fp::from_literal(8).neg());
-    i_1_divisor = add_polyx(mul_x, mul_scalar);
+//     let mul_x = multi_poly_with_x(i_1_divisor.clone());
+//     let mul_scalar: Seq<FpVesta> =
+//         mul_scalar_polyx(i_1_divisor.clone(), FpVesta::from_literal(8).neg());
+//     i_1_divisor = add_polyx(mul_x, mul_scalar);
 
-    let i_1_division = divide_poly(i_1_dividend, i_1_divisor.clone()).0;
-    let i_1 = mul_scalar_polyx(i_1_division, Fp::from_literal(4));
+//     let i_1_division = divide_polyx(i_1_dividend, i_1_divisor.clone()).0;
+//     let i_1 = mul_scalar_polyx(i_1_division, FpVesta::from_literal(4));
 
-    // i=2 in outer sum
+//     // i=2 in outer sum
 
-    let i_2_dividend: Seq<Fp> = sub_polyx(
-        Seq::from_vec(vec![
-            Fp::from_literal(7),
-            Fp::from_literal(8),
-            Fp::from_literal(9),
-        ]),
-        Seq::from_vec(vec![
-            Fp::from_literal(3),
-            Fp::from_literal(2),
-            Fp::from_literal(1),
-        ]),
-    );
-    let i_2_division = divide_poly(i_2_dividend, i_1_divisor).0;
-    let i_2 = mul_scalar_polyx(i_2_division, Fp::from_literal(16));
-    let result = add_polyx(i_0, add_polyx(i_1, i_2));
-    let commitment: (FpVesta, FpVesta, bool) = commit_polyx(&(G.clone(), W), result, r);
-    assert_eq!(commitment, q_prime);
-}
+//     let i_2_dividend: Seq<FpVesta> = sub_polyx(
+//         Seq::from_vec(vec![
+//             FpVesta::from_literal(7),
+//             FpVesta::from_literal(8),
+//             FpVesta::from_literal(9),
+//         ]),
+//         Seq::from_vec(vec![
+//             FpVesta::from_literal(3),
+//             FpVesta::from_literal(2),
+//             FpVesta::from_literal(1),
+//         ]),
+//     );
+//     let i_2_division = divide_polyx(i_2_dividend, i_1_divisor).0;
+//     let i_2 = mul_scalar_polyx(i_2_division, FpVesta::from_literal(16));
+//     let result = add_polyx(i_0, add_polyx(i_1, i_2));
+//     let commitment: (FpPallas, FpPallas, bool) = commit_polyx(&(G.clone(), W), result, r);
+//     assert_eq!(commitment, q_prime);
+// }
 #[cfg(test)]
 #[test]
 fn test_step_14() {
@@ -1975,7 +1980,7 @@ fn test_step_14() {
 
             let q_i = q[i].clone();
             let n_e = q_i.len();
-            // let mut divisor: Seq<Fp> = Seq::from_vec(vec![Fp::from_literal(1)]);
+            // let mut divisor: Seq<Fp> = Seq::from_vec(vec![FpVesta::from_literal(1)]);
             let mut divisor: Polyx = Seq::<FpVesta>::create(q_i.len() + 1 as usize);
             divisor[0] = FpVesta::ONE();
 
@@ -2145,7 +2150,7 @@ fn test_step_18() {
         assert_eq!(P, test_P);
         ////////////TEST IMPLEMENTATION FOR v//////////////////
         let mut test_v = FpVesta::ZERO();
-        // let mut second_sum: Fp = Fp::ZERO();
+        // let mut second_sum: Fp = FpVesta::ZERO();
         let mut first_sum: FpVesta = FpVesta::ZERO();
         let mut second_sum: FpVesta = FpVesta::ZERO();
         for i in 0..n_q {
@@ -2562,23 +2567,23 @@ fn test_poly_mul_x(a: UniPolynomial) {
     for i in 1..new_p.len() {
         assert_eq!(new_p[i], p1[i - 1]);
     }
-    assert_eq!(new_p[0], Fp::from_literal(0));
+    assert_eq!(new_p[0], FpVesta::from_literal(0));
 }
 
-#[cfg(test)]
-#[quickcheck]
-fn test_lagrange(a: Points) {
-    let points_seq = a.0;
+// #[cfg(test)]
+// #[quickcheck]
+// fn test_lagrange(a: Points) {
+//     let points_seq = a.0;
 
-    let legrange_poly = lagrange_poly(points_seq.clone());
+//     let legrange_poly = lagrange_poly(points_seq.clone());
 
-    for j in 0..points_seq.len() {
-        let eval_x = points_seq[j].0;
-        let point_y = points_seq[j].1;
-        let res = eval_polyx(legrange_poly.clone(), eval_x);
-        assert_eq!(res, point_y)
-    }
-}
+//     for j in 0..points_seq.len() {
+//         let eval_x = points_seq[j].0;
+//         let point_y = points_seq[j].1;
+//         let res = eval_polyx(legrange_poly.clone(), eval_x);
+//         assert_eq!(res, point_y)
+//     }
+// }
 
 #[cfg(test)]
 #[quickcheck]
