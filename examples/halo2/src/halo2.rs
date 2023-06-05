@@ -1364,36 +1364,6 @@ fn test_step_5_6_7_8() {
     );
 }
 
-// hardcoded test, results calculated on the "blackboard"
-// #[cfg(test)]
-// #[test]
-// fn test_step_11_manual() {
-//     let n_q = 3;
-//     let n_a = 3;
-//     let x1 = Fp::TWO();
-//     let H_prime = g1mul_pallas(Fp::TWO(), g1_generator_pallas());
-//     let R = g1_generator_pallas();
-//     let a = Seq::<G1>::from_vec(vec![
-//         g1mul_pallas(Fp::from_literal(2), g1_generator_pallas()),
-//         g1mul_pallas(Fp::from_literal(3), g1_generator_pallas()),
-//         g1mul_pallas(Fp::from_literal(4), g1_generator_pallas()),
-//     ]);
-//     let q = Seq::<Seq<u128>>::from_vec(vec![
-//         (Seq::<u128>::from_vec(vec![0])),
-//         (Seq::<u128>::from_vec(vec![1, 2, 0])),
-//         (Seq::<u128>::from_vec(vec![2, 0, 2])),
-//     ]);
-//     let Q_s = step_11(n_a, x1, H_prime, R, a, q);
-
-//     // testing BULLET 1
-//     // Q_i = [x1]Q_i + A_j, for every time i is in some sigma(j)
-//     assert_eq!(g1mul_pallas(Fp::from_literal(3), g1_generator_pallas()), Q_s[1]);
-//     assert_eq!(g1mul_pallas(Fp::from_literal(24), g1_generator_pallas()), Q_s[2]);
-
-//     // testing BULLET 2
-//     assert_eq!(g1mul_pallas(Fp::from_literal(77), g1_generator_pallas()), Q_s[0]);
-// }
-
 #[cfg(test)]
 #[test]
 fn test_step_11() {
@@ -2088,158 +2058,6 @@ fn test_step_16() {
         .quickcheck(a as fn(x3: u8, q_polys: SeqOfUniPoly) -> bool);
 }
 
-// #[cfg(test)]
-// #[test]
-// fn test_step_18_manuel() {
-//     let x: Fp = Fp::from_literal(83729);
-//     let x1: Fp = Fp::from_literal(1209837);
-//     let x2: Fp = Fp::from_literal(5423890);
-//     let x3: Fp = Fp::from_literal(2);
-//     let x4: Fp = Fp::from_literal(2340938);
-//     let omega: Fp = Fp::from_literal(929392);
-//     let Q_prime: G1 = g1mul_pallas(Fp::from_literal(123231), g1_generator_pallas());
-//     let Q: Seq<G1> = Seq::<G1>::from_vec(vec![
-//         g1mul_pallas(Fp::from_literal(2), g1_generator_pallas()),
-//         g1mul_pallas(Fp::from_literal(3), g1_generator_pallas()),
-//         g1mul_pallas(Fp::from_literal(4), g1_generator_pallas()),
-//     ]);
-//     let q: Seq<Seq<u128>> = Seq::<Seq<u128>>::from_vec(vec![
-//         (Seq::<u128>::from_vec(vec![0])),
-//         (Seq::<u128>::from_vec(vec![1, 2, 0])),
-//         (Seq::<u128>::from_vec(vec![2, 0, 2])),
-//     ]);
-//     let u: Seq<Fp> = Seq::<Fp>::from_vec(vec![
-//         Fp::from_literal(2123),
-//         Fp::from_literal(0),
-//         Fp::from_literal(2),
-//     ]);
-//     let r: Seq<Seq<Fp>> = Seq::<Seq<Fp>>::from_vec(vec![
-//         (Seq::<Fp>::from_vec(vec![
-//             Fp::from_literal(123),
-//             Fp::from_literal(4322),
-//             Fp::from_literal(99283),
-//         ])),
-//         (Seq::<Fp>::from_vec(vec![
-//             Fp::from_literal(2839),
-//             Fp::from_literal(2123),
-//             Fp::from_literal(0),
-//         ])),
-//         (Seq::<Fp>::from_vec(vec![
-//             Fp::from_literal(1919919191),
-//             Fp::from_literal(0),
-//             Fp::from_literal(11183),
-//         ])),
-//     ]);
-
-//     let P_sum_0: (FpVesta, FpVesta, bool) = Q[0];
-//     let P_sum_1: (FpVesta, FpVesta, bool) = g1mul_pallas(x4, Q[1]);
-//     let P_sum_2: (FpVesta, FpVesta, bool) = g1mul_pallas(x4.pow(2), Q[2]);
-//     let P_sum: (FpVesta, FpVesta, bool) = g1add_pallas(g1add_pallas(P_sum_0, P_sum_1), P_sum_2);
-//     let P_test: (FpVesta, FpVesta, bool) = g1add_pallas(g1mul_pallas(x4, P_sum), Q_prime);
-//     let (P, v) = step_18(
-//         x,
-//         x1,
-//         x2,
-//         x3,
-//         x4,
-//         omega,
-//         Q_prime,
-//         Q,
-//         u.clone(),
-//         r.clone(),
-//         q,
-//     );
-//     assert_eq!(P_test, P);
-//     //Calculate v
-//     let r_clone: Seq<Seq<Fp>> = r.clone();
-//     let first_sum_0_dividend = u[0]
-//         - eval_polyx(
-//             Seq::<Fp>::from_vec(vec![
-//                 Fp::from_literal(123),
-//                 Fp::from_literal(4322),
-//                 Fp::from_literal(99283),
-//             ]),
-//             x3,
-//         );
-//     let mut first_sum_0_divisor: Fp = x3 - x;
-//     let first_sum_0: Fp = first_sum_0_dividend / first_sum_0_divisor;
-
-// let P_sum_0: (FpVesta, FpVesta, bool) = g1mul_pallas(x4.pow(2), Q[0]);
-// let P_sum_1: (FpVesta, FpVesta, bool) = g1mul_pallas(x4.pow(1), Q[1]);
-// let P_sum_2: (FpVesta, FpVesta, bool) = g1mul_pallas(x4.pow(0), Q[2]);
-// let P_sum: (FpVesta, FpVesta, bool) = g1add_pallas(g1add_pallas(P_sum_0, P_sum_1), P_sum_2);
-// let P_test: (FpVesta, FpVesta, bool) = g1add_pallas(g1mul_pallas(x4.pow(3), Q_prime), P_sum);
-// let (P, v) = step_18(
-//     x,
-//     x1,
-//     x2,
-//     x3,
-//     x4,
-//     omega,
-//     Q_prime,
-//     Q,
-//     u.clone(),
-//     r.clone(),
-//     q,
-// );
-// assert_eq!(P_test, P);
-// //Calculate v
-// let r_clone: Seq<Seq<Fp>> = r.clone();
-// let first_sum_0_dividend = u[0]
-//     - eval_polyx(
-//         Seq::<Fp>::from_vec(vec![
-//             Fp::from_literal(123),
-//             Fp::from_literal(4322),
-//             Fp::from_literal(99283),
-//         ]),
-//         x3,
-//     );
-// let mut first_sum_0_divisor: Fp = x3 - x;
-// let first_sum_0: Fp = first_sum_0_dividend / first_sum_0_divisor;
-
-//     let first_sum_1_dividend = u[1]
-//         - eval_polyx(
-//             Seq::<Fp>::from_vec(vec![
-//                 Fp::from_literal(2839),
-//                 Fp::from_literal(2123),
-//                 Fp::from_literal(0),
-//             ]),
-//             x3,
-//         );
-
-//     let mut first_sum_1_divisor: Fp = x3 - (omega * x);
-//     first_sum_1_divisor = first_sum_1_divisor * (x3 - (omega.pow(2) * x));
-//     first_sum_1_divisor = first_sum_1_divisor * (x3 - x);
-//     let first_sum_1: Fp = x2 * (first_sum_1_dividend / first_sum_1_divisor);
-
-//     let first_sum_2_dividend = u[2]
-//         - eval_polyx(
-//             Seq::<Fp>::from_vec(vec![
-//                 Fp::from_literal(1919919191),
-//                 Fp::from_literal(0),
-//                 Fp::from_literal(11183),
-//             ]),
-//             x3,
-//         );
-
-//     let mut first_sum_2_divisor: Fp = (x3 - (omega.pow(2) * x));
-//     first_sum_2_divisor = first_sum_2_divisor * (x3 - x);
-//     first_sum_2_divisor = first_sum_2_divisor * (x3 - (omega.pow(2) * x));
-//     let first_sum_2: Fp = x2.pow(2) * (first_sum_2_dividend / first_sum_2_divisor);
-
-//     let first_sum: Fp = first_sum_0 + first_sum_1 + first_sum_2;
-
-//     let second_sum_0: Fp = x4 * u[0];
-//     let second_sum_1: Fp = x4 * u[1];
-//     let second_sum_2: Fp = x4 * u[2];
-
-//     let second_sum: Fp = x4 * (second_sum_0 + second_sum_1 + second_sum_2);
-
-//     let test_v: Fp = first_sum + second_sum;
-
-//     assert_eq!(test_v, v)
-// }
-
 #[cfg(test)]
 #[test]
 fn test_step_18() {
@@ -2326,7 +2144,6 @@ fn test_step_18() {
         }
         assert_eq!(P, test_P);
         ////////////TEST IMPLEMENTATION FOR v//////////////////
-        ///
         let mut test_v = FpVesta::ZERO();
         // let mut second_sum: Fp = Fp::ZERO();
         let mut first_sum: FpVesta = FpVesta::ZERO();
@@ -2581,18 +2398,6 @@ fn test_step_24() {
     assert_eq!(R[1], real_R[1]);
 }
 
-// u: Seq<Fp>,
-// L: Seq<G1>,
-// P_prime: G1,
-// R: Seq<G1>,
-// c: Fp,
-// G_prime_0: G1,
-// b_0: Fp,
-// z: Fp,
-// U: G1,
-// f: Fp,
-// W: G1,
-
 #[cfg(test)]
 #[test]
 fn test_step_26() {
@@ -2641,6 +2446,7 @@ fn test_step_26() {
     let diff: G1_pallas = g1add_pallas(rhs, g1neg_pallas(lhs));
     assert!(step_26(u, L, P_prime, R, c, G_prime_0, b_0, z, U, f, W))
 }
+
 #[cfg(test)]
 #[test]
 fn testmsm() {
@@ -2745,6 +2551,53 @@ fn test_step_9_10() {
     QuickCheck::new().tests(1).quickcheck(
         a as fn(a_prime_seq: SeqOfUniPoly, omega_value: u128, x_value: u128) -> TestResult,
     );
+}
+
+#[cfg(test)]
+#[quickcheck]
+fn test_poly_mul_x(a: UniPolynomial) {
+    // TODO not sure this should stay?
+    let p1 = a.0;
+    let new_p = &multi_poly_with_x(p1.clone());
+    for i in 1..new_p.len() {
+        assert_eq!(new_p[i], p1[i - 1]);
+    }
+    assert_eq!(new_p[0], Fp::from_literal(0));
+}
+
+#[cfg(test)]
+#[quickcheck]
+fn test_lagrange(a: Points) {
+    let points_seq = a.0;
+
+    let legrange_poly = lagrange_poly(points_seq.clone());
+
+    for j in 0..points_seq.len() {
+        let eval_x = points_seq[j].0;
+        let point_y = points_seq[j].1;
+        let res = eval_polyx(legrange_poly.clone(), eval_x);
+        assert_eq!(res, point_y)
+    }
+}
+
+#[cfg(test)]
+#[quickcheck]
+fn test_lagrange_basis(a: Points) {
+    let points_seq = a.0;
+
+    for i in 0..points_seq.len() {
+        let x = points_seq[i].0;
+        let basis = lagrange_basis(points_seq.clone(), x);
+        for j in 0..points_seq.len() {
+            let eval_x = points_seq[j].0;
+            let res = eval_polyx(basis.clone(), eval_x);
+            if x == eval_x {
+                assert_eq!(res, FpVesta::ONE())
+            } else {
+                assert_eq!(res, FpVesta::ZERO())
+            }
+        }
+    }
 }
 
 #[cfg(test)]
