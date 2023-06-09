@@ -18,7 +18,6 @@ public_nat_mod!(
 
 // The scalar field for Vesta and the scalar field for Pallas, from https://o1-labs.github.io/proof-systems/specs/pasta.html#pallas:
 // 28948022309329048855892746252171976963363056481941647379679742748393362948097, or
-// 422226856838314419923949393447878586741291908259801035138795735055355382073928
 // 0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000001
 public_nat_mod!(
     type_name: FpVesta,
@@ -513,8 +512,8 @@ fn test_g1_add_double_special_case_vesta() {
 #[cfg(test)]
 pub fn g1_generator_pallas() -> G1_pallas {
     (
-        FpPallas::from_hex("1"),
-        FpPallas::from_hex("1B74B5A30A12937C53DFA9F06378EE548F655BD4333D477119CF7A23CAED2ABB"),
+        FpPallas::from_hex("1").neg(),
+        FpPallas::from_hex("2"),
         false,
     )
 }
