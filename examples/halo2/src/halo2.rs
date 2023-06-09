@@ -155,13 +155,10 @@ fn calculate_L_or_R(
     let p_g_msm: G1_pallas = msm(p_part.clone(), g_part);
     let p_b_ip: FpVesta = inner_product(p_part, b_part);
     let z_ip: FpVesta = z * p_b_ip;
-    // [z<p'_part, b_part>]U
     let z_ip_U: G1_pallas = g1mul_pallas(z_ip, U);
 
-    // [*]W
     let multed_W: G1_pallas = g1mul_pallas(blinding, W);
 
-    // calculate part j (L_j or R_j)
     let mut part_j: G1_pallas = g1add_pallas(p_g_msm, z_ip_U);
     part_j = g1add_pallas(part_j, multed_W);
 
@@ -281,17 +278,22 @@ fn step_7(commitment_seq: Seq<G1_pallas>, x: FpVesta, n: u128) -> G1_pallas {
 /// * `h_parts` - Sequence of the h_i parts from step 5
 /// * `x` - the challenge from step 5
 /// * `n` - n from the protocol
-fn step_8(h_parts: Seq<Polyx>, x: FpVesta, n: u128) -> Polyx {
+fn step_8(h_parts: Seq<Polyx>, x: FpVesta, n: u128, h_blinds: Seq<FpVesta>) -> (Polyx, FpVesta) {
     let mut res: Polyx = Seq::<FpVesta>::create((1));
+
+    let mut h_prime_blind = FpVesta::ZERO();
+
     for i in 0..h_parts.len() {
         let power: u128 = n * i as u128;
         let x_raised: FpVesta = x.pow(power);
         let h_i: Polyx = h_parts[i].clone();
         let aux_prod: Polyx = mul_scalar_polyx(h_i, x_raised);
-        res = add_polyx(res, aux_prod)
+        res = add_polyx(res, aux_prod);
+
+        h_prime_blind = h_prime_blind + h_blinds[i] * x_raised;
     }
 
-    res
+    (res, h_prime_blind)
 }
 
 /// Step 9
@@ -433,6 +435,8 @@ fn step_12(
     q: Seq<Seq<u128>>,
     sigma_list: Seq<u128>,
     a_blinds: Polyx,
+    r_blind: FpVesta,
+    h_prime_blind: FpVesta,
 ) -> (Seq<Polyx>, Polyx) {
     let n_q: usize = q.len();
 
@@ -469,6 +473,10 @@ fn step_12(
     let sum1: Polyx = add_polyx(product1, product2);
     let final_sum: Polyx = add_polyx(sum1, r);
     qs[0] = final_sum;
+    q_blinds[0] = x1_squared * q_blinds[0];
+
+    q_blinds[0] = q_blinds[0] + r_blind;
+    q_blinds[0] = q_blinds[0] + h_prime_blind * x1;
 
     (qs, q_blinds)
 }
@@ -1229,8 +1237,8 @@ fn test_step_5(h: UniPolynomial, n: u8) -> TestResult {
 #[cfg(test)]
 fn g1_generator_pallas() -> G1_pallas {
     (
-        FpPallas::from_hex("1"),
-        FpPallas::from_hex("1B74B5A30A12937C53DFA9F06378EE548F655BD4333D477119CF7A23CAED2ABB"),
+        FpPallas::from_hex("1").neg(),
+        FpPallas::from_hex("2"),
         false,
     )
 }
@@ -1268,7 +1276,7 @@ fn test_step_5_6_7_8_manual(x: u8, w: u8) -> bool {
         g1mul_pallas(FpVesta::from_literal(4), g1_generator_pallas()),
     ]);
     // there should be as many random elements as there are h_i polys
-    let randomness = Seq::<FpVesta>::from_vec(vec![
+    let h_blindings = Seq::<FpVesta>::from_vec(vec![
         FpVesta::ONE(),
         FpVesta::TWO(),
         FpVesta::from_literal(3),
@@ -1276,14 +1284,14 @@ fn test_step_5_6_7_8_manual(x: u8, w: u8) -> bool {
     // let crs: CRS = (G, W);
 
     let h_s = step_5(h, n, n_g);
-    let H_s = step_6(h_s.clone(), &(G.clone(), W), randomness.clone());
+    let H_s = step_6(h_s.clone(), &(G.clone(), W), h_blindings.clone());
     let H_prime = step_7(H_s, x, n);
-    let h_prime = step_8(h_s, x, n);
+    let (h_prime, h_prime_blinding) = step_8(h_s, x, n, h_blindings.clone());
 
     let mut randomness_sum = FpVesta::ZERO();
-    for i in 0..randomness.len() {
+    for i in 0..h_blindings.len() {
         let x_pow_ni = x.pow(n * (i as u128));
-        randomness_sum = randomness_sum + (randomness[i] * x_pow_ni);
+        randomness_sum = randomness_sum + (h_blindings[i] * x_pow_ni);
     }
     let h_prime_com = commit_polyx(&(G, W), h_prime, randomness_sum);
     assert_eq!(H_prime, h_prime_com);
@@ -1328,28 +1336,28 @@ fn test_step_5_6_7_8() {
         }
 
         // there should be as many random elements as there are h_i polys
-        let mut randomness = Seq::<FpVesta>::create(h_s_len);
+        let mut h_blindings = Seq::<FpVesta>::create(h_s_len);
         // create some "randomness" for commitments
-        randomness[0] = FpVesta::from_literal(randomness_seed as u128 + 1); // +1, so it non-zero
-        for i in 1..randomness.len() {
-            randomness[i] = (randomness[i - 1] + FpVesta::ONE()) * FpVesta::TWO();
+        h_blindings[0] = FpVesta::from_literal(randomness_seed as u128 + 1); // +1, so it non-zero
+        for i in 1..h_blindings.len() {
+            h_blindings[i] = (h_blindings[i - 1] + FpVesta::ONE()) * FpVesta::TWO();
         }
         //////////////////////////////////////////////////////////////////////////////////
         /// SETTING UP VALUES DONE
         //////////////////////////////////////////////////////////////////////////////////
 
         // STEP 6
-        let H_s = step_6(h_s.clone(), &(G.clone(), W), randomness.clone());
+        let H_s = step_6(h_s.clone(), &(G.clone(), W), h_blindings.clone());
         // STEP 7
         let H_prime = step_7(H_s, x, n);
         // STEP 8
-        let h_prime = step_8(h_s, x, n);
+        let (h_prime, h_prime_blinding) = step_8(h_s, x, n, h_blindings.clone());
 
         // sum the randomess corresponding (see the thesis for furhter explanation)
         let mut randomness_sum = FpVesta::ZERO();
-        for i in 0..randomness.len() {
+        for i in 0..h_blindings.len() {
             let x_pow_ni = x.pow(n * (i as u128));
-            randomness_sum = randomness_sum + (randomness[i] * x_pow_ni);
+            randomness_sum = randomness_sum + (h_blindings[i] * x_pow_ni);
         }
 
         // commit to h_prime
@@ -1472,130 +1480,130 @@ fn test_step_11() {
     );
 }
 
-#[cfg(test)]
-#[test]
-fn test_step_12() {
-    fn a(
-        n_a: u8,
-        n_q: u8,
-        x1: u8,
-        r: UniPolynomial,
-        h: UniPolynomial,
-        a_polys: SeqOfUniPoly,
-    ) -> bool {
-        ////////////////////////////////////////////////////////////////////////////////////
-        /// SETTING UP THE REQUIRED VALUES (n_a, n_q, x1, H', R, the q list, the A commitemtns), NOT INTERESTING
-        ////////////////////////////////////////////////////////////////////////////////////
-        let mut n_a: u8 = n_a; // make it non-zero
-        if n_a == 0 {
-            n_a = 1;
-        }
-        let mut n_q: u8 = n_q; // make it non-zero
-        if n_q == 0 {
-            n_q = 1;
-        }
-        if n_q > n_a {
-            n_q = n_q % n_a
-        }
-        let x1 = FpVesta::from_literal(x1 as u128);
+// #[cfg(test)]
+// #[test]
+// fn test_step_12() {
+//     fn a(
+//         n_a: u8,
+//         n_q: u8,
+//         x1: u8,
+//         r: UniPolynomial,
+//         h: UniPolynomial,
+//         a_polys: SeqOfUniPoly,
+//     ) -> bool {
+//         ////////////////////////////////////////////////////////////////////////////////////
+//         /// SETTING UP THE REQUIRED VALUES (n_a, n_q, x1, H', R, the q list, the A commitemtns), NOT INTERESTING
+//         ////////////////////////////////////////////////////////////////////////////////////
+//         let mut n_a: u8 = n_a; // make it non-zero
+//         if n_a == 0 {
+//             n_a = 1;
+//         }
+//         let mut n_q: u8 = n_q; // make it non-zero
+//         if n_q == 0 {
+//             n_q = 1;
+//         }
+//         if n_q > n_a {
+//             n_q = n_q % n_a
+//         }
+//         let x1 = FpVesta::from_literal(x1 as u128);
 
-        let mut sigma_list: Vec<u128> = vec![];
-        let mut q = Seq::<Seq<u128>>::create(n_a as usize);
-        // create some random values for q, each entry with len n_q/2
-        // and entries for sigma_list to be used in sigma
-        // (note, here we actually do not guarantee that q's elements are distinct)
-        // add one more entry for sigma_list, since the loop starts at 1
-        let sigma_idx = rand::Rng::gen_range(&mut rand::thread_rng(), 0..q.len());
-        sigma_list.push(sigma_idx as u128);
-        q[0] = Seq::<u128>::from_vec(vec![0]); // q[0]={0} by definition
-        for i in 1..q.len() {
-            let mut v: Vec<u128> = vec![];
-            for j in 0..n_q {
-                v.push(j as u128);
-            }
-            v.shuffle(&mut thread_rng());
-            let v = &v[0..((n_q / 2) as usize)];
-            q[i] = Seq::from_vec(v.to_vec());
+//         let mut sigma_list: Vec<u128> = vec![];
+//         let mut q = Seq::<Seq<u128>>::create(n_a as usize);
+//         // create some random values for q, each entry with len n_q/2
+//         // and entries for sigma_list to be used in sigma
+//         // (note, here we actually do not guarantee that q's elements are distinct)
+//         // add one more entry for sigma_list, since the loop starts at 1
+//         let sigma_idx = rand::Rng::gen_range(&mut rand::thread_rng(), 0..q.len());
+//         sigma_list.push(sigma_idx as u128);
+//         q[0] = Seq::<u128>::from_vec(vec![0]); // q[0]={0} by definition
+//         for i in 1..q.len() {
+//             let mut v: Vec<u128> = vec![];
+//             for j in 0..n_q {
+//                 v.push(j as u128);
+//             }
+//             v.shuffle(&mut thread_rng());
+//             let v = &v[0..((n_q / 2) as usize)];
+//             q[i] = Seq::from_vec(v.to_vec());
 
-            let sigma_idx = rand::Rng::gen_range(&mut rand::thread_rng(), 0..q.len());
-            sigma_list.push(sigma_idx as u128);
-        }
+//             let sigma_idx = rand::Rng::gen_range(&mut rand::thread_rng(), 0..q.len());
+//             sigma_list.push(sigma_idx as u128);
+//         }
 
-        let sigma_seq = Seq::<u128>::from_vec(sigma_list);
+//         let sigma_seq = Seq::<u128>::from_vec(sigma_list);
 
-        // a_polys is a number of random polys, but there should be n_a of them
-        // (SeqOfUniPoly generates a fixed length seq of polys)
-        let mut a_polys = a_polys.0;
-        if a_polys.len() > n_a as usize {
-            a_polys = Seq::from_vec(a_polys.native_slice()[0..(n_a as usize)].to_vec());
-        } else if a_polys.len() < n_a as usize {
-            let diff = n_a as usize - a_polys.len();
-            for _ in 0..diff {
-                // if wrong size, just use 0
-                a_polys = a_polys.push(&Seq::<FpVesta>::from_vec(vec![FpVesta::ZERO()]));
-            }
-        }
-        //////////////////////////////////////////////////////////////////////////////////
-        /// SETTING UP VALUES DONE
-        //////////////////////////////////////////////////////////////////////////////////
-        let h = h.0;
-        let r = r.0;
-        let (q_s, _) = step_12(
-            n_a as u128,
-            x1,
-            h.clone(),
-            r.clone(),
-            a_polys.clone(),
-            q.clone(),
-            sigma_seq.clone(),
-            Seq::create(a_polys.len()), // we dont test blindess
-        );
-        // calculate each Q_i and check that it corresponds with the output of step_12
-        for i in 0..n_q {
-            let mut q_poly = Seq::<FpVesta>::create(1);
-            // BULLET 1
-            // q_i := x1 * q_i + a'_j(X), for every time i is in some sigma(j)
-            for j in 0..n_a {
-                let p_j = sigma(j as u128, sigma_seq.clone(), q.clone());
-                for k in 0..p_j.len() {
-                    if i == p_j[k] as u8 {
-                        q_poly = add_polyx(mul_scalar_polyx(q_poly, x1), a_polys[j].clone())
-                    }
-                }
-            }
-            // BULLET 2
-            // q_0 := x1^2 * q_0 + x1 * h'(X) + r(X)
-            if i == 0 {
-                q_poly = mul_scalar_polyx(q_poly, x1.pow(2));
-                q_poly = add_polyx(q_poly, mul_scalar_polyx(h.clone(), x1));
-                q_poly = add_polyx(q_poly, r.clone());
-            }
-            q_poly = trim_polyx(q_poly);
-            let expected = trim_polyx(q_s[i as usize].clone());
-            if q_poly.len() != expected.len() {
-                return false;
-            }
-            for j in 0..q_poly.len() {
-                if q_poly[j] != expected[j] {
-                    return false;
-                }
-            }
-        }
+//         // a_polys is a number of random polys, but there should be n_a of them
+//         // (SeqOfUniPoly generates a fixed length seq of polys)
+//         let mut a_polys = a_polys.0;
+//         if a_polys.len() > n_a as usize {
+//             a_polys = Seq::from_vec(a_polys.native_slice()[0..(n_a as usize)].to_vec());
+//         } else if a_polys.len() < n_a as usize {
+//             let diff = n_a as usize - a_polys.len();
+//             for _ in 0..diff {
+//                 // if wrong size, just use 0
+//                 a_polys = a_polys.push(&Seq::<FpVesta>::from_vec(vec![FpVesta::ZERO()]));
+//             }
+//         }
+//         //////////////////////////////////////////////////////////////////////////////////
+//         /// SETTING UP VALUES DONE
+//         //////////////////////////////////////////////////////////////////////////////////
+//         let h = h.0;
+//         let r = r.0;
+//         let (q_s, _) = step_12(
+//             n_a as u128,
+//             x1,
+//             h.clone(),
+//             r.clone(),
+//             a_polys.clone(),
+//             q.clone(),
+//             sigma_seq.clone(),
+//             Seq::create(a_polys.len()), // we dont test blindess
+//         );
+//         // calculate each Q_i and check that it corresponds with the output of step_12
+//         for i in 0..n_q {
+//             let mut q_poly = Seq::<FpVesta>::create(1);
+//             // BULLET 1
+//             // q_i := x1 * q_i + a'_j(X), for every time i is in some sigma(j)
+//             for j in 0..n_a {
+//                 let p_j = sigma(j as u128, sigma_seq.clone(), q.clone());
+//                 for k in 0..p_j.len() {
+//                     if i == p_j[k] as u8 {
+//                         q_poly = add_polyx(mul_scalar_polyx(q_poly, x1), a_polys[j].clone())
+//                     }
+//                 }
+//             }
+//             // BULLET 2
+//             // q_0 := x1^2 * q_0 + x1 * h'(X) + r(X)
+//             if i == 0 {
+//                 q_poly = mul_scalar_polyx(q_poly, x1.pow(2));
+//                 q_poly = add_polyx(q_poly, mul_scalar_polyx(h.clone(), x1));
+//                 q_poly = add_polyx(q_poly, r.clone());
+//             }
+//             q_poly = trim_polyx(q_poly);
+//             let expected = trim_polyx(q_s[i as usize].clone());
+//             if q_poly.len() != expected.len() {
+//                 return false;
+//             }
+//             for j in 0..q_poly.len() {
+//                 if q_poly[j] != expected[j] {
+//                     return false;
+//                 }
+//             }
+//         }
 
-        true
-    }
-    // limit the number of tests, since it is SLOW
-    QuickCheck::new().tests(10).quickcheck(
-        a as fn(
-            n_a: u8,
-            n_q: u8,
-            x1: u8,
-            r: UniPolynomial,
-            h: UniPolynomial,
-            a_polys: SeqOfUniPoly,
-        ) -> bool,
-    );
-}
+//         true
+//     }
+//     // limit the number of tests, since it is SLOW
+//     QuickCheck::new().tests(10).quickcheck(
+//         a as fn(
+//             n_a: u8,
+//             n_q: u8,
+//             x1: u8,
+//             r: UniPolynomial,
+//             h: UniPolynomial,
+//             a_polys: SeqOfUniPoly,
+//         ) -> bool,
+//     );
+// }
 
 // quickcheck is "limited" (not exactly) to eight arguments
 // so we have to reuse some of the values in some way
@@ -2570,41 +2578,6 @@ fn test_poly_mul_x(a: UniPolynomial) {
     assert_eq!(new_p[0], FpVesta::from_literal(0));
 }
 
-// #[cfg(test)]
-// #[quickcheck]
-// fn test_lagrange(a: Points) {
-//     let points_seq = a.0;
-
-//     let legrange_poly = lagrange_poly(points_seq.clone());
-
-//     for j in 0..points_seq.len() {
-//         let eval_x = points_seq[j].0;
-//         let point_y = points_seq[j].1;
-//         let res = eval_polyx(legrange_poly.clone(), eval_x);
-//         assert_eq!(res, point_y)
-//     }
-// }
-
-#[cfg(test)]
-#[quickcheck]
-fn test_lagrange_basis(a: Points) {
-    let points_seq = a.0;
-
-    for i in 0..points_seq.len() {
-        let x = points_seq[i].0;
-        let basis = lagrange_basis(points_seq.clone(), x);
-        for j in 0..points_seq.len() {
-            let eval_x = points_seq[j].0;
-            let res = eval_polyx(basis.clone(), eval_x);
-            if x == eval_x {
-                assert_eq!(res, FpVesta::ONE())
-            } else {
-                assert_eq!(res, FpVesta::ZERO())
-            }
-        }
-    }
-}
-
 #[cfg(test)]
 #[test]
 fn test_commit_to_poly_parts() {
@@ -2687,6 +2660,1430 @@ fn test_rotate(x: u128, a0: u128, a1: u128, a2: u128, a3: u128, a4: u128, a5: u1
 
 #[cfg(test)]
 #[test]
+fn automatic_negative_illegal_circut_example_run() {
+    fn a(
+        a0_0: u128,
+        a0_1: u128,
+        a0_2: u128,
+        a0_3: u128,
+        a1_0: u128,
+        a1_2: u128,
+        a2_0: u128,
+        a2_2: u128,
+    ) -> TestResult {
+        /*
+         * let n = 2^2 = 4
+         * then ω = big is 4 prime root of unity over Fp::Canvas
+         *
+         * | i | a_0 | a_1 | a_2 | q_add |
+         * |---|-----|-----|-----|-------|
+         * | 0 | 2   | 3   | 5   | 1     |
+         * | 1 | 10  |     |     | 0     |
+         * | 2 | 5   | 8   | 13  | 1     |
+         * | 3 | 26  |     |     | 0     |
+         *
+         * then, g(X) = q_add(X) * (a_0(X) + a_1(X) + a_2(X) - a_0(ωX))
+         * and g(ω^i) = 0 for all i in [0,n) (should hold)
+         *
+         *
+         * (n_g - 2 = 2 ??? )
+         */
+        let n: u128 = 4;
+        let n_a: usize = 3;
+        let n_q: u128 = 2;
+        let n_g = 4;
+        let omega: FpVesta =
+            FpVesta::from_hex("3691ce115adfa1187d65aa6313c354eb4a146505975fd3435d2f235b4abeb917");
+        let G: Seq<G1_pallas> = Seq::<G1_pallas>::from_vec(vec![
+            g1mul_pallas(FpVesta::from_literal(22), g1_generator_pallas()),
+            g1mul_pallas(FpVesta::from_literal(7), g1_generator_pallas()),
+            g1mul_pallas(FpVesta::from_literal(9), g1_generator_pallas()),
+            g1mul_pallas(FpVesta::from_literal(43), g1_generator_pallas()),
+        ]);
+        let W: G1_pallas = g1mul_pallas(FpVesta::from_literal(123), g1_generator_pallas());
+        let crs: CRS = (G.clone(), W);
+        let U: G1_pallas = g1mul_pallas(FpVesta::from_literal(72143), g1_generator_pallas());
+
+        let r_poly = Seq::<FpVesta>::from_vec(vec![
+            FpVesta::from_literal(13),
+            FpVesta::from_literal(1123),
+            FpVesta::from_literal(1444),
+            FpVesta::from_literal(9991),
+        ]);
+        let R_blind: FpVesta = FpVesta::from_literal(123);
+        let R: G1_pallas = commit_polyx(&crs, r_poly.clone(), R_blind);
+
+        let p: Seq<Seq<u128>> = Seq::<Seq<u128>>::from_vec(vec![
+            Seq::<u128>::from_vec(vec![0, 1]),
+            Seq::<u128>::from_vec(vec![0]),
+            Seq::<u128>::from_vec(vec![0]),
+        ]);
+
+        let a0_points: Seq<(FpVesta, FpVesta)> = Seq::<(FpVesta, FpVesta)>::from_vec(vec![
+            (omega.pow(0), FpVesta::from_literal(a0_0)),
+            (omega.pow(1), FpVesta::from_literal(a0_1)),
+            (omega.pow(2), FpVesta::from_literal(a0_2)),
+            (omega.pow(3), FpVesta::from_literal(a0_3)),
+        ]);
+
+        let a1_points: Seq<(FpVesta, FpVesta)> = Seq::<(FpVesta, FpVesta)>::from_vec(vec![
+            (omega.pow(0), FpVesta::from_literal(a1_0)),
+            (omega.pow(1), FpVesta::from_literal(0)),
+            (omega.pow(2), FpVesta::from_literal(a1_2)),
+            (omega.pow(3), FpVesta::from_literal(0)),
+        ]);
+
+        let a2_points: Seq<(FpVesta, FpVesta)> = Seq::<(FpVesta, FpVesta)>::from_vec(vec![
+            (omega.pow(0), FpVesta::from_literal(a2_0)),
+            (omega.pow(1), FpVesta::from_literal(0)),
+            (omega.pow(2), FpVesta::from_literal(a2_2)),
+            (omega.pow(3), FpVesta::from_literal(0)),
+        ]);
+
+        let q_add_points: Seq<(FpVesta, FpVesta)> = Seq::<(FpVesta, FpVesta)>::from_vec(vec![
+            (omega.pow(0), FpVesta::from_literal(1)),
+            (omega.pow(1), FpVesta::from_literal(0)),
+            (omega.pow(2), FpVesta::from_literal(1)),
+            (omega.pow(3), FpVesta::from_literal(0)),
+        ]);
+
+        let a_0: Polyx = lagrange_polyx(a0_points);
+        let a_1: Polyx = lagrange_polyx(a1_points);
+        let a_2: Polyx = lagrange_polyx(a2_points);
+        let a_primes: Seq<Polyx> =
+            Seq::<Polyx>::from_vec(vec![a_0.clone(), a_1.clone(), a_2.clone()]);
+        let q_add: Polyx = lagrange_polyx(q_add_points);
+
+        // construct A_i's (commitments)
+        let A_0_blinding: FpVesta = FpVesta::from_literal(123);
+        let A_0: G1_pallas = commit_polyx(&crs, a_0.clone(), A_0_blinding);
+        let A_1_blinding: FpVesta = FpVesta::from_literal(234);
+        let A_1: G1_pallas = commit_polyx(&crs, a_1.clone(), A_1_blinding);
+        let A_2_blinding: FpVesta = FpVesta::from_literal(345);
+        let A_2: G1_pallas = commit_polyx(&crs, a_2.clone(), A_2_blinding);
+        let A_list: Seq<G1_pallas> = Seq::<G1_pallas>::from_vec(vec![A_0, A_1, A_2]);
+        // save a_blinds
+        let a_blinds = Seq::from_vec(vec![A_0_blinding, A_1_blinding, A_2_blinding]);
+
+        // construct g'(X) = q_add(X) * (a_0(X)+a_1(X)+a_2(X)-a_0(omega * X))
+        let mut g_prime: Polyx = add_polyx(a_0.clone(), a_1.clone());
+        g_prime = add_polyx(g_prime, a_2.clone());
+        let a_0_rotated: Polyx = rotate_polyx(a_0.clone(), omega);
+        g_prime = sub_polyx(g_prime, a_0_rotated);
+        g_prime = mul_polyx(g_prime, q_add);
+
+        let q: Seq<Seq<u128>> =
+            Seq::<Seq<u128>>::from_vec(vec![Seq::from_vec(vec![0]), Seq::from_vec(vec![0, 1])]);
+        let sigma_list: Seq<u128> = Seq::<u128>::from_vec(vec![1, 0, 0]);
+
+        let h: Polyx = step_4(g_prime.clone(), omega, n);
+
+        let h_is: Seq<Polyx> = step_5(h.clone(), n, 4);
+
+        let h_blindings: Polyx = Seq::<FpVesta>::from_vec(vec![
+            FpVesta::from_literal(3),
+            FpVesta::from_literal(4523),
+            FpVesta::from_literal(838),
+        ]);
+        let H_is: Seq<G1_pallas> = step_6(h_is.clone(), &crs, h_blindings.clone());
+
+        let x_challenge: FpVesta = FpVesta::from_literal(2);
+        let H_prime: G1_pallas = step_7(H_is, x_challenge, n);
+
+        let (h_prime, h_prime_blind) = step_8(h_is, x_challenge, n, h_blindings.clone());
+
+        let (r, fat_a) = step_9(
+            r_poly.clone(),
+            a_primes.clone(),
+            omega,
+            p.clone(),
+            x_challenge,
+        );
+
+        let s_is: Seq<Polyx> = step_10(omega, p.clone(), x_challenge, fat_a.clone());
+
+        let x1_challenge = FpVesta::from_literal(2);
+        let x2_challenge: FpVesta = FpVesta::from_literal(2);
+
+        let (Q_is, _, _): (Seq<G1_pallas>, FpVesta, FpVesta) = step_11(
+            n_a as u128,
+            x1_challenge,
+            x2_challenge,
+            H_prime,
+            R,
+            A_list,
+            q.clone(),
+            sigma_list.clone(),
+        );
+
+        let (q_is, q_blinds) = step_12(
+            n_a as u128,
+            x1_challenge,
+            h_prime,
+            r_poly,
+            a_primes.clone(),
+            q.clone(),
+            sigma_list.clone(),
+            a_blinds,
+            R_blind,
+            h_prime_blind,
+        );
+
+        let r_is: Seq<Polyx> = step_13(
+            n,
+            omega,
+            x_challenge,
+            x1_challenge,
+            r,
+            s_is,
+            q.clone(),
+            sigma_list.clone(),
+            fat_a,
+            g_prime,
+        );
+
+        let step14_blinding: FpVesta = FpVesta::from_literal(32);
+        let (Q_prime, q_prime, Q_prime_blind) = step_14(
+            &crs,
+            x2_challenge,
+            q_is.clone(),
+            r_is.clone(),
+            q.clone(),
+            step14_blinding,
+            omega,
+            x_challenge,
+        );
+
+        let x3_challenge: FpVesta = step_15(FpVesta::from_literal(3));
+
+        let u: Polyx = step_16(n_q, x3_challenge, q_is.clone());
+
+        let x4_challenge: FpVesta = step_17(FpVesta::from_literal(2));
+
+        let (P, v) = step_18(
+            x_challenge,
+            x1_challenge,
+            x2_challenge,
+            x3_challenge,
+            x4_challenge,
+            omega,
+            Q_prime,
+            Q_is,
+            u.clone(),
+            r_is,
+            q,
+        );
+
+        let (p_poly, p_blind) = step_19(x4_challenge, q_prime, q_is, q_blinds, Q_prime_blind);
+
+        let step20_blinding: FpVesta = FpVesta::from_literal(532);
+        let s_poly_points: Seq<(FpVesta, FpVesta)> = Seq::from_vec(vec![
+            (FpVesta::from_literal(729), FpVesta::from_literal(23)),
+            (FpVesta::from_literal(73), FpVesta::from_literal(102)),
+            (FpVesta::from_literal(444), FpVesta::from_literal(484)),
+            (x3_challenge, FpVesta::ZERO()),
+        ]);
+        let s_poly: Polyx = lagrange_polyx(s_poly_points);
+
+        let (S, s_blind) = step_20(s_poly.clone(), crs, step20_blinding);
+
+        let (xi, z) = step_21(FpVesta::from_literal(2), FpVesta::from_literal(2));
+
+        let P_prime: G1_pallas = step_22(P, G[0], S, v, xi);
+
+        let (p_prime_poly, p_prime_blind) =
+            step_23(p_poly, s_poly, x3_challenge, xi, p_blind, s_blind);
+
+        let L_blinding: Polyx =
+            Seq::<FpVesta>::from_vec(vec![FpVesta::from_literal(549), FpVesta::from_literal(634)]);
+        let R_blinding: Polyx =
+            Seq::<FpVesta>::from_vec(vec![FpVesta::from_literal(827), FpVesta::from_literal(826)]);
+        let u_challenges: Polyx =
+            Seq::from_vec(vec![FpVesta::from_literal(2), FpVesta::from_literal(2)]);
+        let (p_prime, G_prime, b, L, R, L_blinding, R_blinding) = step_24(
+            p_prime_poly,
+            G,
+            x3_challenge,
+            z,
+            U,
+            W,
+            n,
+            2,
+            u_challenges.clone(),
+            L_blinding,
+            R_blinding,
+        );
+        let (c, f) = step_25(
+            p_prime,
+            L_blinding,
+            R_blinding,
+            p_prime_blind,
+            u_challenges.clone(),
+        );
+
+        let V_accepts = step_26(u_challenges, L, P_prime, R, c, G_prime[0], b[0], z, U, f, W);
+
+        assert!(!V_accepts);
+        TestResult::passed()
+    }
+    QuickCheck::new().tests(5).quickcheck(
+        a as fn(
+            a0_0: u128,
+            a0_1: u128,
+            a0_2: u128,
+            a0_3: u128,
+            a1_0: u128,
+            a1_2: u128,
+            a2_0: u128,
+            a2_2: u128,
+        ) -> TestResult,
+    );
+}
+
+#[cfg(test)]
+#[test]
+fn automatic_positive_legal_blinding_example_run() {
+    fn a(
+        rnd1: u128,
+        rnd2: u128,
+        rnd3: u128,
+        rnd4: u128,
+        rnd5: u128,
+        rnd6: u128,
+        rnd7: u128,
+        rnd8: u128,
+    ) -> TestResult {
+        /*
+         * let n = 2^2 = 4
+         * then ω = big is 4 prime root of unity over Fp::Canvas
+         *
+         * | i | a_0 | a_1 | a_2 | q_add |
+         * |---|-----|-----|-----|-------|
+         * | 0 | 2   | 3   | 5   | 1     |
+         * | 1 | 10  |     |     | 0     |
+         * | 2 | 5   | 8   | 13  | 1     |
+         * | 3 | 26  |     |     | 0     |
+         *
+         * then, g(X) = q_add(X) * (a_0(X) + a_1(X) + a_2(X) - a_0(ωX))
+         * and g(ω^i) = 0 for all i in [0,n) (should hold)
+         *
+         *
+         * (n_g - 2 = 2 ??? )
+         */
+        let n: u128 = 4;
+        let n_a: usize = 3;
+        let n_q: u128 = 2;
+        let n_g = 4;
+        let omega: FpVesta =
+            FpVesta::from_hex("3691ce115adfa1187d65aa6313c354eb4a146505975fd3435d2f235b4abeb917");
+        let G: Seq<G1_pallas> = Seq::<G1_pallas>::from_vec(vec![
+            g1mul_pallas(FpVesta::from_literal(22), g1_generator_pallas()),
+            g1mul_pallas(FpVesta::from_literal(7), g1_generator_pallas()),
+            g1mul_pallas(FpVesta::from_literal(9), g1_generator_pallas()),
+            g1mul_pallas(FpVesta::from_literal(43), g1_generator_pallas()),
+        ]);
+        let W: G1_pallas = g1mul_pallas(FpVesta::from_literal(123), g1_generator_pallas());
+        let crs: CRS = (G.clone(), W);
+        let U: G1_pallas = g1mul_pallas(FpVesta::from_literal(72143), g1_generator_pallas());
+
+        let r_poly = Seq::<FpVesta>::from_vec(vec![
+            FpVesta::from_literal(13),
+            FpVesta::from_literal(1123),
+            FpVesta::from_literal(1444),
+            FpVesta::from_literal(9991),
+        ]);
+        let R_blind: FpVesta = FpVesta::from_literal(rnd1);
+        let R: G1_pallas = commit_polyx(&crs, r_poly.clone(), R_blind);
+
+        let p: Seq<Seq<u128>> = Seq::<Seq<u128>>::from_vec(vec![
+            Seq::<u128>::from_vec(vec![0, 1]),
+            Seq::<u128>::from_vec(vec![0]),
+            Seq::<u128>::from_vec(vec![0]),
+        ]);
+
+        let a0_points: Seq<(FpVesta, FpVesta)> = Seq::<(FpVesta, FpVesta)>::from_vec(vec![
+            (omega.pow(0), FpVesta::from_literal(2)),
+            (omega.pow(1), FpVesta::from_literal(10)),
+            (omega.pow(2), FpVesta::from_literal(5)),
+            (omega.pow(3), FpVesta::from_literal(26)),
+        ]);
+
+        let a1_points: Seq<(FpVesta, FpVesta)> = Seq::<(FpVesta, FpVesta)>::from_vec(vec![
+            (omega.pow(0), FpVesta::from_literal(3)),
+            (omega.pow(1), FpVesta::from_literal(0)),
+            (omega.pow(2), FpVesta::from_literal(8)),
+            (omega.pow(3), FpVesta::from_literal(0)),
+        ]);
+
+        let a2_points: Seq<(FpVesta, FpVesta)> = Seq::<(FpVesta, FpVesta)>::from_vec(vec![
+            (omega.pow(0), FpVesta::from_literal(5)),
+            (omega.pow(1), FpVesta::from_literal(0)),
+            (omega.pow(2), FpVesta::from_literal(13)),
+            (omega.pow(3), FpVesta::from_literal(0)),
+        ]);
+
+        let q_add_points: Seq<(FpVesta, FpVesta)> = Seq::<(FpVesta, FpVesta)>::from_vec(vec![
+            (omega.pow(0), FpVesta::from_literal(1)),
+            (omega.pow(1), FpVesta::from_literal(0)),
+            (omega.pow(2), FpVesta::from_literal(1)),
+            (omega.pow(3), FpVesta::from_literal(0)),
+        ]);
+
+        let a_0: Polyx = lagrange_polyx(a0_points);
+        let a_1: Polyx = lagrange_polyx(a1_points);
+        let a_2: Polyx = lagrange_polyx(a2_points);
+        let a_primes: Seq<Polyx> =
+            Seq::<Polyx>::from_vec(vec![a_0.clone(), a_1.clone(), a_2.clone()]);
+        let q_add: Polyx = lagrange_polyx(q_add_points);
+
+        // construct A_i's (commitments)
+        let A_0_blinding: FpVesta = FpVesta::from_literal(rnd2);
+        let A_0: G1_pallas = commit_polyx(&crs, a_0.clone(), A_0_blinding);
+        let A_1_blinding: FpVesta = FpVesta::from_literal(rnd3);
+        let A_1: G1_pallas = commit_polyx(&crs, a_1.clone(), A_1_blinding);
+        let A_2_blinding: FpVesta = FpVesta::from_literal(rnd4);
+        let A_2: G1_pallas = commit_polyx(&crs, a_2.clone(), A_2_blinding);
+        let A_list: Seq<G1_pallas> = Seq::<G1_pallas>::from_vec(vec![A_0, A_1, A_2]);
+        // save a_blinds
+        let a_blinds = Seq::from_vec(vec![A_0_blinding, A_1_blinding, A_2_blinding]);
+
+        // construct g'(X) = q_add(X) * (a_0(X)+a_1(X)+a_2(X)-a_0(omega * X))
+        let mut g_prime: Polyx = add_polyx(a_0.clone(), a_1.clone());
+        g_prime = add_polyx(g_prime, a_2.clone());
+        let a_0_rotated: Polyx = rotate_polyx(a_0.clone(), omega);
+        g_prime = sub_polyx(g_prime, a_0_rotated);
+        g_prime = mul_polyx(g_prime, q_add);
+
+        let q: Seq<Seq<u128>> =
+            Seq::<Seq<u128>>::from_vec(vec![Seq::from_vec(vec![0]), Seq::from_vec(vec![0, 1])]);
+        let sigma_list: Seq<u128> = Seq::<u128>::from_vec(vec![1, 0, 0]);
+
+        let h: Polyx = step_4(g_prime.clone(), omega, n);
+
+        let h_is: Seq<Polyx> = step_5(h.clone(), n, 4);
+
+        let h_blindings: Polyx = Seq::<FpVesta>::from_vec(vec![
+            FpVesta::from_literal(rnd5),
+            FpVesta::from_literal(rnd6),
+            FpVesta::from_literal(rnd7),
+        ]);
+        let H_is: Seq<G1_pallas> = step_6(h_is.clone(), &crs, h_blindings.clone());
+
+        let x_challenge: FpVesta = FpVesta::from_literal(2);
+        let H_prime: G1_pallas = step_7(H_is, x_challenge, n);
+
+        let (h_prime, h_prime_blind) = step_8(h_is, x_challenge, n, h_blindings.clone());
+
+        let (r, fat_a) = step_9(
+            r_poly.clone(),
+            a_primes.clone(),
+            omega,
+            p.clone(),
+            x_challenge,
+        );
+
+        let s_is: Seq<Polyx> = step_10(omega, p.clone(), x_challenge, fat_a.clone());
+
+        let x1_challenge = FpVesta::from_literal(2);
+        let x2_challenge: FpVesta = FpVesta::from_literal(2);
+
+        let (Q_is, _, _): (Seq<G1_pallas>, FpVesta, FpVesta) = step_11(
+            n_a as u128,
+            x1_challenge,
+            x2_challenge,
+            H_prime,
+            R,
+            A_list,
+            q.clone(),
+            sigma_list.clone(),
+        );
+
+        let (q_is, q_blinds) = step_12(
+            n_a as u128,
+            x1_challenge,
+            h_prime,
+            r_poly,
+            a_primes.clone(),
+            q.clone(),
+            sigma_list.clone(),
+            a_blinds,
+            R_blind,
+            h_prime_blind,
+        );
+
+        let r_is: Seq<Polyx> = step_13(
+            n,
+            omega,
+            x_challenge,
+            x1_challenge,
+            r,
+            s_is,
+            q.clone(),
+            sigma_list.clone(),
+            fat_a,
+            g_prime,
+        );
+
+        let step14_blinding: FpVesta = FpVesta::from_literal(rnd8);
+        let (Q_prime, q_prime, Q_prime_blind) = step_14(
+            &crs,
+            x2_challenge,
+            q_is.clone(),
+            r_is.clone(),
+            q.clone(),
+            step14_blinding,
+            omega,
+            x_challenge,
+        );
+
+        let x3_challenge: FpVesta = step_15(FpVesta::from_literal(3));
+
+        let u: Polyx = step_16(n_q, x3_challenge, q_is.clone());
+
+        let x4_challenge: FpVesta = step_17(FpVesta::from_literal(2));
+
+        let (P, v) = step_18(
+            x_challenge,
+            x1_challenge,
+            x2_challenge,
+            x3_challenge,
+            x4_challenge,
+            omega,
+            Q_prime,
+            Q_is,
+            u.clone(),
+            r_is,
+            q,
+        );
+
+        let (p_poly, p_blind) = step_19(x4_challenge, q_prime, q_is, q_blinds, Q_prime_blind);
+
+        let step20_blinding: FpVesta = FpVesta::from_literal(rnd1) * FpVesta::from_literal(rnd2);
+        let s_poly_points: Seq<(FpVesta, FpVesta)> = Seq::from_vec(vec![
+            (FpVesta::from_literal(729), FpVesta::from_literal(23)),
+            (FpVesta::from_literal(73), FpVesta::from_literal(102)),
+            (FpVesta::from_literal(444), FpVesta::from_literal(484)),
+            (x3_challenge, FpVesta::ZERO()),
+        ]);
+        let s_poly: Polyx = lagrange_polyx(s_poly_points);
+
+        let (S, s_blind) = step_20(s_poly.clone(), crs, step20_blinding);
+
+        let (xi, z) = step_21(FpVesta::from_literal(2), FpVesta::from_literal(2));
+
+        let P_prime: G1_pallas = step_22(P, G[0], S, v, xi);
+
+        let (p_prime_poly, p_prime_blind) =
+            step_23(p_poly, s_poly, x3_challenge, xi, p_blind, s_blind);
+
+        let L_blinding: Polyx = Seq::<FpVesta>::from_vec(vec![
+            FpVesta::from_literal(rnd1) * FpVesta::from_literal(rnd3),
+            FpVesta::from_literal(rnd1) * FpVesta::from_literal(rnd4),
+        ]);
+        let R_blinding: Polyx = Seq::<FpVesta>::from_vec(vec![
+            FpVesta::from_literal(rnd1) + FpVesta::from_literal(rnd5),
+            FpVesta::from_literal(rnd1) + FpVesta::from_literal(rnd7),
+        ]);
+        let u_challenges: Polyx =
+            Seq::from_vec(vec![FpVesta::from_literal(2), FpVesta::from_literal(2)]);
+        let (p_prime, G_prime, b, L, R, L_blinding, R_blinding) = step_24(
+            p_prime_poly,
+            G,
+            x3_challenge,
+            z,
+            U,
+            W,
+            n,
+            2,
+            u_challenges.clone(),
+            L_blinding,
+            R_blinding,
+        );
+        let (c, f) = step_25(
+            p_prime,
+            L_blinding,
+            R_blinding,
+            p_prime_blind,
+            u_challenges.clone(),
+        );
+
+        let V_accepts = step_26(u_challenges, L, P_prime, R, c, G_prime[0], b[0], z, U, f, W);
+
+        assert!(V_accepts);
+        TestResult::passed()
+    }
+    QuickCheck::new().tests(5).quickcheck(
+        a as fn(
+            rnd1: u128,
+            rnd2: u128,
+            rnd3: u128,
+            rnd4: u128,
+            rnd5: u128,
+            rnd6: u128,
+            rnd7: u128,
+            rnd8: u128,
+        ) -> TestResult,
+    );
+}
+
+#[cfg(test)]
+#[test]
+fn automatic_positive_legal_challenges_example_run() {
+    fn a(
+        rnd1: u128,
+        rnd2: u128,
+        rnd3: u128,
+        rnd4: u128,
+        rnd5: u128,
+        rnd6: u128,
+        rnd7: u128,
+        rnd8: u128,
+    ) -> TestResult {
+        /*
+         * let n = 2^2 = 4
+         * then ω = big is 4 prime root of unity over Fp::Canvas
+         *
+         * | i | a_0 | a_1 | a_2 | q_add |
+         * |---|-----|-----|-----|-------|
+         * | 0 | 2   | 3   | 5   | 1     |
+         * | 1 | 10  |     |     | 0     |
+         * | 2 | 5   | 8   | 13  | 1     |
+         * | 3 | 26  |     |     | 0     |
+         *
+         * then, g(X) = q_add(X) * (a_0(X) + a_1(X) + a_2(X) - a_0(ωX))
+         * and g(ω^i) = 0 for all i in [0,n) (should hold)
+         *
+         *
+         * (n_g - 2 = 2 ??? )
+         */
+        let mut rnd1 = rnd1;
+        if rnd1 < 2 {
+            rnd1 = 2;
+        }
+        let mut rnd2 = rnd2;
+        if rnd2 < 2 {
+            rnd2 = 2;
+        }
+        let mut rnd3 = rnd3;
+        if rnd3 < 2 {
+            rnd3 = 3;
+        }
+        let mut rnd4 = rnd4;
+        if rnd4 < 2 {
+            rnd4 = 2;
+        }
+        let mut rnd5 = rnd5;
+        if rnd5 < 2 {
+            rnd5 = 2;
+        }
+        let mut rnd6 = rnd6;
+        if rnd6 < 2 {
+            rnd6 = 2;
+        }
+        let mut rnd7 = rnd7;
+        if rnd7 < 2 {
+            rnd7 = 2;
+        }
+        let mut rnd8 = rnd8;
+        if rnd8 < 2 {
+            rnd8 = 2;
+        }
+        let n: u128 = 4;
+        let n_a: usize = 3;
+        let n_q: u128 = 2;
+        let n_g = 4;
+        let omega: FpVesta =
+            FpVesta::from_hex("3691ce115adfa1187d65aa6313c354eb4a146505975fd3435d2f235b4abeb917");
+        let G: Seq<G1_pallas> = Seq::<G1_pallas>::from_vec(vec![
+            g1mul_pallas(FpVesta::from_literal(22), g1_generator_pallas()),
+            g1mul_pallas(FpVesta::from_literal(7), g1_generator_pallas()),
+            g1mul_pallas(FpVesta::from_literal(9), g1_generator_pallas()),
+            g1mul_pallas(FpVesta::from_literal(43), g1_generator_pallas()),
+        ]);
+        let W: G1_pallas = g1mul_pallas(FpVesta::from_literal(123), g1_generator_pallas());
+        let crs: CRS = (G.clone(), W);
+        let U: G1_pallas = g1mul_pallas(FpVesta::from_literal(72143), g1_generator_pallas());
+
+        let r_poly = Seq::<FpVesta>::from_vec(vec![
+            FpVesta::from_literal(13),
+            FpVesta::from_literal(1123),
+            FpVesta::from_literal(1444),
+            FpVesta::from_literal(9991),
+        ]);
+        let R_blind: FpVesta = FpVesta::from_literal(124);
+        let R: G1_pallas = commit_polyx(&crs, r_poly.clone(), R_blind);
+
+        let p: Seq<Seq<u128>> = Seq::<Seq<u128>>::from_vec(vec![
+            Seq::<u128>::from_vec(vec![0, 1]),
+            Seq::<u128>::from_vec(vec![0]),
+            Seq::<u128>::from_vec(vec![0]),
+        ]);
+
+        let a0_points: Seq<(FpVesta, FpVesta)> = Seq::<(FpVesta, FpVesta)>::from_vec(vec![
+            (omega.pow(0), FpVesta::from_literal(2)),
+            (omega.pow(1), FpVesta::from_literal(10)),
+            (omega.pow(2), FpVesta::from_literal(5)),
+            (omega.pow(3), FpVesta::from_literal(26)),
+        ]);
+
+        let a1_points: Seq<(FpVesta, FpVesta)> = Seq::<(FpVesta, FpVesta)>::from_vec(vec![
+            (omega.pow(0), FpVesta::from_literal(3)),
+            (omega.pow(1), FpVesta::from_literal(0)),
+            (omega.pow(2), FpVesta::from_literal(8)),
+            (omega.pow(3), FpVesta::from_literal(0)),
+        ]);
+
+        let a2_points: Seq<(FpVesta, FpVesta)> = Seq::<(FpVesta, FpVesta)>::from_vec(vec![
+            (omega.pow(0), FpVesta::from_literal(5)),
+            (omega.pow(1), FpVesta::from_literal(0)),
+            (omega.pow(2), FpVesta::from_literal(13)),
+            (omega.pow(3), FpVesta::from_literal(0)),
+        ]);
+
+        let q_add_points: Seq<(FpVesta, FpVesta)> = Seq::<(FpVesta, FpVesta)>::from_vec(vec![
+            (omega.pow(0), FpVesta::from_literal(1)),
+            (omega.pow(1), FpVesta::from_literal(0)),
+            (omega.pow(2), FpVesta::from_literal(1)),
+            (omega.pow(3), FpVesta::from_literal(0)),
+        ]);
+
+        let a_0: Polyx = lagrange_polyx(a0_points);
+        let a_1: Polyx = lagrange_polyx(a1_points);
+        let a_2: Polyx = lagrange_polyx(a2_points);
+        let a_primes: Seq<Polyx> =
+            Seq::<Polyx>::from_vec(vec![a_0.clone(), a_1.clone(), a_2.clone()]);
+        let q_add: Polyx = lagrange_polyx(q_add_points);
+
+        // construct A_i's (commitments)
+        let A_0_blinding: FpVesta = FpVesta::from_literal(83838);
+        let A_0: G1_pallas = commit_polyx(&crs, a_0.clone(), A_0_blinding);
+        let A_1_blinding: FpVesta = FpVesta::from_literal(423);
+        let A_1: G1_pallas = commit_polyx(&crs, a_1.clone(), A_1_blinding);
+        let A_2_blinding: FpVesta = FpVesta::from_literal(2308982);
+        let A_2: G1_pallas = commit_polyx(&crs, a_2.clone(), A_2_blinding);
+        let A_list: Seq<G1_pallas> = Seq::<G1_pallas>::from_vec(vec![A_0, A_1, A_2]);
+        // save a_blinds
+        let a_blinds = Seq::from_vec(vec![A_0_blinding, A_1_blinding, A_2_blinding]);
+
+        // construct g'(X) = q_add(X) * (a_0(X)+a_1(X)+a_2(X)-a_0(omega * X))
+        let mut g_prime: Polyx = add_polyx(a_0.clone(), a_1.clone());
+        g_prime = add_polyx(g_prime, a_2.clone());
+        let a_0_rotated: Polyx = rotate_polyx(a_0.clone(), omega);
+        g_prime = sub_polyx(g_prime, a_0_rotated);
+        g_prime = mul_polyx(g_prime, q_add);
+
+        let q: Seq<Seq<u128>> =
+            Seq::<Seq<u128>>::from_vec(vec![Seq::from_vec(vec![0]), Seq::from_vec(vec![0, 1])]);
+        let sigma_list: Seq<u128> = Seq::<u128>::from_vec(vec![1, 0, 0]);
+
+        let h: Polyx = step_4(g_prime.clone(), omega, n);
+
+        let h_is: Seq<Polyx> = step_5(h.clone(), n, 4);
+
+        let h_blindings: Polyx = Seq::<FpVesta>::from_vec(vec![
+            FpVesta::from_literal(23488),
+            FpVesta::from_literal(2389488),
+            FpVesta::from_literal(23),
+        ]);
+        let H_is: Seq<G1_pallas> = step_6(h_is.clone(), &crs, h_blindings.clone());
+
+        let x_challenge: FpVesta = FpVesta::from_literal(rnd1);
+        let H_prime: G1_pallas = step_7(H_is, x_challenge, n);
+
+        let (h_prime, h_prime_blind) = step_8(h_is, x_challenge, n, h_blindings.clone());
+
+        let (r, fat_a) = step_9(
+            r_poly.clone(),
+            a_primes.clone(),
+            omega,
+            p.clone(),
+            x_challenge,
+        );
+
+        let s_is: Seq<Polyx> = step_10(omega, p.clone(), x_challenge, fat_a.clone());
+
+        let x1_challenge = FpVesta::from_literal(rnd2);
+        let x2_challenge: FpVesta = FpVesta::from_literal(rnd3);
+
+        let (Q_is, _, _): (Seq<G1_pallas>, FpVesta, FpVesta) = step_11(
+            n_a as u128,
+            x1_challenge,
+            x2_challenge,
+            H_prime,
+            R,
+            A_list,
+            q.clone(),
+            sigma_list.clone(),
+        );
+
+        let (q_is, q_blinds) = step_12(
+            n_a as u128,
+            x1_challenge,
+            h_prime,
+            r_poly,
+            a_primes.clone(),
+            q.clone(),
+            sigma_list.clone(),
+            a_blinds,
+            R_blind,
+            h_prime_blind,
+        );
+
+        let r_is: Seq<Polyx> = step_13(
+            n,
+            omega,
+            x_challenge,
+            x1_challenge,
+            r,
+            s_is,
+            q.clone(),
+            sigma_list.clone(),
+            fat_a,
+            g_prime,
+        );
+
+        let step14_blinding: FpVesta = FpVesta::from_literal(918238);
+        let (Q_prime, q_prime, Q_prime_blind) = step_14(
+            &crs,
+            x2_challenge,
+            q_is.clone(),
+            r_is.clone(),
+            q.clone(),
+            step14_blinding,
+            omega,
+            x_challenge,
+        );
+
+        let x3_challenge: FpVesta = step_15(FpVesta::from_literal(rnd4));
+
+        let u: Polyx = step_16(n_q, x3_challenge, q_is.clone());
+
+        let x4_challenge: FpVesta = step_17(FpVesta::from_literal(rnd5));
+
+        let (P, v) = step_18(
+            x_challenge,
+            x1_challenge,
+            x2_challenge,
+            x3_challenge,
+            x4_challenge,
+            omega,
+            Q_prime,
+            Q_is,
+            u.clone(),
+            r_is,
+            q,
+        );
+
+        let (p_poly, p_blind) = step_19(x4_challenge, q_prime, q_is, q_blinds, Q_prime_blind);
+
+        let step20_blinding: FpVesta = FpVesta::from_literal(2348888);
+        let s_poly_points: Seq<(FpVesta, FpVesta)> = Seq::from_vec(vec![
+            (FpVesta::from_literal(729), FpVesta::from_literal(23)),
+            (FpVesta::from_literal(73), FpVesta::from_literal(102)),
+            (FpVesta::from_literal(444), FpVesta::from_literal(484)),
+            (x3_challenge, FpVesta::ZERO()),
+        ]);
+        let s_poly: Polyx = lagrange_polyx(s_poly_points);
+
+        let (S, s_blind) = step_20(s_poly.clone(), crs, step20_blinding);
+
+        let (xi, z) = step_21(FpVesta::from_literal(2), FpVesta::from_literal(2));
+
+        let P_prime: G1_pallas = step_22(P, G[0], S, v, xi);
+
+        let (p_prime_poly, p_prime_blind) =
+            step_23(p_poly, s_poly, x3_challenge, xi, p_blind, s_blind);
+
+        let L_blinding: Polyx = Seq::<FpVesta>::from_vec(vec![
+            FpVesta::from_literal(999999),
+            FpVesta::from_literal(726),
+        ]);
+        let R_blinding: Polyx = Seq::<FpVesta>::from_vec(vec![
+            FpVesta::from_literal(3488483),
+            FpVesta::from_literal(39291929),
+        ]);
+        let u_challenges: Polyx = Seq::from_vec(vec![
+            FpVesta::from_literal(rnd6),
+            FpVesta::from_literal(rnd7),
+        ]);
+        let (p_prime, G_prime, b, L, R, L_blinding, R_blinding) = step_24(
+            p_prime_poly,
+            G,
+            x3_challenge,
+            z,
+            U,
+            W,
+            n,
+            2,
+            u_challenges.clone(),
+            L_blinding,
+            R_blinding,
+        );
+        let (c, f) = step_25(
+            p_prime,
+            L_blinding,
+            R_blinding,
+            p_prime_blind,
+            u_challenges.clone(),
+        );
+
+        let V_accepts = step_26(u_challenges, L, P_prime, R, c, G_prime[0], b[0], z, U, f, W);
+
+        assert!(V_accepts);
+        TestResult::passed()
+    }
+    QuickCheck::new().tests(5).quickcheck(
+        a as fn(
+            rnd1: u128,
+            rnd2: u128,
+            rnd3: u128,
+            rnd4: u128,
+            rnd5: u128,
+            rnd6: u128,
+            rnd7: u128,
+            rnd8: u128,
+        ) -> TestResult,
+    );
+}
+
+#[cfg(test)]
+#[test]
+fn automatic_positive_legal_circut_example_run() {
+    fn a(a0_0: u128, a0_2: u128, a1_0: u128, a1_2: u128, a2_0: u128, a2_2: u128) -> TestResult {
+        /*
+         * let n = 2^2 = 4
+         * then ω = big is 4 prime root of unity over Fp::Canvas
+         *
+         * | i | a_0 | a_1 | a_2 | q_add |
+         * |---|-----|-----|-----|-------|
+         * | 0 | 2   | 3   | 5   | 1     |
+         * | 1 | 10  |     |     | 0     |
+         * | 2 | 5   | 8   | 13  | 1     |
+         * | 3 | 26  |     |     | 0     |
+         *
+         * then, g(X) = q_add(X) * (a_0(X) + a_1(X) + a_2(X) - a_0(ωX))
+         * and g(ω^i) = 0 for all i in [0,n) (should hold)
+         *
+         *
+         * (n_g - 2 = 2 ??? )
+         */
+        let n: u128 = 4;
+        let n_a: usize = 3;
+        let n_q: u128 = 2;
+        let n_g = 4;
+        let omega: FpVesta =
+            FpVesta::from_hex("3691ce115adfa1187d65aa6313c354eb4a146505975fd3435d2f235b4abeb917");
+        let G: Seq<G1_pallas> = Seq::<G1_pallas>::from_vec(vec![
+            g1mul_pallas(FpVesta::from_literal(22), g1_generator_pallas()),
+            g1mul_pallas(FpVesta::from_literal(7), g1_generator_pallas()),
+            g1mul_pallas(FpVesta::from_literal(9), g1_generator_pallas()),
+            g1mul_pallas(FpVesta::from_literal(43), g1_generator_pallas()),
+        ]);
+        let W: G1_pallas = g1mul_pallas(FpVesta::from_literal(123), g1_generator_pallas());
+        let crs: CRS = (G.clone(), W);
+        let U: G1_pallas = g1mul_pallas(FpVesta::from_literal(72143), g1_generator_pallas());
+
+        let r_poly = Seq::<FpVesta>::from_vec(vec![
+            FpVesta::from_literal(13),
+            FpVesta::from_literal(1123),
+            FpVesta::from_literal(1444),
+            FpVesta::from_literal(9991),
+        ]);
+        let R_blind: FpVesta = FpVesta::from_literal(123);
+        let R: G1_pallas = commit_polyx(&crs, r_poly.clone(), R_blind);
+
+        let p: Seq<Seq<u128>> = Seq::<Seq<u128>>::from_vec(vec![
+            Seq::<u128>::from_vec(vec![0, 1]),
+            Seq::<u128>::from_vec(vec![0]),
+            Seq::<u128>::from_vec(vec![0]),
+        ]);
+
+        let a0_points: Seq<(FpVesta, FpVesta)> = Seq::<(FpVesta, FpVesta)>::from_vec(vec![
+            (omega.pow(0), FpVesta::from_literal(a0_0)),
+            (
+                omega.pow(1),
+                FpVesta::from_literal(a0_0)
+                    + FpVesta::from_literal(a1_0)
+                    + FpVesta::from_literal(a2_0),
+            ),
+            (omega.pow(2), FpVesta::from_literal(a0_2)),
+            (
+                omega.pow(3),
+                FpVesta::from_literal(a0_2)
+                    + FpVesta::from_literal(a1_2)
+                    + FpVesta::from_literal(a2_2),
+            ),
+        ]);
+
+        let a1_points: Seq<(FpVesta, FpVesta)> = Seq::<(FpVesta, FpVesta)>::from_vec(vec![
+            (omega.pow(0), FpVesta::from_literal(a1_0)),
+            (omega.pow(1), FpVesta::from_literal(0)),
+            (omega.pow(2), FpVesta::from_literal(a1_2)),
+            (omega.pow(3), FpVesta::from_literal(0)),
+        ]);
+
+        let a2_points: Seq<(FpVesta, FpVesta)> = Seq::<(FpVesta, FpVesta)>::from_vec(vec![
+            (omega.pow(0), FpVesta::from_literal(a2_0)),
+            (omega.pow(1), FpVesta::from_literal(0)),
+            (omega.pow(2), FpVesta::from_literal(a2_2)),
+            (omega.pow(3), FpVesta::from_literal(0)),
+        ]);
+
+        let q_add_points: Seq<(FpVesta, FpVesta)> = Seq::<(FpVesta, FpVesta)>::from_vec(vec![
+            (omega.pow(0), FpVesta::from_literal(1)),
+            (omega.pow(1), FpVesta::from_literal(0)),
+            (omega.pow(2), FpVesta::from_literal(1)),
+            (omega.pow(3), FpVesta::from_literal(0)),
+        ]);
+
+        let a_0: Polyx = lagrange_polyx(a0_points);
+        let a_1: Polyx = lagrange_polyx(a1_points);
+        let a_2: Polyx = lagrange_polyx(a2_points);
+        let a_primes: Seq<Polyx> =
+            Seq::<Polyx>::from_vec(vec![a_0.clone(), a_1.clone(), a_2.clone()]);
+        let q_add: Polyx = lagrange_polyx(q_add_points);
+
+        // construct A_i's (commitments)
+        let A_0_blinding: FpVesta = FpVesta::from_literal(123);
+        let A_0: G1_pallas = commit_polyx(&crs, a_0.clone(), A_0_blinding);
+        let A_1_blinding: FpVesta = FpVesta::from_literal(234);
+        let A_1: G1_pallas = commit_polyx(&crs, a_1.clone(), A_1_blinding);
+        let A_2_blinding: FpVesta = FpVesta::from_literal(345);
+        let A_2: G1_pallas = commit_polyx(&crs, a_2.clone(), A_2_blinding);
+        let A_list: Seq<G1_pallas> = Seq::<G1_pallas>::from_vec(vec![A_0, A_1, A_2]);
+        // save a_blinds
+        let a_blinds = Seq::from_vec(vec![A_0_blinding, A_1_blinding, A_2_blinding]);
+
+        // construct g'(X) = q_add(X) * (a_0(X)+a_1(X)+a_2(X)-a_0(omega * X))
+        let mut g_prime: Polyx = add_polyx(a_0.clone(), a_1.clone());
+        g_prime = add_polyx(g_prime, a_2.clone());
+        let a_0_rotated: Polyx = rotate_polyx(a_0.clone(), omega);
+        g_prime = sub_polyx(g_prime, a_0_rotated);
+        g_prime = mul_polyx(g_prime, q_add);
+
+        let q: Seq<Seq<u128>> =
+            Seq::<Seq<u128>>::from_vec(vec![Seq::from_vec(vec![0]), Seq::from_vec(vec![0, 1])]);
+        let sigma_list: Seq<u128> = Seq::<u128>::from_vec(vec![1, 0, 0]);
+
+        let h: Polyx = step_4(g_prime.clone(), omega, n);
+
+        let h_is: Seq<Polyx> = step_5(h.clone(), n, 4);
+
+        let h_blindings: Polyx = Seq::<FpVesta>::from_vec(vec![
+            FpVesta::from_literal(3),
+            FpVesta::from_literal(4523),
+            FpVesta::from_literal(838),
+        ]);
+        let H_is: Seq<G1_pallas> = step_6(h_is.clone(), &crs, h_blindings.clone());
+
+        let x_challenge: FpVesta = FpVesta::from_literal(2);
+        let H_prime: G1_pallas = step_7(H_is, x_challenge, n);
+
+        let (h_prime, h_prime_blind) = step_8(h_is, x_challenge, n, h_blindings.clone());
+
+        let (r, fat_a) = step_9(
+            r_poly.clone(),
+            a_primes.clone(),
+            omega,
+            p.clone(),
+            x_challenge,
+        );
+
+        let s_is: Seq<Polyx> = step_10(omega, p.clone(), x_challenge, fat_a.clone());
+
+        let x1_challenge = FpVesta::from_literal(2);
+        let x2_challenge: FpVesta = FpVesta::from_literal(2);
+
+        let (Q_is, _, _): (Seq<G1_pallas>, FpVesta, FpVesta) = step_11(
+            n_a as u128,
+            x1_challenge,
+            x2_challenge,
+            H_prime,
+            R,
+            A_list,
+            q.clone(),
+            sigma_list.clone(),
+        );
+
+        let (q_is, q_blinds) = step_12(
+            n_a as u128,
+            x1_challenge,
+            h_prime,
+            r_poly,
+            a_primes.clone(),
+            q.clone(),
+            sigma_list.clone(),
+            a_blinds,
+            R_blind,
+            h_prime_blind,
+        );
+
+        let r_is: Seq<Polyx> = step_13(
+            n,
+            omega,
+            x_challenge,
+            x1_challenge,
+            r,
+            s_is,
+            q.clone(),
+            sigma_list.clone(),
+            fat_a,
+            g_prime,
+        );
+
+        let step14_blinding: FpVesta = FpVesta::from_literal(32);
+        let (Q_prime, q_prime, Q_prime_blind) = step_14(
+            &crs,
+            x2_challenge,
+            q_is.clone(),
+            r_is.clone(),
+            q.clone(),
+            step14_blinding,
+            omega,
+            x_challenge,
+        );
+
+        let x3_challenge: FpVesta = step_15(FpVesta::from_literal(3));
+
+        let u: Polyx = step_16(n_q, x3_challenge, q_is.clone());
+
+        let x4_challenge: FpVesta = step_17(FpVesta::from_literal(2));
+
+        let (P, v) = step_18(
+            x_challenge,
+            x1_challenge,
+            x2_challenge,
+            x3_challenge,
+            x4_challenge,
+            omega,
+            Q_prime,
+            Q_is,
+            u.clone(),
+            r_is,
+            q,
+        );
+
+        let (p_poly, p_blind) = step_19(x4_challenge, q_prime, q_is, q_blinds, Q_prime_blind);
+
+        let step20_blinding: FpVesta = FpVesta::from_literal(532);
+        let s_poly_points: Seq<(FpVesta, FpVesta)> = Seq::from_vec(vec![
+            (FpVesta::from_literal(729), FpVesta::from_literal(23)),
+            (FpVesta::from_literal(73), FpVesta::from_literal(102)),
+            (FpVesta::from_literal(444), FpVesta::from_literal(484)),
+            (x3_challenge, FpVesta::ZERO()),
+        ]);
+        let s_poly: Polyx = lagrange_polyx(s_poly_points);
+
+        let (S, s_blind) = step_20(s_poly.clone(), crs, step20_blinding);
+
+        let (xi, z) = step_21(FpVesta::from_literal(2), FpVesta::from_literal(2));
+
+        let P_prime: G1_pallas = step_22(P, G[0], S, v, xi);
+
+        let (p_prime_poly, p_prime_blind) =
+            step_23(p_poly, s_poly, x3_challenge, xi, p_blind, s_blind);
+
+        let L_blinding: Polyx =
+            Seq::<FpVesta>::from_vec(vec![FpVesta::from_literal(549), FpVesta::from_literal(634)]);
+        let R_blinding: Polyx =
+            Seq::<FpVesta>::from_vec(vec![FpVesta::from_literal(827), FpVesta::from_literal(826)]);
+        let u_challenges: Polyx =
+            Seq::from_vec(vec![FpVesta::from_literal(2), FpVesta::from_literal(2)]);
+        let (p_prime, G_prime, b, L, R, L_blinding, R_blinding) = step_24(
+            p_prime_poly,
+            G,
+            x3_challenge,
+            z,
+            U,
+            W,
+            n,
+            2,
+            u_challenges.clone(),
+            L_blinding,
+            R_blinding,
+        );
+        let (c, f) = step_25(
+            p_prime,
+            L_blinding,
+            R_blinding,
+            p_prime_blind,
+            u_challenges.clone(),
+        );
+
+        let V_accepts = step_26(u_challenges, L, P_prime, R, c, G_prime[0], b[0], z, U, f, W);
+
+        assert!(V_accepts);
+        TestResult::passed()
+    }
+    QuickCheck::new().tests(5).quickcheck(
+        a as fn(
+            a0_0: u128,
+            a0_2: u128,
+            a1_0: u128,
+            a1_2: u128,
+            a2_0: u128,
+            a2_2: u128,
+        ) -> TestResult,
+    );
+}
+
+#[cfg(test)]
+#[test]
+fn negative_illegal_circut_example_run() {
+    /*
+     * let n = 2^2 = 4
+     * then ω = big is 4 prime root of unity over Fp::Canvas
+     *
+     * | i | a_0 | a_1 | a_2 | q_add |
+     * |---|-----|-----|-----|-------|
+     * | 0 | 2   | 3   | 5   | 1     |
+     * | 1 | 10  |     |     | 0     |
+     * | 2 | 5   | 8   | 13  | 1     |
+     * | 3 | 26  |     |     | 0     |
+     *
+     * then, g(X) = q_add(X) * (a_0(X) + a_1(X) + a_2(X) - a_0(ωX))
+     * and g(ω^i) = 0 for all i in [0,n) (should hold)
+     *
+     *
+     * (n_g - 2 = 2 ??? )
+     */
+    let n: u128 = 4;
+    let n_a: usize = 3;
+    let n_q: u128 = 2;
+    let n_g = 4;
+    let omega: FpVesta =
+        FpVesta::from_hex("3691ce115adfa1187d65aa6313c354eb4a146505975fd3435d2f235b4abeb917");
+    let G: Seq<G1_pallas> = Seq::<G1_pallas>::from_vec(vec![
+        g1mul_pallas(FpVesta::from_literal(22), g1_generator_pallas()),
+        g1mul_pallas(FpVesta::from_literal(7), g1_generator_pallas()),
+        g1mul_pallas(FpVesta::from_literal(9), g1_generator_pallas()),
+        g1mul_pallas(FpVesta::from_literal(43), g1_generator_pallas()),
+    ]);
+    let W: G1_pallas = g1mul_pallas(FpVesta::from_literal(123), g1_generator_pallas());
+    let crs: CRS = (G.clone(), W);
+    let U: G1_pallas = g1mul_pallas(FpVesta::from_literal(72143), g1_generator_pallas());
+
+    let r_poly = Seq::<FpVesta>::from_vec(vec![
+        FpVesta::from_literal(13),
+        FpVesta::from_literal(1123),
+        FpVesta::from_literal(1444),
+        FpVesta::from_literal(9991),
+    ]);
+    let R_blind: FpVesta = FpVesta::from_literal(123);
+    let R: G1_pallas = commit_polyx(&crs, r_poly.clone(), R_blind);
+
+    let p: Seq<Seq<u128>> = Seq::<Seq<u128>>::from_vec(vec![
+        Seq::<u128>::from_vec(vec![0, 1]),
+        Seq::<u128>::from_vec(vec![0]),
+        Seq::<u128>::from_vec(vec![0]),
+    ]);
+
+    let a0_points: Seq<(FpVesta, FpVesta)> = Seq::<(FpVesta, FpVesta)>::from_vec(vec![
+        (omega.pow(0), FpVesta::from_literal(2)),
+        (omega.pow(1), FpVesta::from_literal(10)),
+        (omega.pow(2), FpVesta::from_literal(5)),
+        (omega.pow(3), FpVesta::from_literal(27)),
+    ]);
+
+    let a1_points: Seq<(FpVesta, FpVesta)> = Seq::<(FpVesta, FpVesta)>::from_vec(vec![
+        (omega.pow(0), FpVesta::from_literal(3)),
+        (omega.pow(1), FpVesta::from_literal(0)),
+        (omega.pow(2), FpVesta::from_literal(8)),
+        (omega.pow(3), FpVesta::from_literal(0)),
+    ]);
+
+    let a2_points: Seq<(FpVesta, FpVesta)> = Seq::<(FpVesta, FpVesta)>::from_vec(vec![
+        (omega.pow(0), FpVesta::from_literal(5)),
+        (omega.pow(1), FpVesta::from_literal(0)),
+        (omega.pow(2), FpVesta::from_literal(13)),
+        (omega.pow(3), FpVesta::from_literal(0)),
+    ]);
+
+    let q_add_points: Seq<(FpVesta, FpVesta)> = Seq::<(FpVesta, FpVesta)>::from_vec(vec![
+        (omega.pow(0), FpVesta::from_literal(1)),
+        (omega.pow(1), FpVesta::from_literal(0)),
+        (omega.pow(2), FpVesta::from_literal(1)),
+        (omega.pow(3), FpVesta::from_literal(0)),
+    ]);
+
+    let a_0: Polyx = lagrange_polyx(a0_points);
+    let a_1: Polyx = lagrange_polyx(a1_points);
+    let a_2: Polyx = lagrange_polyx(a2_points);
+    let a_primes: Seq<Polyx> = Seq::<Polyx>::from_vec(vec![a_0.clone(), a_1.clone(), a_2.clone()]);
+    let q_add: Polyx = lagrange_polyx(q_add_points);
+
+    // construct A_i's (commitments)
+    let A_0_blinding: FpVesta = FpVesta::from_literal(123);
+    let A_0: G1_pallas = commit_polyx(&crs, a_0.clone(), A_0_blinding);
+    let A_1_blinding: FpVesta = FpVesta::from_literal(234);
+    let A_1: G1_pallas = commit_polyx(&crs, a_1.clone(), A_1_blinding);
+    let A_2_blinding: FpVesta = FpVesta::from_literal(345);
+    let A_2: G1_pallas = commit_polyx(&crs, a_2.clone(), A_2_blinding);
+    let A_list: Seq<G1_pallas> = Seq::<G1_pallas>::from_vec(vec![A_0, A_1, A_2]);
+    // save a_blinds
+    let a_blinds = Seq::from_vec(vec![A_0_blinding, A_1_blinding, A_2_blinding]);
+
+    // construct g'(X) = q_add(X) * (a_0(X)+a_1(X)+a_2(X)-a_0(omega * X))
+    let mut g_prime: Polyx = add_polyx(a_0.clone(), a_1.clone());
+    g_prime = add_polyx(g_prime, a_2.clone());
+    let a_0_rotated: Polyx = rotate_polyx(a_0.clone(), omega);
+    g_prime = sub_polyx(g_prime, a_0_rotated);
+    g_prime = mul_polyx(g_prime, q_add);
+
+    let q: Seq<Seq<u128>> =
+        Seq::<Seq<u128>>::from_vec(vec![Seq::from_vec(vec![0]), Seq::from_vec(vec![0, 1])]);
+    let sigma_list: Seq<u128> = Seq::<u128>::from_vec(vec![1, 0, 0]);
+
+    let h: Polyx = step_4(g_prime.clone(), omega, n);
+
+    let h_is: Seq<Polyx> = step_5(h.clone(), n, 4);
+
+    let h_blindings: Polyx = Seq::<FpVesta>::from_vec(vec![
+        FpVesta::from_literal(3),
+        FpVesta::from_literal(4523),
+        FpVesta::from_literal(838),
+    ]);
+    let H_is: Seq<G1_pallas> = step_6(h_is.clone(), &crs, h_blindings.clone());
+
+    let x_challenge: FpVesta = FpVesta::from_literal(2);
+    let H_prime: G1_pallas = step_7(H_is, x_challenge, n);
+
+    let (h_prime, h_prime_blind) = step_8(h_is, x_challenge, n, h_blindings.clone());
+
+    let (r, fat_a) = step_9(
+        r_poly.clone(),
+        a_primes.clone(),
+        omega,
+        p.clone(),
+        x_challenge,
+    );
+
+    let s_is: Seq<Polyx> = step_10(omega, p.clone(), x_challenge, fat_a.clone());
+
+    let x1_challenge = FpVesta::from_literal(2);
+    let x2_challenge: FpVesta = FpVesta::from_literal(2);
+
+    let (Q_is, _, _): (Seq<G1_pallas>, FpVesta, FpVesta) = step_11(
+        n_a as u128,
+        x1_challenge,
+        x2_challenge,
+        H_prime,
+        R,
+        A_list,
+        q.clone(),
+        sigma_list.clone(),
+    );
+
+    let (q_is, q_blinds) = step_12(
+        n_a as u128,
+        x1_challenge,
+        h_prime,
+        r_poly,
+        a_primes.clone(),
+        q.clone(),
+        sigma_list.clone(),
+        a_blinds,
+        R_blind,
+        h_prime_blind,
+    );
+
+    let r_is: Seq<Polyx> = step_13(
+        n,
+        omega,
+        x_challenge,
+        x1_challenge,
+        r,
+        s_is,
+        q.clone(),
+        sigma_list.clone(),
+        fat_a,
+        g_prime,
+    );
+
+    let step14_blinding: FpVesta = FpVesta::from_literal(32);
+    let (Q_prime, q_prime, Q_prime_blind) = step_14(
+        &crs,
+        x2_challenge,
+        q_is.clone(),
+        r_is.clone(),
+        q.clone(),
+        step14_blinding,
+        omega,
+        x_challenge,
+    );
+
+    let x3_challenge: FpVesta = step_15(FpVesta::from_literal(3));
+
+    let u: Polyx = step_16(n_q, x3_challenge, q_is.clone());
+
+    let x4_challenge: FpVesta = step_17(FpVesta::from_literal(2));
+
+    let (P, v) = step_18(
+        x_challenge,
+        x1_challenge,
+        x2_challenge,
+        x3_challenge,
+        x4_challenge,
+        omega,
+        Q_prime,
+        Q_is,
+        u.clone(),
+        r_is,
+        q,
+    );
+
+    let (p_poly, p_blind) = step_19(x4_challenge, q_prime, q_is, q_blinds, Q_prime_blind);
+
+    let step20_blinding: FpVesta = FpVesta::from_literal(532);
+    let s_poly_points: Seq<(FpVesta, FpVesta)> = Seq::from_vec(vec![
+        (FpVesta::from_literal(729), FpVesta::from_literal(23)),
+        (FpVesta::from_literal(73), FpVesta::from_literal(102)),
+        (FpVesta::from_literal(444), FpVesta::from_literal(484)),
+        (x3_challenge, FpVesta::ZERO()),
+    ]);
+    let s_poly: Polyx = lagrange_polyx(s_poly_points);
+
+    let (S, s_blind) = step_20(s_poly.clone(), crs, step20_blinding);
+
+    let (xi, z) = step_21(FpVesta::from_literal(2), FpVesta::from_literal(2));
+
+    let P_prime: G1_pallas = step_22(P, G[0], S, v, xi);
+
+    let (p_prime_poly, p_prime_blind) = step_23(p_poly, s_poly, x3_challenge, xi, p_blind, s_blind);
+
+    let L_blinding: Polyx =
+        Seq::<FpVesta>::from_vec(vec![FpVesta::from_literal(549), FpVesta::from_literal(634)]);
+    let R_blinding: Polyx =
+        Seq::<FpVesta>::from_vec(vec![FpVesta::from_literal(827), FpVesta::from_literal(826)]);
+    let u_challenges: Polyx =
+        Seq::from_vec(vec![FpVesta::from_literal(2), FpVesta::from_literal(2)]);
+    let (p_prime, G_prime, b, L, R, L_blinding, R_blinding) = step_24(
+        p_prime_poly,
+        G,
+        x3_challenge,
+        z,
+        U,
+        W,
+        n,
+        2,
+        u_challenges.clone(),
+        L_blinding,
+        R_blinding,
+    );
+    let (c, f) = step_25(
+        p_prime,
+        L_blinding,
+        R_blinding,
+        p_prime_blind,
+        u_challenges.clone(),
+    );
+
+    let V_accepts = step_26(u_challenges, L, P_prime, R, c, G_prime[0], b[0], z, U, f, W);
+
+    assert!(!V_accepts);
+}
+#[cfg(test)]
+#[test]
 fn example_run() {
     /*
      * let n = 2^2 = 4
@@ -2708,6 +4105,7 @@ fn example_run() {
     let n: u128 = 4;
     let n_a: usize = 3;
     let n_q: u128 = 2;
+    let n_g = 4;
     let omega: FpVesta =
         FpVesta::from_hex("3691ce115adfa1187d65aa6313c354eb4a146505975fd3435d2f235b4abeb917");
     let G: Seq<G1_pallas> = Seq::<G1_pallas>::from_vec(vec![
@@ -2718,15 +4116,15 @@ fn example_run() {
     ]);
     let W: G1_pallas = g1mul_pallas(FpVesta::from_literal(123), g1_generator_pallas());
     let crs: CRS = (G.clone(), W);
-    let U: G1_pallas = g1mul_pallas(FpVesta::from_literal(743), g1_generator_pallas());
+    let U: G1_pallas = g1mul_pallas(FpVesta::from_literal(72143), g1_generator_pallas());
 
     let r_poly = Seq::<FpVesta>::from_vec(vec![
-        FpVesta::from_literal(987),
-        FpVesta::from_literal(2),
-        FpVesta::from_literal(64),
-        FpVesta::from_literal(355),
+        FpVesta::from_literal(13),
+        FpVesta::from_literal(1123),
+        FpVesta::from_literal(1444),
+        FpVesta::from_literal(9991),
     ]);
-    let R_blind: FpVesta = FpVesta::from_literal(78);
+    let R_blind: FpVesta = FpVesta::from_literal(123);
     let R: G1_pallas = commit_polyx(&crs, r_poly.clone(), R_blind);
 
     let p: Seq<Seq<u128>> = Seq::<Seq<u128>>::from_vec(vec![
@@ -2770,11 +4168,11 @@ fn example_run() {
     let q_add: Polyx = lagrange_polyx(q_add_points);
 
     // construct A_i's (commitments)
-    let A_0_blinding: FpVesta = FpVesta::from_literal(99);
+    let A_0_blinding: FpVesta = FpVesta::from_literal(123);
     let A_0: G1_pallas = commit_polyx(&crs, a_0.clone(), A_0_blinding);
-    let A_1_blinding: FpVesta = FpVesta::from_literal(123);
+    let A_1_blinding: FpVesta = FpVesta::from_literal(234);
     let A_1: G1_pallas = commit_polyx(&crs, a_1.clone(), A_1_blinding);
-    let A_2_blinding: FpVesta = FpVesta::from_literal(748);
+    let A_2_blinding: FpVesta = FpVesta::from_literal(345);
     let A_2: G1_pallas = commit_polyx(&crs, a_2.clone(), A_2_blinding);
     let A_list: Seq<G1_pallas> = Seq::<G1_pallas>::from_vec(vec![A_0, A_1, A_2]);
     // save a_blinds
@@ -2799,16 +4197,16 @@ fn example_run() {
     let h_is: Seq<Polyx> = step_5(h.clone(), n, 4);
 
     let h_blindings: Polyx = Seq::<FpVesta>::from_vec(vec![
-        FpVesta::from_literal(5),
-        FpVesta::from_literal(76),
-        FpVesta::from_literal(726),
+        FpVesta::from_literal(3),
+        FpVesta::from_literal(4523),
+        FpVesta::from_literal(838),
     ]);
-    let H_is: Seq<G1_pallas> = step_6(h_is.clone(), &crs, h_blindings);
+    let H_is: Seq<G1_pallas> = step_6(h_is.clone(), &crs, h_blindings.clone());
 
-    let x_challenge: FpVesta = FpVesta::from_literal(345);
+    let x_challenge: FpVesta = FpVesta::from_literal(2);
     let H_prime: G1_pallas = step_7(H_is, x_challenge, n);
 
-    let h_prime: Polyx = step_8(h_is, x_challenge, n);
+    let (h_prime, h_prime_blind) = step_8(h_is, x_challenge, n, h_blindings.clone());
 
     let (r, fat_a) = step_9(
         r_poly.clone(),
@@ -2820,8 +4218,8 @@ fn example_run() {
 
     let s_is: Seq<Polyx> = step_10(omega, p.clone(), x_challenge, fat_a.clone());
 
-    let x1_challenge = FpVesta::from_literal(475);
-    let x2_challenge: FpVesta = FpVesta::from_literal(286);
+    let x1_challenge = FpVesta::from_literal(2);
+    let x2_challenge: FpVesta = FpVesta::from_literal(2);
 
     let (Q_is, _, _): (Seq<G1_pallas>, FpVesta, FpVesta) = step_11(
         n_a as u128,
@@ -2843,6 +4241,8 @@ fn example_run() {
         q.clone(),
         sigma_list.clone(),
         a_blinds,
+        R_blind,
+        h_prime_blind,
     );
 
     let r_is: Seq<Polyx> = step_13(
@@ -2870,11 +4270,11 @@ fn example_run() {
         x_challenge,
     );
 
-    let x3_challenge: FpVesta = step_15(FpVesta::from_literal(175));
+    let x3_challenge: FpVesta = step_15(FpVesta::from_literal(3));
 
     let u: Polyx = step_16(n_q, x3_challenge, q_is.clone());
 
-    let x4_challenge: FpVesta = step_17(FpVesta::from_literal(391));
+    let x4_challenge: FpVesta = step_17(FpVesta::from_literal(2));
 
     let (P, v) = step_18(
         x_challenge,
@@ -2889,7 +4289,6 @@ fn example_run() {
         r_is,
         q,
     );
-    let u = 123;
 
     let (p_poly, p_blind) = step_19(x4_challenge, q_prime, q_is, q_blinds, Q_prime_blind);
 
@@ -2914,7 +4313,7 @@ fn example_run() {
     );
     let (S, s_blind) = step_20(s_poly.clone(), crs, step20_blinding);
 
-    let (xi, z) = step_21(FpVesta::from_literal(98), FpVesta::from_literal(8438));
+    let (xi, z) = step_21(FpVesta::from_literal(2), FpVesta::from_literal(2));
 
     let P_prime: G1_pallas = step_22(P, G[0], S, v, xi);
 
@@ -2929,10 +4328,8 @@ fn example_run() {
         Seq::<FpVesta>::from_vec(vec![FpVesta::from_literal(549), FpVesta::from_literal(634)]);
     let R_blinding: Polyx =
         Seq::<FpVesta>::from_vec(vec![FpVesta::from_literal(827), FpVesta::from_literal(826)]);
-    let u_challenges: Polyx = Seq::from_vec(vec![
-        FpVesta::from_literal(723),
-        FpVesta::from_literal(9283),
-    ]);
+    let u_challenges: Polyx =
+        Seq::from_vec(vec![FpVesta::from_literal(2), FpVesta::from_literal(2)]);
     let (p_prime, G_prime, b, L, R, L_blinding, R_blinding) = step_24(
         p_prime_poly,
         G,
@@ -2991,7 +4388,641 @@ fn test_primitive_root_of_unity() {
     //13803942648357170028780649679183673168585732045000043587712121170790388377178
 }
 
-fn hahsh() {
-    let test = Seq::<u8>::create(10);
-    test.push(&2);
+/// HERE STARTS IMPLEMENTATION FOR THE POLYNOMIAL RING OVER THE VESTA FIELD ///
+
+pub type Polyx = Seq<FpVesta>;
+
+/// Add two polynomials, return resulting polynomial
+///
+/// # Arguments
+///
+/// * `p1` - the LHS polynomial
+/// * `p2` - the RHS polynomial
+pub fn add_polyx(p1: Polyx, p2: Polyx) -> Polyx {
+    let mut res = Seq::<FpVesta>::create(0);
+    let mut short_len = 0;
+
+    if p1.len() > p2.len() {
+        res = p1.clone();
+        short_len = p2.len();
+    } else {
+        res = p2.clone();
+        short_len = p1.len();
+    }
+
+    for i in 0..short_len {
+        res[i] = p1[i] + p2[i];
+    }
+
+    trim_polyx(res)
+}
+
+/// Subtract two polynomials, return resulting polynomial
+///
+/// # Arguments
+///
+/// * `p1` - the LHS polynomial
+/// * `p2` - the RHS polynomial
+pub fn sub_polyx(p1: Polyx, p2: Polyx) -> Polyx {
+    let mut largest = p1.len();
+    if p2.len() > p1.len() {
+        largest = p2.len();
+    }
+
+    let mut res = Seq::<FpVesta>::create(largest);
+    for i in 0..p1.len() {
+        res[i] = p1[i];
+    }
+
+    for i in 0..p2.len() {
+        res[i] = res[i] - p2[i];
+    }
+
+    trim_polyx(res)
+}
+
+/// Polynomial multiplication using sparse multiplication.
+/// This can be more efficient than operand scanning but also prone to side-channel
+/// attacks.
+/// Mostly copied from hacspec's poly_mul
+///
+/// # Arguments
+///
+/// * `p1` LHS polynomial
+/// * `p2` RHS polynomial
+pub fn mul_polyx(a: Polyx, b: Polyx) -> Polyx {
+    let mut result = Seq::<FpVesta>::create(a.len() + b.len());
+    for i in 0..a.len() {
+        if !a[i].equal(FpVesta::default()) {
+            for j in 0..b.len() {
+                if !b[j].equal(FpVesta::default()) {
+                    result[i + j] = (result[i + j].add(a[i] * b[j]));
+                }
+            }
+        }
+    }
+    trim_polyx(result)
+}
+
+/// Multiply a polynomial by a scalar, return resulting polynomial
+///
+/// # Arguments
+///
+/// * `p` - the polynomial
+/// * `s` - the scalar
+pub fn mul_scalar_polyx(p: Polyx, s: FpVesta) -> Polyx {
+    let mut res = p.clone();
+
+    for i in 0..res.len() {
+        res[i] = p[i] * s;
+    }
+
+    res
+}
+
+/// Add a scalar (constant) from a polynomial, return resulting polynomial
+///
+/// # Arguments
+///
+/// * `p` - the polynomial
+/// * `s` - the scalar
+pub fn add_scalar_polyx(p: Polyx, s: FpVesta) -> Polyx {
+    let mut res = p.clone();
+    if res.len() == 0 {
+        // if poly empty, initialize res to zero constant term
+        res = Seq::<FpVesta>::create(1);
+    }
+
+    // do the addition on constant term
+    res[0] = res[0] + s;
+
+    res
+}
+
+/// Subtract a scalar (constant) from a polynomial, return resulting polynomial
+///
+/// # Arguments
+///
+/// * `p` - the polynomial
+/// * `s` - the scalar
+pub fn sub_scalar_polyx(p: Polyx, s: FpVesta) -> Polyx {
+    let mut res = p.clone();
+    if res.len() == 0 {
+        // if poly empty, initialize res to zero constant term
+        res = Seq::<FpVesta>::create(1);
+    }
+
+    // do the subtraction on constant term
+    res[0] = res[0] - s;
+
+    res
+}
+
+/// Evaluate a polynomial at point, return the evaluation
+///
+/// # Arguments
+///
+/// * `p` - the polynomial
+/// * `x` - the point
+pub fn eval_polyx(p: Polyx, x: FpVesta) -> FpVesta {
+    let mut res = FpVesta::ZERO();
+
+    for i in 0..p.len() {
+        res = res + p[i] * x.exp(i as u32);
+    }
+
+    res
+}
+
+/// Get the degree of a polynomial
+///
+/// # Arguments
+///
+/// * `p` - the polynomial
+pub fn degree_polyx(p: Polyx) -> u128 {
+    let len = trim_polyx(p).len();
+    if len == 0 {
+        0
+    } else {
+        (len - 1) as u128
+    }
+}
+
+/// Checks if all entries in a polynomial is 0
+/// # Arguments
+/// * `p` the polynomial to be checked
+/// # Returns
+/// * `true` if polynomial is NOT all 0
+/// * `false`if polynomial IS all 0
+pub fn check_not_zero_polyx(p: Polyx) -> bool {
+    let mut sum = FpVesta::ZERO();
+    let mut all_zero = false;
+    for i in 0..p.len() {
+        if p[i] > FpVesta::ZERO() {
+            all_zero = true;
+        }
+    }
+    all_zero
+}
+
+/// Trim a polynomial of trailing zeros (zero-terms) and return it
+///
+/// # Arguments
+///
+/// * `p` - the polynomial
+pub fn trim_polyx(p: Polyx) -> Polyx {
+    let mut last_val_idx = 0;
+    for i in 0..p.len() {
+        if p[i] != FpVesta::ZERO() {
+            last_val_idx = i + 1;
+        }
+    }
+    let mut res = Seq::<FpVesta>::create(last_val_idx);
+    if p.len() != 0 {
+        for i in 0..res.len() {
+            res[i] = p[i];
+        }
+    }
+
+    if p.len() == 0 {
+        res = p;
+    }
+
+    res
+}
+
+/// divide the leading terms of two polynomials, returning a single term (e.g. 5x^3) represented as a polynomial
+/// (helper function for divide_poly)
+///
+/// # Arguments
+///
+/// * `n` - the dividend/enumerator polynomial
+/// * `d` - the divisor/denominator polynomial
+pub fn divide_leading_terms(n: Polyx, d: Polyx) -> Polyx {
+    let n: Polyx = trim_polyx(n);
+    let d: Polyx = trim_polyx(d);
+    let x_pow: usize = n.len() - d.len();
+    let n_coeff: FpVesta = n[n.len() - 1];
+    let d_coeff: FpVesta = d[d.len() - 1];
+    let coeff: FpVesta = n_coeff / d_coeff;
+    let mut res: Polyx = Seq::<FpVesta>::create(x_pow + 1);
+    res[x_pow] = coeff;
+
+    res
+}
+
+/// Perform polynomial long division, returning the quotient and the remainder.
+/// The algorithm is from <https://en.wikipedia.org/wiki/Polynomial_long_division>.
+///
+/// The pseudo-code is shown here:
+///
+/// ```text
+/// function n / d is
+///  require d ≠ 0
+///  q ← 0
+///  r ← n             // At each step n = d × q + r
+///
+///  while r ≠ 0 and degree(r) ≥ degree(d) do
+///      t ← lead(r) / lead(d)       // Divide the leading terms
+///      q ← q + t
+///      r ← r − t × d
+///
+///  return (q, r)
+/// ```
+///
+/// # Arguments
+///
+/// * `n` - the dividend/enumerator polynomial
+/// * `d` - the divisor/denominator polynomial
+pub fn divide_polyx(n: Polyx, d: Polyx) -> (Polyx, Polyx) {
+    let mut q: Polyx = Seq::<FpVesta>::create(n.len());
+    let mut r: Polyx = n.clone();
+
+    let mut loop_upper_bound = d.len();
+    if q.len() > d.len() {
+        loop_upper_bound = q.len();
+    }
+    for _ in 0..loop_upper_bound {
+        if check_not_zero_polyx(r.clone()) && degree_polyx(r.clone()) >= degree_polyx(d.clone()) {
+            let t: Polyx = divide_leading_terms(r.clone(), d.clone());
+
+            q = add_polyx(q, t.clone());
+            let aux_prod: Polyx = mul_polyx(d.clone(), t.clone());
+            r = sub_polyx(r, aux_prod);
+        }
+    }
+
+    (trim_polyx(q), trim_polyx(r))
+}
+
+/// Wrapper function for multiplying a polynomial with the indeterminate
+/// # Arguments
+/// * `p` - The polynomial to be multiplied with the indeterminate
+pub fn multi_poly_with_x(p: Polyx) -> Polyx {
+    multi_poly_with_x_pow(p, 1 as usize)
+}
+
+/// Wrapper function for multiplying a polynomial with the indeterminate multiple times
+/// # Arguments
+/// * `p` - the polynomial to be multiplied with the inderterminate
+/// * `power` - the number of times the indeterminate should be multiplied to the polynomial
+pub fn multi_poly_with_x_pow(p: Polyx, power: usize) -> Polyx {
+    let p: Polyx = trim_polyx(p);
+    let mut res: Polyx = Seq::<FpVesta>::create(p.len() + power);
+
+    for i in 0..p.len() {
+        res[i + power] = p[i];
+    }
+    res
+}
+
+///Find lowest degree polynomial passing through a set points using legrange interpolation
+/// # Arguments
+/// * `points`is a sequence of points `(Fp,Fp)` that the polynomial must pass through
+/// # Assertions
+/// * No two points may have the same x-value.
+pub fn lagrange_polyx(points: Seq<(FpVesta, FpVesta)>) -> Polyx {
+    let mut poly = Seq::<FpVesta>::create(points.len());
+
+    for i in 0..points.len() {
+        let x: FpVesta = points[i].0;
+        let y: FpVesta = points[i].1;
+        let basis = lagrange_basis(points.clone(), x);
+        let scaled_basis = mul_scalar_polyx(basis, y);
+        poly = add_polyx(poly.clone(), scaled_basis.clone());
+    }
+    poly = trim_polyx(poly);
+    poly
+}
+/// Finds the legrange basis for a set of `points` and a single evaluation point `x`
+/// This will produce a polynomial that evaluates to 1 at `x`and to 0 at all other x-values in the set `points`
+/// No other guarentees are given about the resulting polynomial
+/// # Arguments
+/// * `points`is a sequence of points `(Fp,Fp)` whose x-values the polynomial wil evaluate to 0 at
+/// * `x`is the x-value where the polynomial will evaluate to 1. If `x`is also in `points` the polynomial will still evaluate to 1 at `x``
+/// # Assertions
+/// * No two points may have the same x-value
+pub fn lagrange_basis(points: Seq<(FpVesta, FpVesta)>, x: FpVesta) -> Polyx {
+    let mut basis = Seq::<FpVesta>::create(points.len());
+    basis[0] = FpVesta::ONE();
+    let mut devisor = FpVesta::ONE();
+    for i in 0..points.len() {
+        let point = points[i];
+        let p_x = point.0;
+        if p_x != x {
+            devisor = devisor.mul(x.sub(p_x));
+            let poly_mul_x = multi_poly_with_x(basis.clone());
+            let poly_mul_scalar: Polyx = mul_scalar_polyx(basis.clone(), p_x.neg());
+            basis = add_polyx(poly_mul_x, poly_mul_scalar);
+        }
+    }
+    let test = eval_polyx(basis.clone(), FpVesta::ONE());
+    let mut division_poly = Seq::<FpVesta>::create(points.len());
+    division_poly[0] = devisor;
+
+    let output = divide_polyx(basis.clone(), division_poly.clone());
+
+    let (final_basis, _) = output;
+
+    final_basis
+}
+
+// functions used for testing of polyx
+
+fn gen_zero_polyx() -> Polyx {
+    let poly = Seq::<FpVesta>::create(1);
+    poly
+}
+
+fn gen_one_polyx() -> Polyx {
+    let mut poly = Seq::<FpVesta>::create(1);
+    poly[0] = FpVesta::ONE();
+    poly
+}
+
+fn check_equal_polyx(p1: Polyx, p2: Polyx) -> bool {
+    let mut is_equal = false;
+    if trim_polyx(p1.clone()).len() == trim_polyx(p2.clone()).len() {
+        is_equal = true;
+        for i in 0..trim_polyx(p1.clone()).len() {
+            let p1_scaler_i = p1[i].clone();
+            let p2_scaler_i = p2[i].clone();
+            if p1_scaler_i != p2_scaler_i {
+                is_equal = false;
+            }
+        }
+    }
+    is_equal
+}
+#[cfg(test)]
+#[derive(Clone, Debug, Default)]
+struct PolyxContainer(Polyx);
+#[cfg(test)]
+impl Arbitrary for PolyxContainer {
+    fn arbitrary(g: &mut quickcheck::Gen) -> PolyxContainer {
+        let size = u8::arbitrary(g);
+        let mut v: Vec<FpVesta> = vec![];
+        for _ in 0..size {
+            let new_val: FpVesta = FpVesta::from_literal(u128::arbitrary(g));
+            v.push(new_val);
+        }
+        PolyxContainer(Seq::<FpVesta>::from_vec(v))
+    }
+}
+
+#[cfg(test)]
+#[quickcheck]
+fn test_poly_add_logic(p1: PolyxContainer, p2: PolyxContainer, x: u128) {
+    let p1 = p1.0;
+    let p2 = p2.0;
+    let x = FpVesta::from_literal(x);
+    let sum_poly = add_polyx(p1.clone(), p2.clone());
+
+    let expected = eval_polyx(p1, x) + eval_polyx(p2, x);
+    let actual = eval_polyx(sum_poly, x);
+    assert_eq!(expected, actual);
+}
+
+#[cfg(test)]
+#[quickcheck]
+fn test_poly_add_closure(p1: PolyxContainer, p2: PolyxContainer) {
+    let p1 = p1.0;
+    let p2 = p2.0;
+    let p3 = add_polyx(p1.clone(), p2.clone());
+}
+
+#[cfg(test)]
+#[quickcheck]
+fn test_poly_add_associativity(p1: PolyxContainer, p2: PolyxContainer, p3: PolyxContainer) {
+    let p1 = p1.0;
+    let p2 = p2.0;
+    let p3 = p3.0;
+    let p4 = add_polyx(p1.clone(), p2.clone());
+    let p4 = add_polyx(p4.clone(), p3.clone());
+    let p5 = add_polyx(p2.clone(), p3.clone());
+    let p5 = add_polyx(p5.clone(), p1.clone());
+    assert!(check_equal_polyx(p5, p4))
+}
+
+#[cfg(test)]
+#[quickcheck]
+fn test_poly_add_identity(p1: PolyxContainer) {
+    let p1 = p1.0;
+
+    let p2 = add_polyx(p1.clone(), gen_zero_polyx());
+
+    let p3 = add_polyx(gen_zero_polyx(), p1.clone());
+
+    assert!(check_equal_polyx(p1, p2.clone()));
+    assert!(check_equal_polyx(p3, p2));
+}
+
+#[cfg(test)]
+#[quickcheck]
+fn test_poly_add_inverse(p1: PolyxContainer) {
+    let p1 = p1.0;
+    let p1_inv = sub_polyx(gen_zero_polyx(), p1.clone());
+    let p3 = add_polyx(p1.clone(), p1_inv.clone());
+    let p4 = add_polyx(p1_inv, p1);
+    assert!(check_equal_polyx(p3.clone(), p4));
+    assert!(check_equal_polyx(p3, gen_zero_polyx()));
+}
+
+#[cfg(test)]
+#[quickcheck]
+fn test_poly_add_cummutativity(p1: PolyxContainer, p2: PolyxContainer) {
+    let p1 = p1.0;
+    let p2 = p2.0;
+    let p3 = add_polyx(p1.clone(), p2.clone());
+    let p4 = add_polyx(p2.clone(), p1.clone());
+    assert!(check_equal_polyx(p3.clone(), p4));
+}
+
+#[cfg(test)]
+#[quickcheck]
+fn test_poly_add_right_distributive(p1: PolyxContainer, p2: PolyxContainer, p3: PolyxContainer) {
+    let p1 = p1.0;
+    let p2 = p2.0;
+    let p3 = p3.0;
+
+    // p4 = p1 * (p2 + p3)
+    let p4 = add_polyx(p1.clone(), p2.clone());
+    let p4 = mul_polyx(p4.clone(), p3.clone());
+
+    // p5 = (p1 * p2) + (p1 * p3)
+    let p5 = mul_polyx(p1.clone(), p3.clone());
+    let p6 = mul_polyx(p2.clone(), p3.clone());
+    let p5 = add_polyx(p5.clone(), p6.clone());
+    assert!(check_equal_polyx(p4, p5));
+}
+
+//////////////////
+
+#[cfg(test)]
+#[quickcheck]
+fn test_poly_mul_logic(p1: PolyxContainer, p2: PolyxContainer, x: u128) {
+    let p1 = p1.0;
+    let p2 = p2.0;
+    let x = FpVesta::from_literal(x);
+    let mul_poly = mul_polyx(p1.clone(), p2.clone());
+
+    let expected = eval_polyx(p1, x) * eval_polyx(p2, x);
+    let actual = eval_polyx(mul_poly, x);
+    assert_eq!(expected, actual);
+}
+
+#[cfg(test)]
+#[quickcheck]
+fn test_poly_mul_closure(p1: PolyxContainer, p2: PolyxContainer) {
+    let p1 = p1.0;
+    let p2 = p2.0;
+    let p3 = mul_polyx(p1.clone(), p2.clone());
+}
+
+#[cfg(test)]
+#[quickcheck]
+fn test_poly_mul_associativity(p1: PolyxContainer, p2: PolyxContainer, p3: PolyxContainer) {
+    let p1 = p1.0;
+    let p2 = p2.0;
+    let p3 = p3.0;
+    let p4 = mul_polyx(p1.clone(), p2.clone());
+    let p4 = mul_polyx(p4.clone(), p3.clone());
+    let p5 = mul_polyx(p2.clone(), p3.clone());
+    let p5 = mul_polyx(p5.clone(), p1.clone());
+    assert!(check_equal_polyx(p5, p4))
+}
+
+#[cfg(test)]
+#[quickcheck]
+fn test_poly_mul_identity(p1: PolyxContainer) {
+    let p1 = p1.0;
+    let p2 = mul_polyx(p1.clone(), gen_one_polyx());
+    let p3 = mul_polyx(gen_one_polyx(), p1.clone());
+    assert!(check_equal_polyx(p1, p2.clone()));
+    assert!(check_equal_polyx(p3, p2));
+}
+
+#[cfg(test)]
+#[quickcheck]
+fn test_poly_mul_cummutativity(p1: PolyxContainer, p2: PolyxContainer) {
+    let p1 = p1.0;
+    let p2 = p2.0;
+    let p3 = mul_polyx(p1.clone(), p2.clone());
+    let p4 = mul_polyx(p2.clone(), p1.clone());
+    assert!(check_equal_polyx(p3, p4));
+}
+
+#[cfg(test)]
+#[quickcheck]
+fn test_poly_mul_left_distributive(p1: PolyxContainer, p2: PolyxContainer, p3: PolyxContainer) {
+    let p1 = p1.0;
+    let p2 = p2.0;
+    let p3 = p3.0;
+    // p4 = p1 * (p2 + p3)
+    let p4 = add_polyx(p2.clone(), p3.clone());
+    let p4 = mul_polyx(p4.clone(), p1.clone());
+    // p5 = (p1 * p2) + (p1 * p3)
+    let p5 = mul_polyx(p1.clone(), p2.clone());
+    let p6 = mul_polyx(p1.clone(), p3.clone());
+    let p5 = add_polyx(p5.clone(), p6.clone());
+    assert!(check_equal_polyx(p4, p5));
+}
+///////////////////
+
+#[cfg(test)]
+#[quickcheck]
+fn test_poly_div(p1: PolyxContainer, p2: PolyxContainer, x: u128) {
+    let p1 = p1.0;
+    let p2 = p2.0;
+    if p2.len() > 0 {
+        let x = FpVesta::from_literal(x);
+
+        let (q, r) = divide_polyx(p1.clone(), p2.clone());
+        let eval_q = eval_polyx(q, x);
+        let eval_r = eval_polyx(r, x);
+        let eval_r_div = eval_r / eval_polyx(p2.clone(), x);
+
+        let expected = eval_polyx(p1, x) / eval_polyx(p2.clone(), x);
+        let actual = eval_q + eval_r_div;
+
+        assert_eq!(expected, actual);
+    }
+}
+
+#[cfg(test)]
+#[quickcheck]
+fn test_poly_sub(p1: PolyxContainer, p2: PolyxContainer, x: u128) {
+    let p1 = p1.0;
+    let p2 = p2.0;
+    let x = FpVesta::from_literal(x);
+    let sum_poly = sub_polyx(p1.clone(), p2.clone());
+
+    let expected = eval_polyx(p1, x) - eval_polyx(p2, x);
+    let actual = eval_polyx(sum_poly, x);
+    assert_eq!(expected, actual);
+}
+
+#[cfg(test)]
+#[test]
+fn test_poly_eval() {
+    let v1 = vec![5, 10, 20]
+        .iter()
+        .map(|e| FpVesta::from_literal((*e) as u128))
+        .collect();
+    let p1 = Seq::from_vec(v1);
+
+    assert_eq!(eval_polyx(p1, FpVesta::TWO()), FpVesta::from_literal(105));
+}
+
+#[cfg(test)]
+#[test]
+fn test_trim_poly() {
+    let p = Seq::from_vec(vec![
+        FpVesta::ZERO(),
+        FpVesta::from_literal(6),
+        FpVesta::from_literal(4),
+        FpVesta::ZERO(),
+        FpVesta::ZERO(),
+        FpVesta::from_literal(2),
+        FpVesta::ZERO(),
+        FpVesta::ZERO(),
+        FpVesta::ZERO(),
+    ]);
+
+    let trimmed_p = trim_polyx(p.clone());
+    assert_eq!(trimmed_p.len(), p.len() - 3);
+}
+
+#[cfg(test)]
+#[quickcheck]
+fn test_lagrange(a: Points) {
+    let points_seq = a.0;
+
+    let legrange_poly = lagrange_polyx(points_seq.clone());
+
+    for j in 0..points_seq.len() {
+        let eval_x = points_seq[j].0;
+        let point_y = points_seq[j].1;
+        let res = eval_polyx(legrange_poly.clone(), eval_x);
+        assert_eq!(res, point_y)
+    }
+}
+
+#[cfg(test)]
+#[quickcheck]
+fn test_lagrange_basis(a: Points) {
+    let points_seq = a.0;
+    for i in 0..points_seq.len() {
+        let x = points_seq[i].0;
+        let basis = lagrange_basis(points_seq.clone(), x);
+        for j in 0..points_seq.len() {
+            let eval_x = points_seq[j].0;
+            let res = eval_polyx(basis.clone(), eval_x);
+            if x == eval_x {
+                assert_eq!(res, FpVesta::ONE())
+            } else {
+                assert_eq!(res, FpVesta::ZERO())
+            }
+        }
+    }
 }
