@@ -1237,8 +1237,8 @@ fn test_step_5(h: UniPolynomial, n: u8) -> TestResult {
 #[cfg(test)]
 fn g1_generator_pallas() -> G1_pallas {
     (
-        FpPallas::from_hex("1").neg(),
-        FpPallas::from_hex("2"),
+        FpPallas::from_hex("1"),
+        FpPallas::from_hex("1B74B5A30A12937C53DFA9F06378EE548F655BD4333D477119CF7A23CAED2ABB"),
         false,
     )
 }
@@ -2436,8 +2436,8 @@ fn test_step_26() {
     let U: G1_pallas = g1mul_pallas(FpVesta::from_literal(77777777), g1_generator_pallas());
     let f: FpVesta = FpVesta::ONE();
     let W: G1_pallas = (
-        FpPallas::from_hex("29A35E837F1BC8F4D83DD8E452DAC6691BDEDE5F0916BB02E7EB3BF0D8724746"),
-        FpPallas::from_hex("2E7E5A3C4EFBE72E130E31E28F22E98BF0A3225FCB5E579B61B98F28083A8A05"),
+        FpPallas::from_hex("1784F1B68234A1FEF45D4A6F667D6C9ED3663FF6954D060FD8BF280C3DB968D2"),
+        FpPallas::from_hex("16BBF3862C0B3A7E56AE15E80B3DE08F4A06A46A3761FDF4F8AC359BEBA2938E"),
         false,
     );
 
