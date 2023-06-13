@@ -1480,130 +1480,132 @@ fn test_step_11() {
     );
 }
 
-// #[cfg(test)]
-// #[test]
-// fn test_step_12() {
-//     fn a(
-//         n_a: u8,
-//         n_q: u8,
-//         x1: u8,
-//         r: UniPolynomial,
-//         h: UniPolynomial,
-//         a_polys: SeqOfUniPoly,
-//     ) -> bool {
-//         ////////////////////////////////////////////////////////////////////////////////////
-//         /// SETTING UP THE REQUIRED VALUES (n_a, n_q, x1, H', R, the q list, the A commitemtns), NOT INTERESTING
-//         ////////////////////////////////////////////////////////////////////////////////////
-//         let mut n_a: u8 = n_a; // make it non-zero
-//         if n_a == 0 {
-//             n_a = 1;
-//         }
-//         let mut n_q: u8 = n_q; // make it non-zero
-//         if n_q == 0 {
-//             n_q = 1;
-//         }
-//         if n_q > n_a {
-//             n_q = n_q % n_a
-//         }
-//         let x1 = FpVesta::from_literal(x1 as u128);
+#[cfg(test)]
+#[test]
+fn test_step_12() {
+    fn a(
+        n_a: u8,
+        n_q: u8,
+        x1: u8,
+        r: UniPolynomial,
+        h: UniPolynomial,
+        a_polys: SeqOfUniPoly,
+    ) -> bool {
+        ////////////////////////////////////////////////////////////////////////////////////
+        /// SETTING UP THE REQUIRED VALUES (n_a, n_q, x1, H', R, the q list, the A commitemtns), NOT INTERESTING
+        ////////////////////////////////////////////////////////////////////////////////////
+        let mut n_a: u8 = n_a; // make it non-zero
+        if n_a == 0 {
+            n_a = 1;
+        }
+        let mut n_q: u8 = n_q; // make it non-zero
+        if n_q == 0 {
+            n_q = 1;
+        }
+        if n_q > n_a {
+            n_q = n_q % n_a
+        }
+        let x1 = FpVesta::from_literal(x1 as u128);
 
-//         let mut sigma_list: Vec<u128> = vec![];
-//         let mut q = Seq::<Seq<u128>>::create(n_a as usize);
-//         // create some random values for q, each entry with len n_q/2
-//         // and entries for sigma_list to be used in sigma
-//         // (note, here we actually do not guarantee that q's elements are distinct)
-//         // add one more entry for sigma_list, since the loop starts at 1
-//         let sigma_idx = rand::Rng::gen_range(&mut rand::thread_rng(), 0..q.len());
-//         sigma_list.push(sigma_idx as u128);
-//         q[0] = Seq::<u128>::from_vec(vec![0]); // q[0]={0} by definition
-//         for i in 1..q.len() {
-//             let mut v: Vec<u128> = vec![];
-//             for j in 0..n_q {
-//                 v.push(j as u128);
-//             }
-//             v.shuffle(&mut thread_rng());
-//             let v = &v[0..((n_q / 2) as usize)];
-//             q[i] = Seq::from_vec(v.to_vec());
+        let mut sigma_list: Vec<u128> = vec![];
+        let mut q = Seq::<Seq<u128>>::create(n_a as usize);
+        // create some random values for q, each entry with len n_q/2
+        // and entries for sigma_list to be used in sigma
+        // (note, here we actually do not guarantee that q's elements are distinct)
+        // add one more entry for sigma_list, since the loop starts at 1
+        let sigma_idx = rand::Rng::gen_range(&mut rand::thread_rng(), 0..q.len());
+        sigma_list.push(sigma_idx as u128);
+        q[0] = Seq::<u128>::from_vec(vec![0]); // q[0]={0} by definition
+        for i in 1..q.len() {
+            let mut v: Vec<u128> = vec![];
+            for j in 0..n_q {
+                v.push(j as u128);
+            }
+            v.shuffle(&mut thread_rng());
+            let v = &v[0..((n_q / 2) as usize)];
+            q[i] = Seq::from_vec(v.to_vec());
 
-//             let sigma_idx = rand::Rng::gen_range(&mut rand::thread_rng(), 0..q.len());
-//             sigma_list.push(sigma_idx as u128);
-//         }
+            let sigma_idx = rand::Rng::gen_range(&mut rand::thread_rng(), 0..q.len());
+            sigma_list.push(sigma_idx as u128);
+        }
 
-//         let sigma_seq = Seq::<u128>::from_vec(sigma_list);
+        let sigma_seq = Seq::<u128>::from_vec(sigma_list);
 
-//         // a_polys is a number of random polys, but there should be n_a of them
-//         // (SeqOfUniPoly generates a fixed length seq of polys)
-//         let mut a_polys = a_polys.0;
-//         if a_polys.len() > n_a as usize {
-//             a_polys = Seq::from_vec(a_polys.native_slice()[0..(n_a as usize)].to_vec());
-//         } else if a_polys.len() < n_a as usize {
-//             let diff = n_a as usize - a_polys.len();
-//             for _ in 0..diff {
-//                 // if wrong size, just use 0
-//                 a_polys = a_polys.push(&Seq::<FpVesta>::from_vec(vec![FpVesta::ZERO()]));
-//             }
-//         }
-//         //////////////////////////////////////////////////////////////////////////////////
-//         /// SETTING UP VALUES DONE
-//         //////////////////////////////////////////////////////////////////////////////////
-//         let h = h.0;
-//         let r = r.0;
-//         let (q_s, _) = step_12(
-//             n_a as u128,
-//             x1,
-//             h.clone(),
-//             r.clone(),
-//             a_polys.clone(),
-//             q.clone(),
-//             sigma_seq.clone(),
-//             Seq::create(a_polys.len()), // we dont test blindess
-//         );
-//         // calculate each Q_i and check that it corresponds with the output of step_12
-//         for i in 0..n_q {
-//             let mut q_poly = Seq::<FpVesta>::create(1);
-//             // BULLET 1
-//             // q_i := x1 * q_i + a'_j(X), for every time i is in some sigma(j)
-//             for j in 0..n_a {
-//                 let p_j = sigma(j as u128, sigma_seq.clone(), q.clone());
-//                 for k in 0..p_j.len() {
-//                     if i == p_j[k] as u8 {
-//                         q_poly = add_polyx(mul_scalar_polyx(q_poly, x1), a_polys[j].clone())
-//                     }
-//                 }
-//             }
-//             // BULLET 2
-//             // q_0 := x1^2 * q_0 + x1 * h'(X) + r(X)
-//             if i == 0 {
-//                 q_poly = mul_scalar_polyx(q_poly, x1.pow(2));
-//                 q_poly = add_polyx(q_poly, mul_scalar_polyx(h.clone(), x1));
-//                 q_poly = add_polyx(q_poly, r.clone());
-//             }
-//             q_poly = trim_polyx(q_poly);
-//             let expected = trim_polyx(q_s[i as usize].clone());
-//             if q_poly.len() != expected.len() {
-//                 return false;
-//             }
-//             for j in 0..q_poly.len() {
-//                 if q_poly[j] != expected[j] {
-//                     return false;
-//                 }
-//             }
-//         }
+        // a_polys is a number of random polys, but there should be n_a of them
+        // (SeqOfUniPoly generates a fixed length seq of polys)
+        let mut a_polys = a_polys.0;
+        if a_polys.len() > n_a as usize {
+            a_polys = Seq::from_vec(a_polys.native_slice()[0..(n_a as usize)].to_vec());
+        } else if a_polys.len() < n_a as usize {
+            let diff = n_a as usize - a_polys.len();
+            for _ in 0..diff {
+                // if wrong size, just use 0
+                a_polys = a_polys.push(&Seq::<FpVesta>::from_vec(vec![FpVesta::ZERO()]));
+            }
+        }
+        //////////////////////////////////////////////////////////////////////////////////
+        /// SETTING UP VALUES DONE
+        //////////////////////////////////////////////////////////////////////////////////
+        let h = h.0;
+        let r = r.0;
+        let (q_s, _) = step_12(
+            n_a as u128,
+            x1,
+            h.clone(),
+            r.clone(),
+            a_polys.clone(),
+            q.clone(),
+            sigma_seq.clone(),
+            Seq::create(a_polys.len()), //
+            FpVesta::ZERO(),            //
+            FpVesta::ZERO(),            // we dont test blindess
+        );
+        // calculate each Q_i and check that it corresponds with the output of step_12
+        for i in 0..n_q {
+            let mut q_poly = Seq::<FpVesta>::create(1);
+            // BULLET 1
+            // q_i := x1 * q_i + a'_j(X), for every time i is in some sigma(j)
+            for j in 0..n_a {
+                let p_j = sigma(j as u128, sigma_seq.clone(), q.clone());
+                for k in 0..p_j.len() {
+                    if i == p_j[k] as u8 {
+                        q_poly = add_polyx(mul_scalar_polyx(q_poly, x1), a_polys[j].clone())
+                    }
+                }
+            }
+            // BULLET 2
+            // q_0 := x1^2 * q_0 + x1 * h'(X) + r(X)
+            if i == 0 {
+                q_poly = mul_scalar_polyx(q_poly, x1.pow(2));
+                q_poly = add_polyx(q_poly, mul_scalar_polyx(h.clone(), x1));
+                q_poly = add_polyx(q_poly, r.clone());
+            }
+            q_poly = trim_polyx(q_poly);
+            let expected = trim_polyx(q_s[i as usize].clone());
+            if q_poly.len() != expected.len() {
+                return false;
+            }
+            for j in 0..q_poly.len() {
+                if q_poly[j] != expected[j] {
+                    return false;
+                }
+            }
+        }
 
-//         true
-//     }
-//     // limit the number of tests, since it is SLOW
-//     QuickCheck::new().tests(10).quickcheck(
-//         a as fn(
-//             n_a: u8,
-//             n_q: u8,
-//             x1: u8,
-//             r: UniPolynomial,
-//             h: UniPolynomial,
-//             a_polys: SeqOfUniPoly,
-//         ) -> bool,
-//     );
-// }
+        true
+    }
+    // limit the number of tests, since it is SLOW
+    QuickCheck::new().tests(10).quickcheck(
+        a as fn(
+            n_a: u8,
+            n_q: u8,
+            x1: u8,
+            r: UniPolynomial,
+            h: UniPolynomial,
+            a_polys: SeqOfUniPoly,
+        ) -> bool,
+    );
+}
 
 // quickcheck is "limited" (not exactly) to eight arguments
 // so we have to reuse some of the values in some way
