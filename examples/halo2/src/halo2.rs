@@ -6,18 +6,6 @@
 use hacspec_lib::*;
 use hacspec_pasta::*;
 
-/// A struct for the public parameters, pp
-//
-/// Since the group and field is currently fixed, only G, U, W is represented
-struct PublicParams(
-    /// **G** in G^n
-    Seq<G1_pallas>,
-    /// U in G
-    G1_pallas,
-    /// W in G
-    G1_pallas,
-);
-
 /// Common Reference Struct
 ///
 /// This struct is a global variable for the proving system and holds values used in the commitment schemes
@@ -27,23 +15,12 @@ struct PublicParams(
 /// * `1`: G1_pallas in G (random group element)
 type CRS = (Seq<G1_pallas>, G1_pallas);
 
-/// A term in a multivariate polynomial
+/// Rotate a polynomial
 ///
-/// # Tuple entries
-/// * `0`: - The first entry represents the coefficient for the term.
-/// * `1`: - The second entry, a sequence of `u32`s, represent the powers
-///        for each variable, s.t. the i'th variabe is raised to the power
-///        of the i'th entry in the sequence.
-type Term = (FpVesta, Seq<u32>);
-
-/// A representation of input variable in multivariate polynomial
+/// # Arguments
 ///
-/// # Tuple entries
-/// * `0`: - The first entry determines whether this variable should be evaluated or not.
-///        This is useful for only evaluating some variables in a multivariate polynomial.
-/// * `1`: - The second entry is the actual (inputted) value for the variable
-type InputVar = (bool, FpVesta);
-
+/// * `p` - the polynomial to rotate
+/// * `rotation` - the rotation used (suitable for primitive roots of unity)
 fn rotate_polyx(p: Polyx, rotation: FpVesta) -> Polyx {
     let mut res = p;
     for i in 0..res.len() {
@@ -4874,8 +4851,9 @@ fn test_primitive_root_of_unity() {
     }
 }
 
-/// HERE STARTS IMPLEMENTATION FOR THE POLYNOMIAL RING OVER THE VESTA FIELD ///
+// HERE STARTS IMPLEMENTATION FOR THE POLYNOMIAL RING OVER THE VESTA FIELD ///
 
+/// A polynomial represented by its coefficient form, such that index i is the i'th term
 pub type Polyx = Seq<FpVesta>;
 
 /// Add two polynomials, return resulting polynomial
