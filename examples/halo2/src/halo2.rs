@@ -975,7 +975,8 @@ fn step_25(
     (c, f)
 }
 
-///Varifiers final check of the protocol
+/// Verifiers final check of the protocol
+///
 /// # Arguments
 /// * `u` - Sequence of `u_j` from step 24
 /// * `L` - Sequence of `L_j` from step 24
@@ -988,7 +989,6 @@ fn step_25(
 /// * `U` - from public parameters
 /// * `f` - blinding factor from step 25
 /// * `W` - from public parameters
-///
 fn step_26(
     u: Polyx,
     L: Seq<G1_pallas>,
