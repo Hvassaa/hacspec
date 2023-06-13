@@ -164,9 +164,7 @@ fn calculate_L_or_R(
 
     part_j
 }
-fn step_1() {}
-fn step_2() {}
-fn step_3() {}
+
 /// Step 4
 /// Beginning of the vanishing argument
 ///
@@ -214,28 +212,8 @@ fn step_5(h: Polyx, n: u128, n_g: u128) -> Seq<Polyx> {
     }
     poly_parts
 }
-// fn step_5(h: Seq<Fp>, n: u128, n_g: u128) -> Seq<Seq<Fp>> {
-//     let h = trim_poly(h);
-//     let no_of_parts = ((h.len() + n as usize - 1) / n as usize);
-//     let n = n as usize;
-
-//     let mut original_index = 0;
-//     let mut poly_parts: Seq<Seq<Fp>> = Seq::<Seq<Fp>>::create(no_of_parts);
-//     for i in 0..poly_parts.len() {
-//         let mut current_poly_part: Seq<Fp> = Seq::<Fp>::create(n);
-//         for j in 0..n {
-//             if original_index < h.len() {
-//                 current_poly_part[j] = h[original_index];
-//                 original_index = original_index + 1;
-//             }
-//         }
-//         poly_parts[i] = current_poly_part;
-//     }
-//     poly_parts
-// }
 
 /// Step 6
-///
 /// commit to each h_i polynomial keeping them in the seq to peserve the power (i)
 ///
 /// # Arguments
@@ -253,6 +231,7 @@ fn step_6(poly_parts: Seq<Polyx>, crs: &CRS, blindings: Polyx) -> Seq<G1_pallas>
     }
     commitment_seq
 }
+
 /// Step 7
 /// Computes the sum from step 7 in the protocol description
 ///
@@ -330,8 +309,9 @@ fn step_9(
     let r_x = eval_polyx(r, x);
     (r_x, a_seq)
 }
+
 /// Step 10
-/// This functions initializes the s sequence of length n_a and fills it with polynomials of degree n_e-1 made with legrange interpolation
+/// This function initializes the s sequence of length n_a and fills it with polynomials of degree n_e-1 made with legrange interpolation
 ///
 /// # Arguments
 /// * `omega` - omega from the protocol
@@ -594,12 +574,12 @@ fn step_14(
 
     (commitment, q_prime, blinding)
 }
+
+/// Step 15
 /// This function emulates sending a challenge.
-/// It takes a challenge and returns it again.
 ///
 /// # Arguments
 ///  * `x_3` - the challenge to be send
-///
 fn step_15(x_3: FpVesta) -> FpVesta {
     x_3
 }
@@ -622,16 +602,17 @@ fn step_16(n_q: u128, x3: FpVesta, q_polys: Seq<Polyx>) -> Polyx {
     u
 }
 
+/// Step 17
 /// This function emulates sending a challenge.
-/// It takes a challenge and returns it again.
 ///
 /// # Arguments
 ///  * `x_4` - the challenge to be send
-///
 fn step_17(x_4: FpVesta) -> FpVesta {
     x_4
 }
-///
+
+/// Step 18
+/// Get P and the v
 ///
 /// # Arguments
 /// * `x` - challenge from step 7
@@ -746,7 +727,6 @@ fn step_19(
 }
 
 /// Step 20
-///
 /// Get the commitment S and the blindness used
 ///
 /// # Arguments
@@ -759,7 +739,6 @@ fn step_20(s: Polyx, crs: CRS, r: FpVesta) -> (G1_pallas, FpVesta) {
 }
 
 /// Step 21
-///
 /// Get the xi and z challenges. They have to be fed into hacspec, since there is no randomness.
 ///
 /// # Arguments
@@ -805,7 +784,6 @@ fn step_23(
     p_blind: FpVesta,
     s_blind: FpVesta,
 ) -> (Polyx, FpVesta) {
-    // TODO what happens if v does not correspond with v?
     let p_eval_x3 = eval_polyx(p.clone(), x3);
     let xi_mul_s = mul_scalar_polyx(s, xi);
     let mut p_prime = p;
@@ -818,7 +796,6 @@ fn step_23(
 }
 
 /// Step 24
-///
 /// Get **G**', **p**', **b**, L, R, and {L,R} blinds
 ///
 /// # Arguments
@@ -830,7 +807,7 @@ fn step_23(
 /// * `W` - the group elem U from public-params
 /// * `n` - n from the protocol preamble
 /// * `k` - k from the protocol preamble
-/// * `u` - the list of u_j challenges from the verifier // TODO maybe should be interactive
+/// * `u` - the list of u_j challenges from the verifier
 /// * `L_blinding` - the list of blinding to be used for L_j
 /// * `R_blinding` - the list of blinding to be used for R_j
 ///
@@ -945,7 +922,6 @@ fn step_24(
 }
 
 /// Step 25
-///
 /// Get the zeroth entry in **p** and synthetic blinding factor f
 ///
 /// # Arguments
@@ -975,6 +951,7 @@ fn step_25(
     (c, f)
 }
 
+/// Step 26
 /// Verifiers final check of the protocol
 ///
 /// # Arguments
@@ -1030,10 +1007,23 @@ fn step_26(
     let rhs: G1_pallas = g1add_pallas(rhs_term_1, g1add_pallas(rhs_term_2, rhs_term_3));
 
     let check: bool = lhs == rhs;
-    // println!("{:?}", lhs);
-    // println!("{:?}", rhs);
     check
 }
+
+// TESTS
+
+// choices of omega
+// n = 8, k = 3
+// ABBF0854924172DE43AC8291F4C7BFE65008B10372D434FA931DF4CE2230320
+// 4855188899445002300170730717563617051094175372704778513906105166874447905568
+
+// n = 4, k = 2
+// 96E31EEA5205EE7829A559CEC3CAB14D83233F67234D59A2F17C7C5B54146EA
+// 4265513433803163958251475299683560813532603332905934989976535652412227143402
+
+//n = 16, k = 4
+// 1E84C131C00EF5E0BECC724167EC7CDB46D8FD71AA4EA57330B5A6CF7040A65A
+//13803942648357170028780649679183673168585732045000043587712121170790388377178
 
 #[cfg(test)]
 extern crate quickcheck;
@@ -1101,6 +1091,7 @@ fn gen_p(p_len: usize, p_i_max_len: usize) -> Seq<Seq<u128>> {
     }
     p
 }
+
 #[cfg(test)]
 impl Arbitrary for PorQ {
     fn arbitrary(g: &mut quickcheck::Gen) -> PorQ {
@@ -1218,13 +1209,6 @@ fn g1_generator_pallas() -> G1_pallas {
 #[cfg(test)]
 #[quickcheck]
 fn test_step_5_6_7_8_manual(x: u8, w: u8) -> bool {
-    // h: UniPolynomial,
-    // W_power: u8,
-    // random_G_power: u8,
-    // n: u8,
-    // x: u8,
-    // blinding: u8,
-
     // the original h poly
     let h: Polyx = Seq::<FpVesta>::from_vec(vec![
         FpVesta::from_literal(3),
@@ -2296,7 +2280,6 @@ fn test_step_11_12() {
          * and g(ω^i) = 0 for all i in [0,n) (should hold)
          *
          *
-         * (n_g - 2 = 2 ??? )
          */
         let n: u128 = 4;
         let n_a: usize = 3;
@@ -2496,7 +2479,6 @@ fn test_step_18_19() {
          * and g(ω^i) = 0 for all i in [0,n) (should hold)
          *
          *
-         * (n_g - 2 = 2 ??? )
          */
         let n: u128 = 4;
         let n_a: usize = 3;
@@ -2739,7 +2721,6 @@ fn test_step_22_23() {
          * and g(ω^i) = 0 for all i in [0,n) (should hold)
          *
          *
-         * (n_g - 2 = 2 ??? )
          */
         let n: u128 = 4;
         let n_a: usize = 3;
@@ -3208,7 +3189,6 @@ fn automatic_negative_illegal_circut_example_run() {
          * and g(ω^i) = 0 for all i in [0,n) (should hold)
          *
          *
-         * (n_g - 2 = 2 ??? )
          */
         let n: u128 = 4;
         let n_a: usize = 3;
@@ -3490,7 +3470,6 @@ fn automatic_positive_legal_blinding_example_run() {
          * and g(ω^i) = 0 for all i in [0,n) (should hold)
          *
          *
-         * (n_g - 2 = 2 ??? )
          */
         let n: u128 = 4;
         let n_a: usize = 3;
@@ -3776,7 +3755,6 @@ fn automatic_positive_legal_challenges_example_run() {
          * and g(ω^i) = 0 for all i in [0,n) (should hold)
          *
          *
-         * (n_g - 2 = 2 ??? )
          */
         let mut rnd1 = rnd1;
         if rnd1 < 2 {
@@ -4087,7 +4065,6 @@ fn automatic_positive_legal_circut_example_run() {
          * and g(ω^i) = 0 for all i in [0,n) (should hold)
          *
          *
-         * (n_g - 2 = 2 ??? )
          */
         let n: u128 = 4;
         let n_a: usize = 3;
@@ -4367,7 +4344,6 @@ fn negative_illegal_circut_example_run() {
      * and g(ω^i) = 0 for all i in [0,n) (should hold)
      *
      *
-     * (n_g - 2 = 2 ??? )
      */
     let n: u128 = 4;
     let n_a: usize = 3;
@@ -4622,7 +4598,6 @@ fn example_run() {
      * and g(ω^i) = 0 for all i in [0,n) (should hold)
      *
      *
-     * (n_g - 2 = 2 ??? )
      */
     let n: u128 = 4;
     let n_a: usize = 3;
@@ -4897,17 +4872,6 @@ fn test_primitive_root_of_unity() {
     for i in 0..n * 2 {
         println!("{:?}", g.pow(i))
     }
-    // n = 8, k = 3
-    // ABBF0854924172DE43AC8291F4C7BFE65008B10372D434FA931DF4CE2230320
-    // 4855188899445002300170730717563617051094175372704778513906105166874447905568
-
-    // n = 4, k = 2
-    // 96E31EEA5205EE7829A559CEC3CAB14D83233F67234D59A2F17C7C5B54146EA
-    // 4265513433803163958251475299683560813532603332905934989976535652412227143402
-
-    //n = 16, k = 4
-    // 1E84C131C00EF5E0BECC724167EC7CDB46D8FD71AA4EA57330B5A6CF7040A65A
-    //13803942648357170028780649679183673168585732045000043587712121170790388377178
 }
 
 /// HERE STARTS IMPLEMENTATION FOR THE POLYNOMIAL RING OVER THE VESTA FIELD ///
@@ -5216,9 +5180,11 @@ pub fn lagrange_polyx(points: Seq<(FpVesta, FpVesta)>) -> Polyx {
     poly = trim_polyx(poly);
     poly
 }
-/// Finds the legrange basis for a set of `points` and a single evaluation point `x`
+
+/// Finds the Lagrange basis for a set of `points` and a single evaluation point `x`
 /// This will produce a polynomial that evaluates to 1 at `x`and to 0 at all other x-values in the set `points`
 /// No other guarentees are given about the resulting polynomial
+///
 /// # Arguments
 /// * `points`is a sequence of points `(Fp,Fp)` whose x-values the polynomial wil evaluate to 0 at
 /// * `x`is the x-value where the polynomial will evaluate to 1. If `x`is also in `points` the polynomial will still evaluate to 1 at `x``
@@ -5276,6 +5242,7 @@ fn check_equal_polyx(p1: Polyx, p2: Polyx) -> bool {
     }
     is_equal
 }
+
 #[cfg(test)]
 #[derive(Clone, Debug, Default)]
 struct PolyxContainer(Polyx);
