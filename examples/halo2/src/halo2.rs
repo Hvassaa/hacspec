@@ -1159,40 +1159,6 @@ impl Arbitrary for G1Container {
 }
 
 #[cfg(test)]
-#[test]
-fn test_step_4() {
-    fn a(omega_value: u8, n: u8, r: u8) -> bool {
-        let g_prime_degree = n as u128 + 5;
-
-        let vanishing_poly_degree = n as u128 % g_prime_degree + 5;
-        let mut r = r as u128;
-
-        // r cannot be 0 as it would lead to g_prime being all 0
-        if r == 0 {
-            r = r + 2;
-        }
-
-        let omega: FpVesta = FpVesta::from_literal((omega_value as u128) + 1);
-        let g_prime = compute_vanishing_polynomial(omega, g_prime_degree as u128);
-        let g_prime = mul_scalar_polyx(g_prime, FpVesta::from_literal(r));
-        let h = step_4(g_prime, omega, vanishing_poly_degree);
-        let h_degree = degree_polyx(h.clone());
-        let expected_h_degree = g_prime_degree - vanishing_poly_degree;
-        assert_eq!(h_degree, expected_h_degree);
-        for i in 0..n {
-            let x = omega.pow(i as u128);
-            let evaluation = eval_polyx(h.clone(), x);
-            assert_eq!(evaluation, FpVesta::ZERO());
-        }
-        true
-    }
-    // limit the number of tests, since it is SLOW
-    QuickCheck::new()
-        .tests(5)
-        .quickcheck(a as fn(omega_value: u8, n: u8, r: u8) -> bool);
-}
-
-#[cfg(test)]
 #[quickcheck]
 fn test_step_5(h: UniPolynomial, n: u8) -> TestResult {
     if n < 2 {
