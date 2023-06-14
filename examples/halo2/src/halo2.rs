@@ -450,7 +450,7 @@ fn step_12(
 /// * `s` - s, the computed polynomials from step 10
 /// * `q` - q, from the protocol
 /// * `sigma_list` - s.t. q[sigma_list[i]]=p_i (indexing/mapping into q, for p_i)
-/// * `a` - a, the list of evaluations from step 9
+/// * `g_prime_eval_combined_from_a` - g'(x) calculated from **a**
 /// * `g_prime` - the polynomial from step 2
 fn step_13(
     n: u128,
@@ -461,10 +461,10 @@ fn step_13(
     s: Seq<Polyx>,
     q: Seq<Seq<u128>>,
     sigma_list: Seq<u128>,
-    a: Seq<Polyx>,
+    g_prime_eval_combined_from_a: FpVesta,
     g_prime: Polyx,
-) -> Seq<Polyx> {
-    let n_a: usize = a.len();
+) -> (Seq<Polyx>, Seq<Polyx>) {
+    let n_a: usize = s.len();
     let n_q: usize = q.len();
     let mut rs: Seq<Polyx> = Seq::<Polyx>::create(n_q as usize);
 
@@ -485,20 +485,37 @@ fn step_13(
         }
     }
 
+    // the calculation until now is the same
+    let mut rs_verifier = rs.clone();
+    let mut rs_prover = rs;
+
     // bullet 2
+    // PPROVER WORKS HERE
     let g_prime_x: FpVesta = eval_polyx(g_prime, x);
     let vanishing_poly: Polyx = compute_vanishing_polynomial(omega, n);
     let vanishing_poly_x: FpVesta = eval_polyx(vanishing_poly, x);
     let h = g_prime_x / vanishing_poly_x;
     let x1_squared: FpVesta = x1 * x1;
-    let r0: Polyx = rs[0 as usize].clone();
+    let r0: Polyx = rs_prover[0 as usize].clone();
     let product1 = mul_scalar_polyx(r0, x1_squared);
     let product2 = h * x1;
     let sum1 = add_scalar_polyx(product1, product2);
     let final_sum = add_scalar_polyx(sum1, r);
-    rs[0] = final_sum;
+    rs_prover[0] = final_sum;
 
-    rs
+    // VERIFIER WORKS HERE
+    let vanishing_poly: Polyx = compute_vanishing_polynomial(omega, n);
+    let vanishing_poly_x: FpVesta = eval_polyx(vanishing_poly, x);
+    let h = g_prime_eval_combined_from_a / vanishing_poly_x;
+    let x1_squared: FpVesta = x1 * x1;
+    let r0: Polyx = rs_verifier[0 as usize].clone();
+    let product1 = mul_scalar_polyx(r0, x1_squared);
+    let product2 = h * x1;
+    let sum1 = add_scalar_polyx(product1, product2);
+    let final_sum = add_scalar_polyx(sum1, r);
+    rs_verifier[0] = final_sum;
+
+    (rs_prover, rs_verifier)
 }
 
 /// Step 14
@@ -1544,20 +1561,11 @@ fn test_step_12() {
 #[cfg(test)]
 #[test]
 fn test_step_13() {
-    fn a(
-        n_a: u8,
-        n_q: u8,
-        omega: u8,
-        x: u8,
-        r: u8,
-        s: SeqOfUniPoly,
-        a: SeqOfUniPoly,
-        g_prime: UniPolynomial,
-    ) -> bool {
+    fn a(n_q: u8, omega: u8, x: u8, r: u8, s: SeqOfUniPoly, g_prime: UniPolynomial) -> bool {
         ////////////////////////////////////////////////////////////////////////////////////
         /// SETTING UP THE REQUIRED VALUES (n_a, n_q, x1, H', R, the q list, the A commitemtns), NOT INTERESTING
         ////////////////////////////////////////////////////////////////////////////////////
-        let mut n_a: u128 = a.0.len() as u128; // make it non-zero
+        let mut n_a: u128 = s.0.len() as u128; // make it non-zero
         if n_a == 0 {
             n_a = 1;
         }
@@ -1578,7 +1586,6 @@ fn test_step_13() {
         let r = FpVesta::from_literal(r as u128);
         let s = s.0;
         let mut q = Seq::<Seq<u128>>::create(n_a as usize);
-        let a = a.0;
         let g_prime = g_prime.0;
 
         let mut sigma_list: Vec<u128> = vec![];
@@ -1621,7 +1628,7 @@ fn test_step_13() {
         //////////////////////////////////////////////////////////////////////////////////
         /// SETTING UP VALUES DONE
         //////////////////////////////////////////////////////////////////////////////////
-        let r_s = step_13(
+        let (r_s, _) = step_13(
             n as u128,
             omega,
             x,
@@ -1630,7 +1637,7 @@ fn test_step_13() {
             s_polys.clone(),
             q.clone(),
             sigma_seq.clone(),
-            a,
+            eval_polyx(g_prime.clone(), x),
             g_prime.clone(),
         );
 
@@ -1654,9 +1661,6 @@ fn test_step_13() {
                 r_poly = mul_scalar_polyx(r_poly, x1.pow(2));
 
                 // calculate h
-                // TODO for this to make sense we should test
-                // * eval_poly_x
-                // * compute_vanishing_polynomial
                 let g_prime_x: FpVesta = eval_polyx(g_prime.clone(), x);
                 let vanishing_poly: Polyx = compute_vanishing_polynomial(omega, n);
                 let vanishing_poly_x: FpVesta = eval_polyx(vanishing_poly, x);
@@ -1681,16 +1685,7 @@ fn test_step_13() {
     }
     // limit the number of tests, since it is SLOW
     QuickCheck::new().tests(5).quickcheck(
-        a as fn(
-            n_a: u8,
-            n_q: u8,
-            omega: u8,
-            x: u8,
-            r: u8,
-            s: SeqOfUniPoly,
-            a: SeqOfUniPoly,
-            g_prime: UniPolynomial,
-        ) -> bool,
+        a as fn(n_q: u8, omega: u8, x: u8, r: u8, s: SeqOfUniPoly, g_prime: UniPolynomial) -> bool,
     );
 }
 
@@ -2214,8 +2209,8 @@ fn test_step_26() {
     let U: G1_pallas = g1mul_pallas(FpVesta::from_literal(77777777), g1_generator_pallas());
     let f: FpVesta = FpVesta::ONE();
     let W: G1_pallas = (
-        FpPallas::from_hex("1784F1B68234A1FEF45D4A6F667D6C9ED3663FF6954D060FD8BF280C3DB968D2"),
-        FpPallas::from_hex("16BBF3862C0B3A7E56AE15E80B3DE08F4A06A46A3761FDF4F8AC359BEBA2938E"),
+        FpPallas::from_hex("29A35E837F1BC8F4D83DD8E452DAC6691BDEDE5F0916BB02E7EB3BF0D8724746"),
+        FpPallas::from_hex("2E7E5A3C4EFBE72E130E31E28F22E98BF0A3225FCB5E579B61B98F28083A8A05"),
         false,
     );
 
@@ -2549,7 +2544,7 @@ fn test_step_18_19() {
         g_prime = add_polyx(g_prime, a_2.clone());
         let a_0_rotated: Polyx = rotate_polyx(a_0.clone(), omega);
         g_prime = sub_polyx(g_prime, a_0_rotated);
-        g_prime = mul_polyx(g_prime, q_add);
+        g_prime = mul_polyx(g_prime, q_add.clone());
 
         let q: Seq<Seq<u128>> =
             Seq::<Seq<u128>>::from_vec(vec![Seq::from_vec(vec![0]), Seq::from_vec(vec![0, 1])]);
@@ -2608,7 +2603,14 @@ fn test_step_18_19() {
             h_prime_blind,
         );
 
-        let r_is: Seq<Polyx> = step_13(
+        let fat_a_0: &Seq<FpVesta> = &fat_a[0];
+        let fat_a_1: &Seq<FpVesta> = &fat_a[1];
+        let fat_a_2: &Seq<FpVesta> = &fat_a[2];
+        // recreate g'(x) from **a**
+        let g_prime_eval_combined_from_a =
+            eval_polyx(q_add, x_challenge) * (fat_a_0[0] + fat_a_1[0] + fat_a_2[0] - fat_a_0[1]);
+
+        let (r_is_prover, r_is_verifier): (Seq<Polyx>, Seq<Polyx>) = step_13(
             n,
             omega,
             x_challenge,
@@ -2617,7 +2619,7 @@ fn test_step_18_19() {
             s_is,
             q.clone(),
             sigma_list.clone(),
-            fat_a,
+            g_prime_eval_combined_from_a,
             g_prime,
         );
 
@@ -2626,7 +2628,7 @@ fn test_step_18_19() {
             &crs,
             x2_challenge,
             q_is.clone(),
-            r_is.clone(),
+            r_is_prover,
             q.clone(),
             step14_blinding,
             omega,
@@ -2649,7 +2651,7 @@ fn test_step_18_19() {
             Q_prime,
             Q_is,
             u.clone(),
-            r_is,
+            r_is_verifier,
             q,
         );
 
@@ -2791,7 +2793,7 @@ fn test_step_22_23() {
         g_prime = add_polyx(g_prime, a_2.clone());
         let a_0_rotated: Polyx = rotate_polyx(a_0.clone(), omega);
         g_prime = sub_polyx(g_prime, a_0_rotated);
-        g_prime = mul_polyx(g_prime, q_add);
+        g_prime = mul_polyx(g_prime, q_add.clone());
 
         let q: Seq<Seq<u128>> =
             Seq::<Seq<u128>>::from_vec(vec![Seq::from_vec(vec![0]), Seq::from_vec(vec![0, 1])]);
@@ -2850,7 +2852,14 @@ fn test_step_22_23() {
             h_prime_blind,
         );
 
-        let r_is: Seq<Polyx> = step_13(
+        let fat_a_0: &Seq<FpVesta> = &fat_a[0];
+        let fat_a_1: &Seq<FpVesta> = &fat_a[1];
+        let fat_a_2: &Seq<FpVesta> = &fat_a[2];
+        // recreate g'(x) from **a**
+        let g_prime_eval_combined_from_a =
+            eval_polyx(q_add, x_challenge) * (fat_a_0[0] + fat_a_1[0] + fat_a_2[0] - fat_a_0[1]);
+
+        let (r_is_prover, r_is_verifier): (Seq<Polyx>, Seq<Polyx>) = step_13(
             n,
             omega,
             x_challenge,
@@ -2859,7 +2868,7 @@ fn test_step_22_23() {
             s_is,
             q.clone(),
             sigma_list.clone(),
-            fat_a,
+            g_prime_eval_combined_from_a,
             g_prime,
         );
 
@@ -2868,7 +2877,7 @@ fn test_step_22_23() {
             &crs,
             x2_challenge,
             q_is.clone(),
-            r_is.clone(),
+            r_is_prover,
             q.clone(),
             step14_blinding,
             omega,
@@ -2891,7 +2900,7 @@ fn test_step_22_23() {
             Q_prime,
             Q_is,
             u.clone(),
-            r_is,
+            r_is_verifier,
             q,
         );
 
@@ -3249,7 +3258,7 @@ fn automatic_negative_illegal_circut_example_run() {
         g_prime = add_polyx(g_prime, a_2.clone());
         let a_0_rotated: Polyx = rotate_polyx(a_0.clone(), omega);
         g_prime = sub_polyx(g_prime, a_0_rotated);
-        g_prime = mul_polyx(g_prime, q_add);
+        g_prime = mul_polyx(g_prime, q_add.clone());
 
         let q: Seq<Seq<u128>> =
             Seq::<Seq<u128>>::from_vec(vec![Seq::from_vec(vec![0]), Seq::from_vec(vec![0, 1])]);
@@ -3308,7 +3317,14 @@ fn automatic_negative_illegal_circut_example_run() {
             h_prime_blind,
         );
 
-        let r_is: Seq<Polyx> = step_13(
+        let fat_a_0: &Seq<FpVesta> = &fat_a[0];
+        let fat_a_1: &Seq<FpVesta> = &fat_a[1];
+        let fat_a_2: &Seq<FpVesta> = &fat_a[2];
+        // recreate g'(x) from **a**
+        let g_prime_eval_combined_from_a =
+            eval_polyx(q_add, x_challenge) * (fat_a_0[0] + fat_a_1[0] + fat_a_2[0] - fat_a_0[1]);
+
+        let (r_is_prover, r_is_verifier): (Seq<Polyx>, Seq<Polyx>) = step_13(
             n,
             omega,
             x_challenge,
@@ -3317,7 +3333,7 @@ fn automatic_negative_illegal_circut_example_run() {
             s_is,
             q.clone(),
             sigma_list.clone(),
-            fat_a,
+            g_prime_eval_combined_from_a,
             g_prime,
         );
 
@@ -3326,7 +3342,7 @@ fn automatic_negative_illegal_circut_example_run() {
             &crs,
             x2_challenge,
             q_is.clone(),
-            r_is.clone(),
+            r_is_prover,
             q.clone(),
             step14_blinding,
             omega,
@@ -3349,7 +3365,7 @@ fn automatic_negative_illegal_circut_example_run() {
             Q_prime,
             Q_is,
             u.clone(),
-            r_is,
+            r_is_verifier,
             q,
         );
 
@@ -3530,7 +3546,7 @@ fn automatic_positive_legal_blinding_example_run() {
         g_prime = add_polyx(g_prime, a_2.clone());
         let a_0_rotated: Polyx = rotate_polyx(a_0.clone(), omega);
         g_prime = sub_polyx(g_prime, a_0_rotated);
-        g_prime = mul_polyx(g_prime, q_add);
+        g_prime = mul_polyx(g_prime, q_add.clone());
 
         let q: Seq<Seq<u128>> =
             Seq::<Seq<u128>>::from_vec(vec![Seq::from_vec(vec![0]), Seq::from_vec(vec![0, 1])]);
@@ -3589,7 +3605,14 @@ fn automatic_positive_legal_blinding_example_run() {
             h_prime_blind,
         );
 
-        let r_is: Seq<Polyx> = step_13(
+        let fat_a_0: &Seq<FpVesta> = &fat_a[0];
+        let fat_a_1: &Seq<FpVesta> = &fat_a[1];
+        let fat_a_2: &Seq<FpVesta> = &fat_a[2];
+        // recreate g'(x) from **a**
+        let g_prime_eval_combined_from_a =
+            eval_polyx(q_add, x_challenge) * (fat_a_0[0] + fat_a_1[0] + fat_a_2[0] - fat_a_0[1]);
+
+        let (r_is_prover, r_is_verifier): (Seq<Polyx>, Seq<Polyx>) = step_13(
             n,
             omega,
             x_challenge,
@@ -3598,7 +3621,7 @@ fn automatic_positive_legal_blinding_example_run() {
             s_is,
             q.clone(),
             sigma_list.clone(),
-            fat_a,
+            g_prime_eval_combined_from_a,
             g_prime,
         );
 
@@ -3607,7 +3630,7 @@ fn automatic_positive_legal_blinding_example_run() {
             &crs,
             x2_challenge,
             q_is.clone(),
-            r_is.clone(),
+            r_is_prover,
             q.clone(),
             step14_blinding,
             omega,
@@ -3630,7 +3653,7 @@ fn automatic_positive_legal_blinding_example_run() {
             Q_prime,
             Q_is,
             u.clone(),
-            r_is,
+            r_is_verifier,
             q,
         );
 
@@ -3847,7 +3870,7 @@ fn automatic_positive_legal_challenges_example_run() {
         g_prime = add_polyx(g_prime, a_2.clone());
         let a_0_rotated: Polyx = rotate_polyx(a_0.clone(), omega);
         g_prime = sub_polyx(g_prime, a_0_rotated);
-        g_prime = mul_polyx(g_prime, q_add);
+        g_prime = mul_polyx(g_prime, q_add.clone());
 
         let q: Seq<Seq<u128>> =
             Seq::<Seq<u128>>::from_vec(vec![Seq::from_vec(vec![0]), Seq::from_vec(vec![0, 1])]);
@@ -3906,7 +3929,14 @@ fn automatic_positive_legal_challenges_example_run() {
             h_prime_blind,
         );
 
-        let r_is: Seq<Polyx> = step_13(
+        let fat_a_0: &Seq<FpVesta> = &fat_a[0];
+        let fat_a_1: &Seq<FpVesta> = &fat_a[1];
+        let fat_a_2: &Seq<FpVesta> = &fat_a[2];
+        // recreate g'(x) from **a**
+        let g_prime_eval_combined_from_a =
+            eval_polyx(q_add, x_challenge) * (fat_a_0[0] + fat_a_1[0] + fat_a_2[0] - fat_a_0[1]);
+
+        let (r_is_prover, r_is_verifier): (Seq<Polyx>, Seq<Polyx>) = step_13(
             n,
             omega,
             x_challenge,
@@ -3915,7 +3945,7 @@ fn automatic_positive_legal_challenges_example_run() {
             s_is,
             q.clone(),
             sigma_list.clone(),
-            fat_a,
+            g_prime_eval_combined_from_a,
             g_prime,
         );
 
@@ -3924,7 +3954,7 @@ fn automatic_positive_legal_challenges_example_run() {
             &crs,
             x2_challenge,
             q_is.clone(),
-            r_is.clone(),
+            r_is_prover,
             q.clone(),
             step14_blinding,
             omega,
@@ -3947,7 +3977,7 @@ fn automatic_positive_legal_challenges_example_run() {
             Q_prime,
             Q_is,
             u.clone(),
-            r_is,
+            r_is_verifier,
             q,
         );
 
@@ -4135,7 +4165,7 @@ fn automatic_positive_legal_circut_example_run() {
         g_prime = add_polyx(g_prime, a_2.clone());
         let a_0_rotated: Polyx = rotate_polyx(a_0.clone(), omega);
         g_prime = sub_polyx(g_prime, a_0_rotated);
-        g_prime = mul_polyx(g_prime, q_add);
+        g_prime = mul_polyx(g_prime, q_add.clone());
 
         let q: Seq<Seq<u128>> =
             Seq::<Seq<u128>>::from_vec(vec![Seq::from_vec(vec![0]), Seq::from_vec(vec![0, 1])]);
@@ -4194,7 +4224,14 @@ fn automatic_positive_legal_circut_example_run() {
             h_prime_blind,
         );
 
-        let r_is: Seq<Polyx> = step_13(
+        let fat_a_0: &Seq<FpVesta> = &fat_a[0];
+        let fat_a_1: &Seq<FpVesta> = &fat_a[1];
+        let fat_a_2: &Seq<FpVesta> = &fat_a[2];
+        // recreate g'(x) from **a**
+        let g_prime_eval_combined_from_a =
+            eval_polyx(q_add, x_challenge) * (fat_a_0[0] + fat_a_1[0] + fat_a_2[0] - fat_a_0[1]);
+
+        let (r_is_prover, r_is_verifier): (Seq<Polyx>, Seq<Polyx>) = step_13(
             n,
             omega,
             x_challenge,
@@ -4203,7 +4240,7 @@ fn automatic_positive_legal_circut_example_run() {
             s_is,
             q.clone(),
             sigma_list.clone(),
-            fat_a,
+            g_prime_eval_combined_from_a,
             g_prime,
         );
 
@@ -4212,7 +4249,7 @@ fn automatic_positive_legal_circut_example_run() {
             &crs,
             x2_challenge,
             q_is.clone(),
-            r_is.clone(),
+            r_is_prover,
             q.clone(),
             step14_blinding,
             omega,
@@ -4235,7 +4272,7 @@ fn automatic_positive_legal_circut_example_run() {
             Q_prime,
             Q_is,
             u.clone(),
-            r_is,
+            r_is_verifier,
             q,
         );
 
@@ -4403,7 +4440,7 @@ fn negative_illegal_circut_example_run() {
     g_prime = add_polyx(g_prime, a_2.clone());
     let a_0_rotated: Polyx = rotate_polyx(a_0.clone(), omega);
     g_prime = sub_polyx(g_prime, a_0_rotated);
-    g_prime = mul_polyx(g_prime, q_add);
+    g_prime = mul_polyx(g_prime, q_add.clone());
 
     let q: Seq<Seq<u128>> =
         Seq::<Seq<u128>>::from_vec(vec![Seq::from_vec(vec![0]), Seq::from_vec(vec![0, 1])]);
@@ -4462,7 +4499,14 @@ fn negative_illegal_circut_example_run() {
         h_prime_blind,
     );
 
-    let r_is: Seq<Polyx> = step_13(
+    let fat_a_0: &Seq<FpVesta> = &fat_a[0];
+    let fat_a_1: &Seq<FpVesta> = &fat_a[1];
+    let fat_a_2: &Seq<FpVesta> = &fat_a[2];
+    // recreate g'(x) from **a**
+    let g_prime_eval_combined_from_a =
+        eval_polyx(q_add, x_challenge) * (fat_a_0[0] + fat_a_1[0] + fat_a_2[0] - fat_a_0[1]);
+
+    let (r_is_prover, r_is_verifier): (Seq<Polyx>, Seq<Polyx>) = step_13(
         n,
         omega,
         x_challenge,
@@ -4471,7 +4515,7 @@ fn negative_illegal_circut_example_run() {
         s_is,
         q.clone(),
         sigma_list.clone(),
-        fat_a,
+        g_prime_eval_combined_from_a,
         g_prime,
     );
 
@@ -4480,7 +4524,7 @@ fn negative_illegal_circut_example_run() {
         &crs,
         x2_challenge,
         q_is.clone(),
-        r_is.clone(),
+        r_is_prover,
         q.clone(),
         step14_blinding,
         omega,
@@ -4503,7 +4547,7 @@ fn negative_illegal_circut_example_run() {
         Q_prime,
         Q_is,
         u.clone(),
-        r_is,
+        r_is_verifier,
         q,
     );
 
@@ -4657,7 +4701,7 @@ fn example_run() {
     g_prime = add_polyx(g_prime, a_2.clone());
     let a_0_rotated: Polyx = rotate_polyx(a_0.clone(), omega);
     g_prime = sub_polyx(g_prime, a_0_rotated);
-    g_prime = mul_polyx(g_prime, q_add);
+    g_prime = mul_polyx(g_prime, q_add.clone());
     for i in 0..4 {
         assert_eq!(eval_polyx(g_prime.clone(), omega.pow(i)), FpVesta::ZERO());
     }
@@ -4719,7 +4763,14 @@ fn example_run() {
         h_prime_blind,
     );
 
-    let r_is: Seq<Polyx> = step_13(
+    let fat_a_0: &Seq<FpVesta> = &fat_a[0];
+    let fat_a_1: &Seq<FpVesta> = &fat_a[1];
+    let fat_a_2: &Seq<FpVesta> = &fat_a[2];
+    // recreate g'(x) from **a**
+    let g_prime_eval_combined_from_a =
+        eval_polyx(q_add, x_challenge) * (fat_a_0[0] + fat_a_1[0] + fat_a_2[0] - fat_a_0[1]);
+
+    let (r_is_prover, r_is_verifier): (Seq<Polyx>, Seq<Polyx>) = step_13(
         n,
         omega,
         x_challenge,
@@ -4728,7 +4779,7 @@ fn example_run() {
         s_is,
         q.clone(),
         sigma_list.clone(),
-        fat_a,
+        g_prime_eval_combined_from_a,
         g_prime,
     );
 
@@ -4737,7 +4788,7 @@ fn example_run() {
         &crs,
         x2_challenge,
         q_is.clone(),
-        r_is.clone(),
+        r_is_prover,
         q.clone(),
         step14_blinding,
         omega,
@@ -4760,7 +4811,7 @@ fn example_run() {
         Q_prime,
         Q_is,
         u.clone(),
-        r_is,
+        r_is_verifier,
         q,
     );
 
