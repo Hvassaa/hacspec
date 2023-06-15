@@ -37,4 +37,5 @@ members = [
     "xor",
     "pasta",
     "halo2",
+    "polynomial",
 ]
