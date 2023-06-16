@@ -267,8 +267,6 @@ fn test_poly_mul_associativity(p1: Polynomial<FpPallas>, p2: Polynomial<FpPallas
     let p4 = p4.clone() * p3.clone();
     let p5 = p2.clone() * p3.clone();
     let p5 = p5.clone() * p1.clone();
-    println!("{:?}", p4);
-    println!("{:?}", p5);
     assert_eq!(p4, p5);
 }
 
