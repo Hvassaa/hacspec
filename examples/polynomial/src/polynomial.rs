@@ -12,7 +12,7 @@ public_nat_mod!(
 );
 
 struct Polynomial<T: Numeric + NumericCopy + Clone> {
-    coefficients: Seq<T>
+    coefficients: Seq<T>,
 }
 
 impl<T: Numeric + NumericCopy + PartialEq> Polynomial<T> {
@@ -34,17 +34,18 @@ impl<T: Numeric + NumericCopy + PartialEq> Polynomial<T> {
 
     fn trim(self) -> Polynomial<T> {
         let len = self.coefficients.len();
-        for i in (0..len).rev() {
+        for i in (1..len).rev() {
             if self.coefficients[i] != T::default() {
                 return Polynomial {coefficients: self.coefficients.slice(0, i + usize::one())}
             }
+
         }
-        self
+        Polynomial {coefficients: self.coefficients.slice(0, usize::one())}
 
     }
 }
 
-impl<T: Numeric + NumericCopy> Add for Polynomial<T> {
+impl<T: Numeric + NumericCopy + PartialEq> Add for Polynomial<T> {
     type Output = Self;
 
     fn add(self, other: Self) -> Self {
@@ -63,7 +64,9 @@ impl<T: Numeric + NumericCopy> Add for Polynomial<T> {
             result[i] = result[i].add(small[i]);
         }
 
-        Polynomial {coefficients: result}
+        return (Polynomial {
+            coefficients: result,
+        }).trim();
     }
 }
 
@@ -78,7 +81,10 @@ impl<T: Numeric + NumericCopy + PartialEq> Sub for Polynomial<T> {
             neg_rhs[i] = T::default().sub(rhs[i]);
         }
 
-        return (self.clone() + (Polynomial {coefficients: neg_rhs})).trim();
+        return self.clone()
+            + (Polynomial {
+                coefficients: neg_rhs,
+            });
     }
 }
 
@@ -104,21 +110,25 @@ impl<T: Numeric + NumericCopy + PartialEq> Mul for Polynomial<T> {
 }
 
 impl<T: Numeric + NumericCopy + PartialEq> PartialEq for Polynomial<T> {
+    /// Check if is equal to another polynomial
+    ///
+    /// # Arguments
+    ///
+    /// * `other` - the other polynomial
     fn eq(&self, other: &Self) -> bool {
-
         let lhs = &self.clone().trim().coefficients;
         let rhs = &other.clone().trim().coefficients;
 
         if lhs.len() != rhs.len() {
-            false
+            return false;
         } else {
             for i in 0..lhs.len() {
                 if lhs[i] != rhs[i] {
                     return false;
                 }
             }
-            true
         }
+        true
     }
 }
 
@@ -141,13 +151,22 @@ use quickcheck::*;
 
 impl<T: Numeric + NumericCopy> Clone for Polynomial<T> {
     fn clone(&self) -> Self {
-        Polynomial {coefficients: self.coefficients.clone()}
+        Polynomial {
+            coefficients: self.coefficients.clone(),
+        }
     }
 }
 
 // Only needed for test/Arbitrary
 #[cfg(test)]
 impl<T: Numeric + NumericCopy> Debug for Polynomial<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self.coefficients)
+    }
+}
+
+#[cfg(test)]
+impl<T: Numeric + NumericCopy> Display for Polynomial<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", self.coefficients)
     }
@@ -162,7 +181,9 @@ impl Arbitrary for Polynomial<FpPallas> {
             let new_val = FpPallas::from_literal(u128::arbitrary(g));
             v.push(new_val);
         }
-        Polynomial {coefficients: Seq::from_vec(v)}
+        Polynomial {
+            coefficients: Seq::from_vec(v),
+        }
     }
 }
 
@@ -195,7 +216,11 @@ fn test_poly_add_closure(p1: Polynomial<FpPallas>, p2: Polynomial<FpPallas>) {
 
 #[cfg(test)]
 #[quickcheck]
-fn test_poly_add_associativity(p1: Polynomial<FpPallas>, p2: Polynomial<FpPallas>, p3: Polynomial<FpPallas>) {
+fn test_poly_add_associativity(
+    p1: Polynomial<FpPallas>,
+    p2: Polynomial<FpPallas>,
+    p3: Polynomial<FpPallas>,
+) {
     let p4 = p1.clone() + p2.clone();
     let p4 = p4.clone() + p3.clone();
     let p5 = p2.clone() + p3.clone();
@@ -242,6 +267,8 @@ fn test_poly_mul_associativity(p1: Polynomial<FpPallas>, p2: Polynomial<FpPallas
     let p4 = p4.clone() * p3.clone();
     let p5 = p2.clone() * p3.clone();
     let p5 = p5.clone() * p1.clone();
+    println!("{:?}", p4);
+    println!("{:?}", p5);
     assert_eq!(p4, p5);
 }
 
@@ -253,7 +280,6 @@ fn test_poly_mul_identity(p1: Polynomial<FpPallas>) {
     let p2 = p1.clone() * const_one_poly.clone();
     let p3 = const_one_poly.clone() * p1.clone();
 
-    println!("const {:?}\np1 {:?}\np2 {:?}\np3 {:?}", const_one_poly, p1, p2, p3);
     assert_eq!(p1, p2);
     assert_eq!(p2, p3);
 }
@@ -272,4 +298,24 @@ fn test_poly_mul_left_distributive(p1: Polynomial<FpPallas>, p2: Polynomial<FpPa
     let p4 = p1.clone() * (p2.clone() + p3.clone());
     let p5 = (p1.clone() * p2) + (p1 * p3);
     assert_eq!(p4, p5);
+}
+
+#[cfg(test)]
+#[quickcheck]
+fn test_poly_add_identity(p1: Polynomial<FpPallas>) {
+    let p2 = p1.clone() + Polynomial::<FpPallas>::default();
+
+    let p3 = Polynomial::<FpPallas>::default() + p1.clone();
+    assert_eq!(p1, p2);
+    assert_eq!(p3, p2);
+}
+
+#[cfg(test)]
+#[quickcheck]
+fn test_poly_add_inverse(p1: Polynomial<FpPallas>) {
+    let p1_inv = Polynomial::<FpPallas>::default() - p1.clone();
+    let p3 = p1.clone() + p1_inv.clone();
+    let p4 = p1_inv + p1;
+    assert_eq!(p3, p4);
+    assert_eq!(p3, Polynomial::<FpPallas>::default());
 }
