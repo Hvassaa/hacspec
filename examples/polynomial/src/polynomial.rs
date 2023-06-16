@@ -56,6 +56,39 @@ impl<T: Numeric + NumericCopy> Add for Polynomial<T> {
     }
 }
 
+impl<T: Numeric + NumericCopy> Sub for Polynomial<T> {
+    type Output = Self;
+
+    fn sub(self, other: Self) -> Self {
+        let rhs = other.coefficients;
+
+        let mut neg_rhs = Seq::<T>::create(rhs.len());
+        for i in 0..rhs.len() {
+            neg_rhs[i] = T::default().sub(rhs[i]);
+        }
+
+        return self.clone() + (Polynomial {coefficients: neg_rhs});
+    }
+}
+
+impl<T: Numeric + NumericCopy + PartialEq> PartialEq for Polynomial<T> {
+    fn eq(&self, other: &Self) -> bool {
+        let lhs = &self.coefficients;
+        let rhs = &other.coefficients;
+
+        if lhs.len() != rhs.len() {
+            false
+        } else {
+            for i in 0..lhs.len() {
+                if lhs[i] != rhs[i] {
+                    return false;
+                }
+            }
+            true
+        }
+    }
+}
+
 // TESTS
 
 #[cfg(test)]
@@ -89,7 +122,7 @@ impl Arbitrary for Polynomial<FpPallas> {
             let new_val = FpPallas::from_literal(u128::arbitrary(g));
             v.push(new_val);
         }
-        Polynomial {coefficients: Seq::create(0)}
+        Polynomial {coefficients: Seq::from_vec(v)}
     }
 }
 
@@ -109,3 +142,35 @@ fn test_poly_add_logic(p1: Polynomial<FpPallas>, p2: Polynomial<FpPallas>, x: us
 fn test_poly_add_closure(p1: Polynomial<FpPallas>, p2: Polynomial<FpPallas>) {
     let p3 = p1 + p2;
 }
+
+#[cfg(test)]
+#[quickcheck]
+fn test_poly_add_associativity(p1: Polynomial<FpPallas>, p2: Polynomial<FpPallas>, p3: Polynomial<FpPallas>) {
+    let p4 = p1.clone() + p2.clone();
+    let p4 = p4.clone() + p3.clone();
+    let p5 = p2.clone() + p3.clone();
+    let p5 = p5.clone() + p1.clone();
+    assert_eq!(p4, p5);
+}
+
+#[cfg(test)]
+#[quickcheck]
+fn test_poly_sub(p1: Polynomial<FpPallas>, p2: Polynomial<FpPallas>, x: u128) {
+    let x = FpPallas::from_literal(x);
+    let sum_poly = p1.clone() - p2.clone();
+
+    let expected = p1.evaluate(x) - p2.evaluate(x);
+    let actual = sum_poly.evaluate(x);
+    assert_eq!(expected, actual);
+}
+
+
+
+
+
+
+
+
+
+
+
