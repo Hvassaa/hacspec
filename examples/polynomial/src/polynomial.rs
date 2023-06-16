@@ -12,7 +12,7 @@ public_nat_mod!(
 );
 
 struct Polynomial<T: Numeric + NumericCopy + Clone> {
-    coefficients: Seq<T>
+    coefficients: Seq<T>,
 }
 
 impl<T: Numeric + NumericCopy> Polynomial<T> {
@@ -52,7 +52,9 @@ impl<T: Numeric + NumericCopy> Add for Polynomial<T> {
             result[i] = result[i].add(small[i]);
         }
 
-        return Polynomial {coefficients: result};
+        return Polynomial {
+            coefficients: result,
+        };
     }
 }
 
@@ -67,25 +69,34 @@ impl<T: Numeric + NumericCopy> Sub for Polynomial<T> {
             neg_rhs[i] = T::default().sub(rhs[i]);
         }
 
-        return self.clone() + (Polynomial {coefficients: neg_rhs});
+        return self.clone()
+            + (Polynomial {
+                coefficients: neg_rhs,
+            });
     }
 }
 
 impl<T: Numeric + NumericCopy + PartialEq> PartialEq for Polynomial<T> {
+    /// Check if is equal to another polynomial
+    ///
+    /// # Arguments
+    ///
+    /// * `other` - the other polynomial
     fn eq(&self, other: &Self) -> bool {
+        let mut equal = true;
         let lhs = &self.coefficients;
         let rhs = &other.coefficients;
 
         if lhs.len() != rhs.len() {
-            false
+            equal = false;
         } else {
             for i in 0..lhs.len() {
                 if lhs[i] != rhs[i] {
-                    return false;
+                    equal = false;
                 }
             }
-            true
         }
+        equal
     }
 }
 
@@ -101,7 +112,9 @@ use quickcheck::*;
 
 impl<T: Numeric + NumericCopy> Clone for Polynomial<T> {
     fn clone(&self) -> Self {
-        Polynomial {coefficients: self.coefficients.clone()}
+        Polynomial {
+            coefficients: self.coefficients.clone(),
+        }
     }
 }
 
@@ -122,8 +135,21 @@ impl Arbitrary for Polynomial<FpPallas> {
             let new_val = FpPallas::from_literal(u128::arbitrary(g));
             v.push(new_val);
         }
-        Polynomial {coefficients: Seq::from_vec(v)}
+        Polynomial {
+            coefficients: Seq::from_vec(v),
+        }
     }
+}
+
+fn gen_zero_polyx() -> Polynomial<FpPallas> {
+    let coef = Seq::<FpPallas>::create(1);
+    Polynomial { coefficients: coef }
+}
+
+fn gen_one_polyx() -> Polynomial<FpPallas> {
+    let mut coef = Seq::<FpPallas>::create(1);
+    coef[usize::zero()] = FpPallas::ONE();
+    Polynomial { coefficients: coef }
 }
 
 #[cfg(test)]
@@ -145,7 +171,11 @@ fn test_poly_add_closure(p1: Polynomial<FpPallas>, p2: Polynomial<FpPallas>) {
 
 #[cfg(test)]
 #[quickcheck]
-fn test_poly_add_associativity(p1: Polynomial<FpPallas>, p2: Polynomial<FpPallas>, p3: Polynomial<FpPallas>) {
+fn test_poly_add_associativity(
+    p1: Polynomial<FpPallas>,
+    p2: Polynomial<FpPallas>,
+    p3: Polynomial<FpPallas>,
+) {
     let p4 = p1.clone() + p2.clone();
     let p4 = p4.clone() + p3.clone();
     let p5 = p2.clone() + p3.clone();
@@ -164,13 +194,22 @@ fn test_poly_sub(p1: Polynomial<FpPallas>, p2: Polynomial<FpPallas>, x: u128) {
     assert_eq!(expected, actual);
 }
 
+#[cfg(test)]
+#[quickcheck]
+fn test_poly_add_identity(p1: Polynomial<FpPallas>) {
+    let p2 = p1.clone() + gen_zero_polyx();
 
+    let p3 = gen_zero_polyx() + p1.clone();
+    assert_eq!(p1, p2);
+    assert_eq!(p3, p2);
+}
 
-
-
-
-
-
-
-
-
+#[cfg(test)]
+#[quickcheck]
+fn test_poly_add_inverse(p1: Polynomial<FpPallas>) {
+    let p1_inv = gen_zero_polyx() - p1.clone();
+    let p3 = p1.clone() + p1_inv.clone();
+    let p4 = p1_inv + p1;
+    assert_eq!(p3, p4);
+    assert_eq!(p3, gen_zero_polyx());
+}
