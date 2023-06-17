@@ -32,6 +32,8 @@ impl<T: Numeric + NumericCopy + PartialEq> Polynomial<T> {
         result
     }
 
+    /// Get the polynomial trimmed of trailing zeros
+    /// Mostly for internal use
     fn trim(&self) -> Polynomial<T> {
         let len = self.coefficients.len();
         for i in (1..len).rev() {
@@ -46,13 +48,28 @@ impl<T: Numeric + NumericCopy + PartialEq> Polynomial<T> {
         }
     }
 
+    /// Get the degree of the polynomial
     fn degree(&self) -> usize {
         self.trim().coefficients.len()
     }
 
+    /// Get the coefficient of the leading term
     fn leading_term(&self) -> T {
         let coeffs = self.trim().coefficients;
         coeffs[coeffs.len() - usize::one()]
+    }
+
+    /// Get the coefficient of the term at some degree
+    ///
+    /// # Arguments
+    ///
+    /// * `degree` - the degree to get coefficient for
+    fn get_coefficient(&self, degree: usize) -> T {
+        if self.trim().coefficients.len() > degree {
+            self.coefficients[degree]
+        } else {
+            T::default()
+        }
     }
 }
 
