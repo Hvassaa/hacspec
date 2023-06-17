@@ -32,16 +32,27 @@ impl<T: Numeric + NumericCopy + PartialEq> Polynomial<T> {
         result
     }
 
-    fn trim(self) -> Polynomial<T> {
+    fn trim(&self) -> Polynomial<T> {
         let len = self.coefficients.len();
         for i in (1..len).rev() {
             if self.coefficients[i] != T::default() {
-                return Polynomial {coefficients: self.coefficients.slice(0, i + usize::one())}
+                return Polynomial {
+                    coefficients: self.coefficients.slice(0, i + usize::one()),
+                };
             }
-
         }
-        Polynomial {coefficients: self.coefficients.slice(0, usize::one())}
+        Polynomial {
+            coefficients: self.coefficients.slice(0, usize::one()),
+        }
+    }
 
+    fn degree(&self) -> usize {
+        self.trim().coefficients.len()
+    }
+
+    fn leading_term(&self) -> T {
+        let coeffs = self.trim().coefficients;
+        coeffs[coeffs.len() - usize::one()]
     }
 }
 
@@ -66,7 +77,8 @@ impl<T: Numeric + NumericCopy + PartialEq> Add for Polynomial<T> {
 
         return (Polynomial {
             coefficients: result,
-        }).trim();
+        })
+        .trim();
     }
 }
 
@@ -104,20 +116,50 @@ impl<T: Numeric + NumericCopy + PartialEq> Mul for Polynomial<T> {
                 }
             }
         }
-        (Polynomial {coefficients: result}).trim()
+        (Polynomial {
+            coefficients: result,
+        })
+        .trim()
     }
+}
 
+impl<T: Numeric + NumericCopy + PartialEq + hacspec_lib::Div<Output = T>> Div for Polynomial<T> {
+    type Output = (Self, Self);
+
+    fn div(self, rhs: Self) -> Self::Output {
+        let mut q = Polynomial::<T>::default();
+        let mut r = self.clone();
+
+        if rhs.degree() > self.degree() {
+            return (q.trim(), r.trim());
+        }
+
+        let mut loop_upper_bound = rhs.degree();
+        if self.degree() > rhs.degree() {
+            loop_upper_bound = self.degree();
+        }
+
+        for _ in 0..loop_upper_bound {
+            if r.trim() != Polynomial::<T>::default() && r.degree() >= rhs.degree() {
+                let degree_diff = r.degree() - rhs.degree();
+                let mut t = Seq::<T>::create(degree_diff + usize::one());
+                t[degree_diff] = r.leading_term() / rhs.leading_term();
+                let t = Polynomial { coefficients: t };
+
+                q = q + t.clone();
+                let aux_prod = rhs.clone() * t;
+                r = r - aux_prod;
+            }
+        }
+
+        (q.trim(), r.trim())
+    }
 }
 
 impl<T: Numeric + NumericCopy + PartialEq> PartialEq for Polynomial<T> {
-    /// Check if is equal to another polynomial
-    ///
-    /// # Arguments
-    ///
-    /// * `other` - the other polynomial
     fn eq(&self, other: &Self) -> bool {
-        let lhs = &self.clone().trim().coefficients;
-        let rhs = &other.clone().trim().coefficients;
+        let lhs = &self.trim().coefficients;
+        let rhs = &other.trim().coefficients;
 
         if lhs.len() != rhs.len() {
             return false;
@@ -135,7 +177,9 @@ impl<T: Numeric + NumericCopy + PartialEq> PartialEq for Polynomial<T> {
 impl<T: Numeric + NumericCopy + PartialEq> Default for Polynomial<T> {
     /// Constant polynomial with value T::default
     fn default() -> Self {
-        Polynomial {coefficients: Seq::<T>::create(1)}
+        Polynomial {
+            coefficients: Seq::<T>::create(1),
+        }
     }
 }
 
@@ -187,13 +231,13 @@ impl Arbitrary for Polynomial<FpPallas> {
     }
 }
 
+// For testing, a constant polynomial with value 1
 #[cfg(test)]
 fn constant_one_poly_pallas() -> Polynomial<FpPallas> {
     let mut c = Seq::<FpPallas>::create(1);
     c[usize::zero()] = FpPallas::ONE();
-    Polynomial {coefficients: c}
+    Polynomial { coefficients: c }
 }
-
 
 // Addition
 
@@ -228,7 +272,17 @@ fn test_poly_add_associativity(
     assert_eq!(p4, p5);
 }
 
-// subtraction
+#[cfg(test)]
+#[quickcheck]
+fn test_poly_add_identity(p1: Polynomial<FpPallas>) {
+    let p2 = p1.clone() + Polynomial::<FpPallas>::default();
+
+    let p3 = Polynomial::<FpPallas>::default() + p1.clone();
+    assert_eq!(p1, p2);
+    assert_eq!(p3, p2);
+}
+
+// Subtraction
 
 #[cfg(test)]
 #[quickcheck]
@@ -239,6 +293,18 @@ fn test_poly_sub(p1: Polynomial<FpPallas>, p2: Polynomial<FpPallas>, x: u128) {
     let expected = p1.evaluate(x) - p2.evaluate(x);
     let actual = sum_poly.evaluate(x);
     assert_eq!(expected, actual);
+}
+
+// Addition / Subtraction
+
+#[cfg(test)]
+#[quickcheck]
+fn test_poly_add_inverse(p1: Polynomial<FpPallas>) {
+    let p1_inv = Polynomial::<FpPallas>::default() - p1.clone();
+    let p3 = p1.clone() + p1_inv.clone();
+    let p4 = p1_inv + p1;
+    assert_eq!(p3, p4);
+    assert_eq!(p3, Polynomial::<FpPallas>::default());
 }
 
 // Multiplication
@@ -262,7 +328,11 @@ fn test_poly_mul_closure(p1: Polynomial<FpPallas>, p2: Polynomial<FpPallas>) {
 
 #[cfg(test)]
 #[quickcheck]
-fn test_poly_mul_associativity(p1: Polynomial<FpPallas>, p2: Polynomial<FpPallas>, p3: Polynomial<FpPallas>) {
+fn test_poly_mul_associativity(
+    p1: Polynomial<FpPallas>,
+    p2: Polynomial<FpPallas>,
+    p3: Polynomial<FpPallas>,
+) {
     let p4 = p1.clone() * p2.clone();
     let p4 = p4.clone() * p3.clone();
     let p5 = p2.clone() * p3.clone();
@@ -292,28 +362,34 @@ fn test_poly_mul_cummutativity(p1: Polynomial<FpPallas>, p2: Polynomial<FpPallas
 
 #[cfg(test)]
 #[quickcheck]
-fn test_poly_mul_left_distributive(p1: Polynomial<FpPallas>, p2: Polynomial<FpPallas>, p3: Polynomial<FpPallas>) {
+fn test_poly_mul_left_distributive(
+    p1: Polynomial<FpPallas>,
+    p2: Polynomial<FpPallas>,
+    p3: Polynomial<FpPallas>,
+) {
     let p4 = p1.clone() * (p2.clone() + p3.clone());
     let p5 = (p1.clone() * p2) + (p1 * p3);
     assert_eq!(p4, p5);
 }
 
-#[cfg(test)]
-#[quickcheck]
-fn test_poly_add_identity(p1: Polynomial<FpPallas>) {
-    let p2 = p1.clone() + Polynomial::<FpPallas>::default();
-
-    let p3 = Polynomial::<FpPallas>::default() + p1.clone();
-    assert_eq!(p1, p2);
-    assert_eq!(p3, p2);
-}
+// Divide
 
 #[cfg(test)]
 #[quickcheck]
-fn test_poly_add_inverse(p1: Polynomial<FpPallas>) {
-    let p1_inv = Polynomial::<FpPallas>::default() - p1.clone();
-    let p3 = p1.clone() + p1_inv.clone();
-    let p4 = p1_inv + p1;
-    assert_eq!(p3, p4);
-    assert_eq!(p3, Polynomial::<FpPallas>::default());
+fn test_poly_div(p1: Polynomial<FpPallas>, p2: Polynomial<FpPallas>, x: u128) {
+    if p2.degree() > 0 {
+        let x = FpPallas::from_literal(x);
+
+        let (q, r) = p1.clone() / p2.clone();
+        let eval_q = q.evaluate(x);
+        let eval_r = r.evaluate(x);
+        let eval_p1 = p1.evaluate(x);
+        let eval_p2 = p2.evaluate(x);
+        let eval_r_div = eval_r / eval_p2;
+
+        let expected = eval_p1 / eval_p2;
+        let actual = eval_q + eval_r_div;
+
+        assert_eq!(expected, actual);
+    }
 }
