@@ -9,14 +9,13 @@ pub struct Polynomial<T: Numeric + NumericCopy + Clone> {
 }
 
 impl<T: Numeric + NumericCopy + PartialEq> Polynomial<T> {
-
     /// Create a polynomial, defined from its coefficient form
     ///
     /// # Arguments
     ///
     /// * `coefficients` - the polynomial in coefficient form
     pub fn new(coefficients: Seq<T>) -> Polynomial<T> {
-        (Polynomial {coefficients}).trim()
+        (Polynomial { coefficients }).trim()
     }
 
     /// Get a clone of the coefficients (useful for printing)
@@ -81,7 +80,7 @@ impl<T: Numeric + NumericCopy + PartialEq> Polynomial<T> {
     }
 }
 
-impl<T: Numeric + NumericCopy + PartialEq> Add for Polynomial<T> {
+impl<T: Numeric + NumericCopy + PartialEq> Add<Polynomial<T>> for Polynomial<T> {
     type Output = Self;
 
     fn add(self, other: Self) -> Self {
@@ -107,17 +106,17 @@ impl<T: Numeric + NumericCopy + PartialEq> Add for Polynomial<T> {
     }
 }
 
-/*
+impl<T: Numeric + NumericCopy + PartialEq> Add<T> for Polynomial<T> {
+    type Output = Self;
 
     fn add(self, other: T) -> Self {
         let mut c = self.coefficients;
         c[usize::zero()] = c[usize::zero()] + other;
-        Polynomial {coefficients: c}
-
+        Polynomial { coefficients: c }
     }
- */
+}
 
-impl<T: Numeric + NumericCopy + PartialEq> Sub for Polynomial<T> {
+impl<T: Numeric + NumericCopy + PartialEq> Sub<Polynomial<T>> for Polynomial<T> {
     type Output = Self;
 
     fn sub(self, other: Self) -> Self {
@@ -135,7 +134,17 @@ impl<T: Numeric + NumericCopy + PartialEq> Sub for Polynomial<T> {
     }
 }
 
-impl<T: Numeric + NumericCopy + PartialEq> Mul for Polynomial<T> {
+impl<T: Numeric + NumericCopy + PartialEq> Sub<T> for Polynomial<T> {
+    type Output = Self;
+
+    fn sub(self, other: T) -> Self {
+        let mut c = self.coefficients;
+        c[usize::zero()] = c[usize::zero()] - other;
+        Polynomial { coefficients: c }
+    }
+}
+
+impl<T: Numeric + NumericCopy + PartialEq> Mul<Polynomial<T>> for Polynomial<T> {
     type Output = Self;
 
     fn mul(self, rhs: Self) -> Self::Output {
@@ -158,7 +167,21 @@ impl<T: Numeric + NumericCopy + PartialEq> Mul for Polynomial<T> {
     }
 }
 
-impl<T: Numeric + NumericCopy + PartialEq + hacspec_lib::Div<Output = T>> Div for Polynomial<T> {
+impl<T: Numeric + NumericCopy + PartialEq> Mul<T> for Polynomial<T> {
+    type Output = Self;
+
+    fn mul(self, rhs: T) -> Self::Output {
+        let mut c = self.coefficients;
+        for i in 0..c.len() {
+            c[i] = c[i] * rhs;
+        }
+        Polynomial { coefficients: c }
+    }
+}
+
+impl<T: Numeric + NumericCopy + PartialEq + hacspec_lib::Div<Output = T>> Div<Polynomial<T>>
+    for Polynomial<T>
+{
     type Output = (Self, Self);
 
     fn div(self, rhs: Self) -> Self::Output {
@@ -188,6 +211,18 @@ impl<T: Numeric + NumericCopy + PartialEq + hacspec_lib::Div<Output = T>> Div fo
         }
 
         (q.trim(), r.trim())
+    }
+}
+
+impl<T: Numeric + NumericCopy + PartialEq + hacspec_lib::Div<Output = T>> Div<T> for Polynomial<T> {
+    type Output = Self;
+
+    fn div(self, rhs: T) -> Self {
+        let mut c = self.coefficients;
+        for i in 0..c.len() {
+            c[i] = c[i] / rhs;
+        }
+        Polynomial { coefficients: c }
     }
 }
 
@@ -228,7 +263,7 @@ extern crate quickcheck_macros;
 #[cfg(test)]
 use quickcheck::*;
 
-#[cfg(test)]
+#[cfg(test)] // as to not export it
 public_nat_mod!(
     type_name: FpPallas,
     type_of_canvas: PallasCanvas,
@@ -244,7 +279,7 @@ impl<T: Numeric + NumericCopy> Clone for Polynomial<T> {
     }
 }
 
-// Only needed for test/Arbitrary
+// Only needed for test/Arbitrary (and mut refs are not supported)
 #[cfg(test)]
 impl<T: Numeric + NumericCopy> Debug for Polynomial<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -415,7 +450,7 @@ fn test_poly_mul_left_distributive(
     assert_eq!(p4, p5);
 }
 
-// Divide
+// Division
 
 #[cfg(test)]
 #[quickcheck]
@@ -436,3 +471,50 @@ fn test_poly_div(p1: Polynomial<FpPallas>, p2: Polynomial<FpPallas>, x: u128) {
         assert_eq!(expected, actual);
     }
 }
+
+// Scalar tests
+
+#[cfg(test)]
+#[quickcheck]
+fn test_scalar_add(p: Polynomial<FpPallas>, x: u128, scalar: u128) {
+    let x = FpPallas::from_literal(x);
+    let scalar = FpPallas::from_literal(scalar);
+    let p_modified = p.clone() + scalar;
+    let p_eval = p.evaluate(x);
+    let p_modified_eval = p_modified.evaluate(x);
+    assert_eq!(p_eval + scalar, p_modified_eval);
+}
+
+#[cfg(test)]
+#[quickcheck]
+fn test_scalar_sub(p: Polynomial<FpPallas>, x: u128, scalar: u128) {
+    let x = FpPallas::from_literal(x);
+    let scalar = FpPallas::from_literal(scalar);
+    let p_modified = p.clone() - scalar;
+    let p_eval = p.evaluate(x);
+    let p_modified_eval = p_modified.evaluate(x);
+    assert_eq!(p_eval - scalar, p_modified_eval);
+}
+
+#[cfg(test)]
+#[quickcheck]
+fn test_scalar_mul(p: Polynomial<FpPallas>, x: u128, scalar: u128) {
+    let x = FpPallas::from_literal(x);
+    let scalar = FpPallas::from_literal(scalar);
+    let p_modified = p.clone() * scalar;
+    let p_eval = p.evaluate(x);
+    let p_modified_eval = p_modified.evaluate(x);
+    assert_eq!(p_eval * scalar, p_modified_eval);
+}
+
+#[cfg(test)]
+#[quickcheck]
+fn test_scalar_div(p: Polynomial<FpPallas>, x: u128, scalar: u128) {
+    let x = FpPallas::from_literal(x);
+    let scalar = FpPallas::from_literal(scalar);
+    let p_modified = p.clone() / scalar;
+    let p_eval = p.evaluate(x);
+    let p_modified_eval = p_modified.evaluate(x);
+    assert_eq!(p_eval / scalar, p_modified_eval);
+}
+
