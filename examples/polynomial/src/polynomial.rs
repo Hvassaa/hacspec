@@ -4,24 +4,32 @@
 
 use hacspec_lib::*;
 
-public_nat_mod!(
-    type_name: FpPallas,
-    type_of_canvas: PallasCanvas,
-    bit_size_of_field: 255,
-    modulo_value: "40000000000000000000000000000000224698FC094CF91B992D30ED00000001"
-);
-
-struct Polynomial<T: Numeric + NumericCopy + Clone> {
+pub struct Polynomial<T: Numeric + NumericCopy + Clone> {
     coefficients: Seq<T>,
 }
 
 impl<T: Numeric + NumericCopy + PartialEq> Polynomial<T> {
+
+    /// Create a polynomial, defined from its coefficient form
+    ///
+    /// # Arguments
+    ///
+    /// * `coefficients` - the polynomial in coefficient form
+    pub fn new(coefficients: Seq<T>) -> Polynomial<T> {
+        (Polynomial {coefficients}).trim()
+    }
+
+    /// Get a clone of the coefficients (useful for printing)
+    pub fn coeffs(&self) -> Seq<T> {
+        self.coefficients.clone()
+    }
+
     /// Evaluate a polynomial at point, return the evaluation
     ///
     /// # Arguments
     ///
     /// * `x` - the point
-    fn evaluate(self, x: T) -> T {
+    pub fn evaluate(self, x: T) -> T {
         let coefficients = self.coefficients;
         let mut result = T::default();
 
@@ -49,12 +57,12 @@ impl<T: Numeric + NumericCopy + PartialEq> Polynomial<T> {
     }
 
     /// Get the degree of the polynomial
-    fn degree(&self) -> usize {
+    pub fn degree(&self) -> usize {
         self.trim().coefficients.len()
     }
 
     /// Get the coefficient of the leading term
-    fn leading_term(&self) -> T {
+    pub fn leading_term(&self) -> T {
         let coeffs = self.trim().coefficients;
         coeffs[coeffs.len() - usize::one()]
     }
@@ -64,7 +72,7 @@ impl<T: Numeric + NumericCopy + PartialEq> Polynomial<T> {
     /// # Arguments
     ///
     /// * `degree` - the degree to get coefficient for
-    fn get_coefficient(&self, degree: usize) -> T {
+    pub fn get_coefficient(&self, degree: usize) -> T {
         if self.trim().coefficients.len() > degree {
             self.coefficients[degree]
         } else {
@@ -98,6 +106,16 @@ impl<T: Numeric + NumericCopy + PartialEq> Add for Polynomial<T> {
         .trim();
     }
 }
+
+/*
+
+    fn add(self, other: T) -> Self {
+        let mut c = self.coefficients;
+        c[usize::zero()] = c[usize::zero()] + other;
+        Polynomial {coefficients: c}
+
+    }
+ */
 
 impl<T: Numeric + NumericCopy + PartialEq> Sub for Polynomial<T> {
     type Output = Self;
@@ -209,6 +227,14 @@ extern crate quickcheck;
 extern crate quickcheck_macros;
 #[cfg(test)]
 use quickcheck::*;
+
+#[cfg(test)]
+public_nat_mod!(
+    type_name: FpPallas,
+    type_of_canvas: PallasCanvas,
+    bit_size_of_field: 255,
+    modulo_value: "40000000000000000000000000000000224698FC094CF91B992D30ED00000001"
+);
 
 impl<T: Numeric + NumericCopy> Clone for Polynomial<T> {
     fn clone(&self) -> Self {
