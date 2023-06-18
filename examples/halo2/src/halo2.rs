@@ -21,7 +21,7 @@ type CRS = (Seq<G1_pallas>, G1_pallas);
 ///
 /// * `p` - the polynomial to rotate
 /// * `rotation` - the rotation used (suitable for primitive roots of unity)
-fn rotate_polyx(p: Polyx, rotation: FpVesta) -> Polyx {
+pub fn rotate_polyx(p: Polyx, rotation: FpVesta) -> Polyx {
     let mut res = p;
     for i in 0..res.len() {
         let coef = res[i];

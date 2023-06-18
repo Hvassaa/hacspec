@@ -1,0 +1,18 @@
+[package]
+name = "hacspec-plonkish"
+version = "0.1.0"
+authors = ["Lasse Bramer Schmidt <lassebramer@gmail.com>", "Rasmus Tomtava Bjerg <rs.bjerg@gmail.com>"]
+edition = "2018"
+
+[lib]
+path = "src/plonkish.rs"
+
+[dependencies]
+hacspec-lib = { path = "../../lib" }
+hacspec-halo2 = { path = "../halo2/" }
+hacspec-polynomial = { path = "../polynomial" }
+hacspec-pasta = { path = "../pasta" }
+
+[dev-dependencies]
+quickcheck = "1"
+quickcheck_macros = "1"
