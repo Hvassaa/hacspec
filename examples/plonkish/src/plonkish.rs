@@ -52,7 +52,7 @@ impl Configuration {
         Configuration { matrix, polys, omega, g: Polynomial::<FpVesta>::default() }
     }
 
-    fn apply_chip(self, chip: &Chip) -> Self {
+    fn apply_chip(self, chip: Box<Chip>) -> Self {
         let matrix = self.matrix;
         let polys = self.polys;
         let omega = self.omega;
@@ -139,9 +139,9 @@ fn test_test() {
 
 
     let mut config = Configuration::new(matrix, omega);
-    let addition_chip = AdditionChip {};
-    let subtraction_chip = SubtractionChip {};
-    let g = config.apply_chip(&addition_chip).apply_chip(&subtraction_chip).get_g();
+    let addition_chip = Box::new(AdditionChip {});
+    let subtraction_chip = Box::new(SubtractionChip {});
+    let g = config.apply_chip(addition_chip).apply_chip(subtraction_chip).get_g();
 
 
     for i in 0..n {
