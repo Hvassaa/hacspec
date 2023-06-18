@@ -13,7 +13,7 @@ use hacspec_pasta::*;
 /// # Tuple entries
 /// * `0`: Seq<G1_pallas> ∈ Gᵈ (vector of random elems.)
 /// * `1`: G1_pallas in G (random group element)
-type CRS = (Seq<G1_pallas>, G1_pallas);
+pub type CRS = (Seq<G1_pallas>, G1_pallas);
 
 /// Rotate a polynomial
 ///
@@ -39,7 +39,7 @@ pub fn rotate_polyx(p: Polyx, rotation: FpVesta) -> Polyx {
 /// * `crs` - the common reference string
 /// * `a` - the "vector"
 /// * `blinding` - blinding factor
-fn commit_polyx(crs: &CRS, a: Polyx, blinding: FpVesta) -> G1_pallas {
+pub fn commit_polyx(crs: &CRS, a: Polyx, blinding: FpVesta) -> G1_pallas {
     let (G, W) = crs;
     let (f1, f2, b) = W;
 
@@ -149,7 +149,7 @@ fn calculate_L_or_R(
 /// * `g_prime` - polynomial from step 2
 /// * `omega` - a n=2ˆk root of unity (global variable)
 /// * `n` - n=2ˆk (global variable)
-fn step_4(g_prime: Polyx, omega: FpVesta, n: usize) -> Polyx {
+pub fn step_4(g_prime: Polyx, omega: FpVesta, n: usize) -> Polyx {
     let vanishing = compute_vanishing_polynomial(omega, n);
 
     let (h, remainder) = divide_polyx(g_prime, vanishing);
@@ -169,7 +169,7 @@ fn step_4(g_prime: Polyx, omega: FpVesta, n: usize) -> Polyx {
 /// * `h` - Polynomial to be split
 /// * `n` - defines length of new polynomials (global variable for prooving system)
 /// * `n_g` - splits into n_g-2 new polynomials
-fn step_5(h: Polyx, n: usize, n_g: usize) -> Seq<Polyx> {
+pub fn step_5(h: Polyx, n: usize, n_g: usize) -> Seq<Polyx> {
     let h = trim_polyx(h);
     let n_g = n_g;
     let n = n;
@@ -200,7 +200,7 @@ fn step_5(h: Polyx, n: usize, n_g: usize) -> Seq<Polyx> {
 ///
 /// # Constraints
 /// * `blindings` should be at least as long as the `poly_parts`
-fn step_6(poly_parts: Seq<Polyx>, crs: &CRS, blindings: Polyx) -> Seq<G1_pallas> {
+pub fn step_6(poly_parts: Seq<Polyx>, crs: &CRS, blindings: Polyx) -> Seq<G1_pallas> {
     let mut commitment_seq: Seq<G1_pallas> = Seq::<G1_pallas>::create(poly_parts.len());
     for i in 0..poly_parts.len() {
         let commitment: G1_pallas = commit_polyx(crs, poly_parts[i].clone(), blindings[i]);
@@ -216,7 +216,7 @@ fn step_6(poly_parts: Seq<Polyx>, crs: &CRS, blindings: Polyx) -> Seq<G1_pallas>
 /// * `commitment_seq` - is a sequence of commitments
 /// * `x` - is the challenge each commitment should be multiplied with
 /// * `n` - Global parameter for the prooving system
-fn step_7(commitment_seq: Seq<G1_pallas>, x: FpVesta, n: usize) -> G1_pallas {
+pub fn step_7(commitment_seq: Seq<G1_pallas>, x: FpVesta, n: usize) -> G1_pallas {
     let mut result: G1_pallas = g1_default_pallas();
     for i in 0..commitment_seq.len() {
         let power: usize = n * i;
@@ -234,7 +234,7 @@ fn step_7(commitment_seq: Seq<G1_pallas>, x: FpVesta, n: usize) -> G1_pallas {
 /// * `h_parts` - Sequence of the h_i parts from step 5
 /// * `x` - the challenge from step 5
 /// * `n` - n from the protocol
-fn step_8(h_parts: Seq<Polyx>, x: FpVesta, n: usize, h_blinds: Seq<FpVesta>) -> (Polyx, FpVesta) {
+pub fn step_8(h_parts: Seq<Polyx>, x: FpVesta, n: usize, h_blinds: Seq<FpVesta>) -> (Polyx, FpVesta) {
     let mut res: Polyx = Seq::<FpVesta>::create((1));
 
     let mut h_prime_blind = FpVesta::ZERO();
@@ -261,7 +261,7 @@ fn step_8(h_parts: Seq<Polyx>, x: FpVesta, n: usize, h_blinds: Seq<FpVesta>) -> 
 /// * `omega` - The generator for the evaluations points also a global parameter for the protocol
 /// * `p` - a list of sets p_i which contains integers from the protocol
 /// * `x` - The challenge from step 7
-fn step_9(
+pub fn step_9(
     r: Polyx,
     a_prime_seq: Seq<Polyx>,
     omega: FpVesta,
@@ -295,7 +295,7 @@ fn step_9(
 /// * `p` - the p list from the protocol
 /// * `x` - the challenge from step 7
 /// * `a` - the sequence of sequences from step 9
-fn step_10(omega: FpVesta, p: Seq<Seq<usize>>, x: FpVesta, a: Seq<Polyx>) -> Seq<Polyx> {
+pub fn step_10(omega: FpVesta, p: Seq<Seq<usize>>, x: FpVesta, a: Seq<Polyx>) -> Seq<Polyx> {
     let n_a = a.len();
     let mut s = Seq::<Polyx>::create(n_a);
     for i in 0..n_a {
@@ -330,7 +330,7 @@ fn step_10(omega: FpVesta, p: Seq<Seq<usize>>, x: FpVesta, a: Seq<Polyx>) -> Seq
 /// * `a` - A, the list of hiding commitments for a_i's
 /// * `q` - q, from the protocol
 /// * `sigma_list` - s.t. q[sigma_list[i]]=p_i (indexing/mapping into q, for p_i)
-fn step_11(
+pub fn step_11(
     n_a: usize,
     x1: FpVesta,
     x2: FpVesta,
@@ -383,7 +383,7 @@ fn step_11(
 /// * `q` - q, from the protocol
 /// * `sigma_list` - s.t. q[sigma_list[i]]=p_i (indexing/mapping into q, for p_i)
 /// * `a_blind` - the blindness used in step 1 for the A_i commitments
-fn step_12(
+pub fn step_12(
     n_a: usize,
     x1: FpVesta,
     h_prime: Polyx,
@@ -452,7 +452,7 @@ fn step_12(
 /// * `sigma_list` - s.t. q[sigma_list[i]]=p_i (indexing/mapping into q, for p_i)
 /// * `g_prime_eval_combined_from_a` - g'(x) calculated from **a**
 /// * `g_prime` - the polynomial from step 2
-fn step_13(
+pub fn step_13(
     n: usize,
     omega: FpVesta,
     x: FpVesta,
@@ -529,7 +529,7 @@ fn step_13(
 /// * `q` - q, from the protocol
 /// * `blinding` - randomness for commiting
 /// * `x` - the challenge from step 7
-fn step_14(
+pub fn step_14(
     crs: &CRS,
     x2: FpVesta,
     q_polys: Seq<Polyx>,
@@ -574,7 +574,7 @@ fn step_14(
 ///
 /// # Arguments
 ///  * `x_3` - the challenge to be send
-fn step_15(x_3: FpVesta) -> FpVesta {
+pub fn step_15(x_3: FpVesta) -> FpVesta {
     x_3
 }
 
@@ -585,7 +585,7 @@ fn step_15(x_3: FpVesta) -> FpVesta {
 /// * `n_q` - n_q from the protocol
 /// * `x3` - the challenge from step 15
 /// * `q_polys` - the q polynomials from step 12
-fn step_16(n_q: usize, x3: FpVesta, q_polys: Seq<Polyx>) -> Polyx {
+pub fn step_16(n_q: usize, x3: FpVesta, q_polys: Seq<Polyx>) -> Polyx {
     let mut u: Polyx = Seq::<FpVesta>::create(n_q);
     for i in 0..(n_q) {
         let q_i: Polyx = q_polys[i].clone();
@@ -601,7 +601,7 @@ fn step_16(n_q: usize, x3: FpVesta, q_polys: Seq<Polyx>) -> Polyx {
 ///
 /// # Arguments
 ///  * `x_4` - the challenge to be send
-fn step_17(x_4: FpVesta) -> FpVesta {
+pub fn step_17(x_4: FpVesta) -> FpVesta {
     x_4
 }
 
@@ -620,7 +620,7 @@ fn step_17(x_4: FpVesta) -> FpVesta {
 /// * `u` - list of scalars from step 16
 /// * `r` - list of polynomials from step 13
 /// * `q` - q, from the protocol
-fn step_18(
+pub fn step_18(
     x: FpVesta,
     x1: FpVesta,
     x2: FpVesta,
@@ -685,7 +685,7 @@ fn step_18(
 /// * `q_polys` - the q polynomials from step 12
 /// * `q_blinds` - the blinds from step 12
 /// * `q_prime_blind` - the blinding from step 14
-fn step_19(
+pub fn step_19(
     x4: FpVesta,
     q_prime: Polyx,
     q_polys: Seq<Polyx>,
@@ -727,7 +727,7 @@ fn step_19(
 /// * `s` - a randomly sampled poly (degree n-1) with a root at x3 from [step_15]
 /// * `crs` - the common reference string
 /// * `r` - randomness for commiting
-fn step_20(s: Polyx, crs: CRS, r: FpVesta) -> (G1_pallas, FpVesta) {
+pub fn step_20(s: Polyx, crs: CRS, r: FpVesta) -> (G1_pallas, FpVesta) {
     let S: G1_pallas = commit_polyx(&crs, s, r);
     (S, r)
 }
@@ -738,7 +738,7 @@ fn step_20(s: Polyx, crs: CRS, r: FpVesta) -> (G1_pallas, FpVesta) {
 /// # Arguments
 /// * `xi` - the ξ challenge
 /// * `z` - the z challenge
-fn step_21(xi: FpVesta, z: FpVesta) -> (FpVesta, FpVesta) {
+pub fn step_21(xi: FpVesta, z: FpVesta) -> (FpVesta, FpVesta) {
     (xi, z)
 }
 
@@ -751,7 +751,7 @@ fn step_21(xi: FpVesta, z: FpVesta) -> (FpVesta, FpVesta) {
 /// * `s` - the group element/commitment from step 20
 /// * `v` - v as calculated in step 18
 /// * `xi` - the ξ challenge from step 21
-fn step_22(p: G1_pallas, g0: G1_pallas, s: G1_pallas, v: FpVesta, xi: FpVesta) -> G1_pallas {
+pub fn step_22(p: G1_pallas, g0: G1_pallas, s: G1_pallas, v: FpVesta, xi: FpVesta) -> G1_pallas {
     let prod1: G1_pallas = g1mul_pallas(v, g0);
     let prod1_neg: G1_pallas = g1neg_pallas(prod1);
     let prod2: G1_pallas = g1mul_pallas(xi, s);
@@ -770,7 +770,7 @@ fn step_22(p: G1_pallas, g0: G1_pallas, s: G1_pallas, v: FpVesta, xi: FpVesta) -
 /// * `xi` - the ξ challenge from step 21
 /// * `p_blind` - the blindness from step 19
 /// * `s_blind` - the blindness from step 20
-fn step_23(
+pub fn step_23(
     p: Polyx,
     s: Polyx,
     x3: FpVesta,
@@ -813,7 +813,7 @@ fn step_23(
 /// * `R` - `Seq<G1>` the sequence of all `R_j`
 /// * `L_blinding`- `Seq<Fp>` the sequence of blinding used for `L_j`
 /// * `R_blinding`- `Seq<Fp>` the sequence of blinding used for `R_j`
-fn step_24(
+pub fn step_24(
     p_prime_poly: Polyx,
     G: Seq<G1_pallas>,
     x3: FpVesta,
@@ -924,7 +924,7 @@ fn step_24(
 /// * `R_blinding` - the blinding used for R in step 24
 /// * `p_prime_blind` - the the accumulated blinding from step 23
 /// * `u` - u challenges from 24
-fn step_25(
+pub fn step_25(
     p_prime: Polyx,
     L_blinding: Polyx,
     R_blinding: Polyx,
@@ -960,7 +960,7 @@ fn step_25(
 /// * `U` - from public parameters
 /// * `f` - blinding factor from step 25
 /// * `W` - from public parameters
-fn step_26(
+pub fn step_26(
     u: Polyx,
     L: Seq<G1_pallas>,
     P_prime: G1_pallas,
