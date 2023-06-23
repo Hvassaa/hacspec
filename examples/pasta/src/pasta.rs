@@ -47,7 +47,8 @@ fn g1add_a_pallas(p: G1_pallas, q: G1_pallas) -> G1_pallas {
 
     let x_diff = x2 - x1;
     let y_diff = y2 - y1;
-    let xovery = y_diff * x_diff.inv(); //  x / y = x * y^-1
+    let xovery = y_diff * x_diff.inv(); //  y / x = x * y^-1
+
     let x3 = xovery.exp(2u32) - x1 - x2;
     let y3 = xovery * (x1 - x3) - y1;
     (x3, y3, false)
@@ -58,7 +59,7 @@ fn g1add_a_vesta(p: G1_vesta, q: G1_vesta) -> G1_vesta {
 
     let x_diff = x2 - x1;
     let y_diff = y2 - y1;
-    let xovery = y_diff * x_diff.inv(); //  x / y = x * y^-1
+    let xovery = y_diff * x_diff.inv(); //  y / x  = x * y^-1
     let x3 = xovery.exp(2u32) - x1 - x2;
     let y3 = xovery * (x1 - x3) - y1;
     (x3, y3, false)

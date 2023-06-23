@@ -4,98 +4,156 @@
 
 use hacspec_lib::*;
 
-#[derive(Copy)]
-pub struct EllipticCurvePoint<
-    T: Numeric + NumericCopy + PartialEq + Integer + hacspec_lib::Div<Output = T>,
-> {
-    x: T,
-    y: T,
+#[derive(Copy, Clone)]
+pub struct WeiestrassCurve<T> {
     a1: T,
     a2: T,
     a3: T,
     a4: T,
     a5: T,
     a6: T,
+    bit_size_of_scalar_field: usize,
+}
+
+impl<T> WeiestrassCurve<T> {
+    /// Create a weierstrass curve
+    ///
+    /// The form of the weierstrass curve is:
+    /// Y^2+a_1XY+a_3Y = X^3+a_2X^2+a_4X+a_6
+    ///
+    /// # Arguments
+    ///
+    /// * `a1`
+    /// * `a2`
+    /// * `a3`
+    /// * `a4`
+    /// * `a5`
+    /// * `a6`
+    /// * `bit_size_of_scalar_field` - the size of the scalar field used for scalar multiplication
+    pub fn new(
+        a1: T,
+        a2: T,
+        a3: T,
+        a4: T,
+        a5: T,
+        a6: T,
+        bit_size_of_scaler_field: usize,
+    ) -> WeiestrassCurve<T> {
+        (WeiestrassCurve {
+            a1,
+            a2,
+            a3,
+            a4,
+            a5,
+            a6,
+            bit_size_of_scalar_field: bit_size_of_scaler_field,
+        })
+    }
+}
+
+/// Create a default instance of 'WeiestrassCurve<T>' with all values set to 0
+impl<T: Integer> Default for WeiestrassCurve<T> {
+    fn default() -> Self {
+        WeiestrassCurve {
+            a1: T::default(),
+            a2: T::default(),
+            a3: T::default(),
+            a4: T::default(),
+            a5: T::default(),
+            a6: T::default(),
+            bit_size_of_scalar_field: 0,
+        }
+    }
+}
+#[derive(Copy, Clone)]
+pub struct EllipticCurvePoint<T> {
+    x: T,
+    y: T,
     isPointAtInfinity: bool,
-    bit_size_of_field: usize,
+    curve: WeiestrassCurve<T>,
 }
 
 impl<T: Numeric + NumericCopy + PartialEq + Integer + hacspec_lib::Div<Output = T>>
     EllipticCurvePoint<T>
 {
+    /// Create point on a weierstrass curve.
+    /// If given point is not on the curve, the point at infinity will be created instead.
+    ///
+    /// # Arguments
+    ///
+    /// * `x` - the x-coordinate
+    /// * `y` - the y-coordinate
+    /// * `isPointAtInfinity` - the size of the scalar field used for scalar multiplication
+    /// * 'curve' - The 'WeiestrassCurve<T>' object defining the curve
+    pub fn new(
+        x: T,
+        y: T,
+        isPointAtInfinity: bool,
+        curve: WeiestrassCurve<T>,
+    ) -> EllipticCurvePoint<T> {
+        let point = (EllipticCurvePoint {
+            x,
+            y,
+            isPointAtInfinity,
+            curve,
+        });
+        if point.is_on_curve() {
+            return point;
+        }
+        (EllipticCurvePoint {
+            x: T::default(),
+            y: T::default(),
+            isPointAtInfinity: true,
+            curve,
+        })
+    }
+    ///Checks if point is identity/point at infinity
     pub fn is_identity(self) -> bool {
         self.isPointAtInfinity
     }
+    ///Doubles point
     pub fn double(self) -> EllipticCurvePoint<T> {
+        let curve = self.curve;
         if self.isPointAtInfinity {
             self
         } else {
             let x12 = self.x.exp(2u32);
-            let lambda = (T::from_literal(3u128) * x12 + T::TWO() * self.a2 * self.x
-                - self.a1 * self.y
-                + self.a4)
-                / (T::TWO() * self.y + self.a1 * self.x + self.a3);
-            let x3 = lambda.exp(2u32) + lambda * self.a1 - self.a2 - T::TWO() * self.x;
-            let y3 = lambda * (self.x - x3) - self.y - self.a1 * self.x - self.a3;
+            let lambda = (T::from_literal(3u128) * x12 + T::TWO() * curve.a2 * self.x
+                - curve.a1 * self.y
+                + curve.a4)
+                / (T::TWO() * self.y + curve.a1 * self.x + curve.a3);
+            let x3 = lambda.exp(2u32) + lambda * curve.a1 - curve.a2 - T::TWO() * self.x;
+            let y3 = lambda * (self.x - x3) - self.y - curve.a1 * self.x - curve.a3;
             EllipticCurvePoint {
                 x: x3,
                 y: y3,
-                a1: self.a1,
-                a2: self.a2,
-                a3: self.a3,
-                a4: self.a4,
-                a5: self.a5,
-                a6: self.a6,
                 isPointAtInfinity: false,
-                bit_size_of_field: self.bit_size_of_field,
+                curve: self.curve,
             }
         }
     }
+    /// negates point as (x,-y)
     pub fn neg(self) -> EllipticCurvePoint<T> {
         EllipticCurvePoint {
             x: self.x,
             y: T::ZERO() - self.y,
-            a1: self.a1,
-            a2: self.a2,
-            a3: self.a3,
-            a4: self.a4,
-            a5: self.a5,
-            a6: self.a6,
             isPointAtInfinity: self.isPointAtInfinity,
-            bit_size_of_field: self.bit_size_of_field,
+            curve: self.curve,
         }
     }
-
+    /// Checks if point is on the curve
+    /// point is on the curve IFF
+    /// the point satisfies the Weiestrass equation:
+    /// Yˆ2 + a_1XY + a_3Y = xˆ3 + a_2Xˆ2 + a_4X + a_6
+    /// or it is the point at infinity
     pub fn is_on_curve(self) -> bool {
-        // point is on the curve IFF
-        // the point satisfies the Weiestrass equation:
-        // Yˆ2 + a_1XY + a_3Y = xˆ3 + a_2Xˆ2 + a_4X + a_6
-        // or it is the point at infinity
+        let curve = self.curve;
         let x = self.x;
         let y = self.y;
-        let on_curve = y * y + self.a1 * x * y + self.a3 * y
-            == x * x * x + self.a2 * x * x + self.a4 * x + self.a6;
+        let on_curve = y * y + curve.a1 * x * y + curve.a3 * y
+            == x * x * x + curve.a2 * x * x + curve.a4 * x + curve.a6;
 
         (on_curve) || self.isPointAtInfinity
-    }
-}
-
-impl<T: Numeric + NumericCopy + PartialEq + Integer + hacspec_lib::Div<Output = T>> Clone
-    for EllipticCurvePoint<T>
-{
-    fn clone(&self) -> Self {
-        EllipticCurvePoint {
-            x: self.x,
-            y: self.y,
-            a1: self.a1,
-            a2: self.a2,
-            a3: self.a3,
-            a4: self.a4,
-            a5: self.a5,
-            a6: self.a6,
-            isPointAtInfinity: self.isPointAtInfinity,
-            bit_size_of_field: self.bit_size_of_field,
-        }
     }
 }
 
@@ -103,8 +161,9 @@ impl<T: Numeric + NumericCopy + PartialEq + Integer + hacspec_lib::Div<Output = 
     Add<EllipticCurvePoint<T>> for EllipticCurvePoint<T>
 {
     type Output = Self;
-
+    /// Adds two curve points
     fn add(self, other: EllipticCurvePoint<T>) -> Self {
+        let curve = self.curve;
         if self.isPointAtInfinity {
             return other;
         }
@@ -118,34 +177,22 @@ impl<T: Numeric + NumericCopy + PartialEq + Integer + hacspec_lib::Div<Output = 
             return EllipticCurvePoint {
                 x: T::default(),
                 y: T::default(),
-                a1: self.a1,
-                a2: self.a2,
-                a3: self.a3,
-                a4: self.a4,
-                a5: self.a5,
-                a6: self.a6,
                 isPointAtInfinity: true,
-                bit_size_of_field: self.bit_size_of_field,
+                curve: self.curve,
             };
         }
         let x_diff = other.x - self.x;
         let y_diff = other.y - self.y;
         let lambda = y_diff / x_diff;
 
-        let x3 = lambda.exp(2u32) + self.a1 * lambda - self.a2 - self.x - other.x;
-        let y3 = lambda * self.x - self.a1 * x3 - self.a3 - lambda * x3 - self.y;
+        let x3 = lambda.exp(2u32) + curve.a1 * lambda - curve.a2 - self.x - other.x;
+        let y3 = lambda * self.x - curve.a1 * x3 - curve.a3 - lambda * x3 - self.y;
 
         return EllipticCurvePoint {
             x: x3,
             y: y3,
-            a1: self.a1,
-            a2: self.a2,
-            a3: self.a3,
-            a4: self.a4,
-            a5: self.a5,
-            a6: self.a6,
             isPointAtInfinity: false,
-            bit_size_of_field: self.bit_size_of_field,
+            curve: self.curve,
         };
     }
 }
@@ -156,7 +203,8 @@ impl<
     > Mul<U> for EllipticCurvePoint<T>
 {
     type Output = Self;
-
+    /// Scalar multiplication as G * m
+    /// G is curve point and m is scalar
     fn mul(self, rhs: U) -> Self::Output {
         if self.isPointAtInfinity {
             return self;
@@ -165,8 +213,8 @@ impl<
         t.x = T::default();
         t.y = T::default();
         t.isPointAtInfinity = true;
-        let bit_size_of_field = self.bit_size_of_field;
-        for i in 0..self.bit_size_of_field {
+        let bit_size_of_field = self.curve.bit_size_of_scalar_field;
+        for i in 0..self.curve.bit_size_of_scalar_field {
             t = t.double();
             //starting from second most significant bit
             if rhs.get_bit(bit_size_of_field - 1 - i) == U::ONE() {
@@ -177,9 +225,8 @@ impl<
     }
 }
 
-impl<T: Numeric + NumericCopy + PartialEq + Integer + hacspec_lib::Div<Output = T>> PartialEq
-    for EllipticCurvePoint<T>
-{
+impl<T: Numeric + NumericCopy + PartialEq + Integer> PartialEq for EllipticCurvePoint<T> {
+    /// Checks if two curve points are identical, regardless of underlying curve.
     fn eq(&self, other: &Self) -> bool {
         if self.x != other.x {
             return false;
@@ -190,43 +237,20 @@ impl<T: Numeric + NumericCopy + PartialEq + Integer + hacspec_lib::Div<Output = 
         if self.isPointAtInfinity != other.isPointAtInfinity {
             return false;
         }
-        // if self.a1 != other.a1 {
-        //     return false;
-        // }
-        // if self.a2 != other.a2 {
-        //     return false;
-        // }
-        // if self.a3 != other.a3 {
-        //     return false;
-        // }
-        // if self.a4 != other.a4 {
-        //     return false;
-        // }
-        // if self.a5 != other.a5 {
-        //     return false;
-        // }
-        // if self.a6 != other.a6 {
-        //     return false;
-        // }
         return true;
     }
 }
 
-impl<T: Numeric + NumericCopy + PartialEq + Integer + hacspec_lib::Div<Output = T>> Default
-    for EllipticCurvePoint<T>
-{
+impl<T: Numeric + NumericCopy + Integer> Default for EllipticCurvePoint<T> {
+    /// Creates default instance of 'EllipticCurvePoint<T>' as point at infinity
+    /// The assosiated curve is set to be the default, which is all 0.
+    ///
     fn default() -> Self {
         EllipticCurvePoint {
             x: T::default(),
             y: T::default(),
-            a1: T::default(),
-            a2: T::default(),
-            a3: T::default(),
-            a4: T::default(),
-            a5: T::default(),
-            a6: T::default(),
             isPointAtInfinity: true,
-            bit_size_of_field: 0,
+            curve: WeiestrassCurve::default(),
         }
     }
 }
@@ -295,14 +319,16 @@ pub fn g1_generator_pallas() -> EllipticCurvePoint<FpPallas> {
     EllipticCurvePoint {
         x: FpPallas::from_hex("1"),
         y: FpPallas::from_hex("1B74B5A30A12937C53DFA9F06378EE548F655BD4333D477119CF7A23CAED2ABB"),
-        a1: FpPallas::ZERO(),
-        a2: FpPallas::ZERO(),
-        a3: FpPallas::ZERO(),
-        a4: FpPallas::ZERO(),
-        a5: FpPallas::ZERO(),
-        a6: FpPallas::from_literal(5),
         isPointAtInfinity: false,
-        bit_size_of_field: 255,
+        curve: WeiestrassCurve {
+            a1: FpPallas::ZERO(),
+            a2: FpPallas::ZERO(),
+            a3: FpPallas::ZERO(),
+            a4: FpPallas::ZERO(),
+            a5: FpPallas::ZERO(),
+            a6: FpPallas::from_literal(5),
+            bit_size_of_scalar_field: 255,
+        },
     }
 }
 
@@ -311,14 +337,16 @@ pub fn identity_pallas() -> EllipticCurvePoint<FpPallas> {
     EllipticCurvePoint {
         x: FpPallas::ZERO(),
         y: FpPallas::ZERO(),
-        a1: FpPallas::ZERO(),
-        a2: FpPallas::ZERO(),
-        a3: FpPallas::ZERO(),
-        a4: FpPallas::ZERO(),
-        a5: FpPallas::ZERO(),
-        a6: FpPallas::from_literal(5),
         isPointAtInfinity: true,
-        bit_size_of_field: 255,
+        curve: WeiestrassCurve {
+            a1: FpPallas::ZERO(),
+            a2: FpPallas::ZERO(),
+            a3: FpPallas::ZERO(),
+            a4: FpPallas::ZERO(),
+            a5: FpPallas::ZERO(),
+            a6: FpPallas::from_literal(5),
+            bit_size_of_scalar_field: 255,
+        },
     }
 }
 
@@ -369,9 +397,7 @@ fn test_identity(a: EllipticCurvePoint<FpPallas>) {
 #[quickcheck]
 fn test_inverse(a: EllipticCurvePoint<FpPallas>) {
     let a_neg = a.neg();
-
     let sum = a + a_neg;
-
     assert!(sum.isPointAtInfinity);
 }
 
@@ -432,14 +458,16 @@ fn test_add_double_special_case() {
     let g = EllipticCurvePoint {
         x: FpPallas::TWO(),
         y: FpPallas::ZERO(),
-        a1: FpPallas::ZERO(),
-        a2: FpPallas::ZERO(),
-        a3: FpPallas::ZERO(),
-        a4: FpPallas::ZERO(),
-        a5: FpPallas::ZERO(),
-        a6: FpPallas::from_literal(5),
         isPointAtInfinity: true,
-        bit_size_of_field: 255,
+        curve: WeiestrassCurve {
+            a1: FpPallas::ZERO(),
+            a2: FpPallas::ZERO(),
+            a3: FpPallas::ZERO(),
+            a4: FpPallas::ZERO(),
+            a5: FpPallas::ZERO(),
+            a6: FpPallas::from_literal(5),
+            bit_size_of_scalar_field: 255,
+        },
     };
     assert_eq!(g + g, g.double());
 }

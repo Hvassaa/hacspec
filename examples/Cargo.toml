@@ -38,4 +38,5 @@ members = [
     "pasta",
     "halo2",
     "polynomial",
+    "weierstrass-curves",
 ]
